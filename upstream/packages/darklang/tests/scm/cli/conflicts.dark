@@ -3,7 +3,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test whenMainChangedANameLastMainWinsAndTheBranchIsRecorded =
   scenario(fun dark ->
     let setup =
@@ -58,7 +57,6 @@ test whenMainChangedANameLastMainWinsAndTheBranchIsRecorded =
 
 // The branch's second edit is newer than main's, so it wins; main's version, which the branch never
 // saw, is recorded as the loser.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test whenTheBranchChangesANameAgainAfterMainDidTheBranchWins =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -79,7 +77,6 @@ test whenTheBranchChangesANameAgainAfterMainDidTheBranchWins =
 
 // Odd, but today's behaviour: two creations of one name are recorded as
 // `same-name-different-hash`, never `independent-creation`.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test whenBothSidesCreateTheSameNameTheNewerWins =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -104,7 +101,6 @@ test whenBothSidesCreateTheSameNameTheNewerWins =
 
 // When the branch renames `a` away and main later edits `a`, main's edit wins and the removal it beat
 // is recorded.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aRenameOnTheBranchLosesToANewerEditOnMain = scenario(fun dark ->
   [ saveNumber(dark, "Tests.App.a", "1")
     saveNumber(dark, "Tests.App.x", "2")
@@ -148,7 +144,6 @@ test aRenameOnTheBranchLosesToANewerEditOnMain = scenario(fun dark ->
       "the beaten removal is recorded") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test ackKeepsTheWinnerAndOverrideTakesTheLoser =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "9341")
@@ -203,7 +198,6 @@ test ackKeepsTheWinnerAndOverrideTakesTheLoser =
 
 
 // Odd, but today's behaviour: the caller's own conflict stays open after the override moved it.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test overridingANameAlsoRepointsItsCallers =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -242,7 +236,6 @@ test overridingANameAlsoRepointsItsCallers =
       draftIsEmpty(dark, "and empties the draft") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test overridingTheCallerFirstThenTheHelperSettlesBoth =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -292,7 +285,6 @@ test overridingTheCallerFirstThenTheHelperSettlesBoth =
       same(conflicts(dark), [], "and nothing is left to settle") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test resolveOnABranchTakesTheirsOrKeepsMine =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.theirs", "1")
@@ -339,7 +331,6 @@ test resolveOnABranchTakesTheirsOrKeepsMine =
 
 
 // Odd, but today's behaviour: after `theirs`, the caller still runs the branch's dropped helper.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test resolveTheirsDropsTheBranchsVersionSoMineHasNothingToKeep =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")

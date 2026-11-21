@@ -1,6 +1,5 @@
 module Darklang.Stdlib.HttpClient
 
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.BadHeader reason=compiler-implementation
 type BadHeader =
   // Occurs whrn a header key is empty. eg. [ ("", "") ]
   | EmptyKey
@@ -62,7 +61,6 @@ type RequestError =
 
 
 // TODO: move this into a RequestError module, along with the type
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.toString reason=compiler-implementation
 let toString(e: RequestError): String =
   match e with
   | BadUrl(details) ->
@@ -286,7 +284,6 @@ let __retryArgs(req: Request): (Int64 * Int64) =
 /// waits for the response where it first looks at it, so `List.map get urls` has every request
 /// in flight at once, up to 50 connections to any one host. Any other request is a write and
 /// runs in program order.
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.sendRaw reason=compiler-implementation
 let sendRaw(req: Request): Result<Response<Bytes>, RequestError> =
   let req = Request.__final(req)
   let (retries, delayMs) = __retryArgs(req)
@@ -305,7 +302,6 @@ let sendRaw(req: Request): Result<Response<Bytes>, RequestError> =
 /// <fn sendRaw>, with the body as a lazy stream: in program order, and the timeout covers the
 /// headers, not the body, so a long-lived stream is not cut off. A stream holds its connection
 /// until it is drained or closed, and counts against the host's 50 until then.
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.streamRaw reason=compiler-implementation
 let streamRaw(req: Request): Result<Response<Stream<UInt8>>, RequestError> =
   let req = Request.__final(req)
   let (retries, delayMs) = __retryArgs(req)
@@ -662,7 +658,6 @@ let stream(
 
 
 /// Returns a header <type (String*String))> with {{'authorization'}} created using HTTP basic auth
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.basicAuth reason=compiler-implementation
 let basicAuth(username: String, password: String): Result<(String * String), String> =
   if String.contains(username, "-") then
     Result.Error("Username cannot contain a hyphen")
@@ -672,29 +667,24 @@ let basicAuth(username: String, password: String): Result<(String * String), Str
 
 
 /// Returns a header <type (String*String))> with {{'authorization'}} set to <param token>
-// @compiler replace: packages/darklang/stdlib/httpclient.dark#Darklang.Stdlib.HttpClient.bearerToken reason=compiler-implementation
 let bearerToken(token: String): (String * String) =
   ("authorization", "bearer " + token)
 
 
 module ContentType =
   /// A header <type (String*String))> with {{content-type}} set for HTML form requests or responses
-  // @compiler replace: packages/darklang/stdlib/httpClient/contentType.dark#Darklang.Stdlib.HttpClient.ContentType.form reason=compiler-implementation
   val form = ("content-type", "application/x-www-form-urlencoded")
 
 
   /// A header <type (String*String))> with {{content-type}} set for JSON requests or responses
-  // @compiler replace: packages/darklang/stdlib/httpClient/contentType.dark#Darklang.Stdlib.HttpClient.ContentType.json reason=compiler-implementation
   val json = ("content-type", "application/json")
 
 
   /// A header <type (String*String))> with {{'content-type'}} set for plain text requests or responses
-  // @compiler replace: packages/darklang/stdlib/httpClient/contentType.dark#Darklang.Stdlib.HttpClient.ContentType.plainText reason=compiler-implementation
   val plainText = ("content-type", "text/plain; charset=utf-8")
 
 
   /// A header <type (String*String))> with {{'content-type'}} set for html requests
-  // @compiler replace: packages/darklang/stdlib/httpClient/contentType.dark#Darklang.Stdlib.HttpClient.ContentType.html reason=compiler-implementation
   val html = ("content-type", "text/html; charset=utf-8")
 
 
@@ -710,7 +700,6 @@ module Sse =
   // arrives on the wire, rather than buffering the entire response.
 
   /// A parsed Server-Sent Event.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.Event reason=compiler-implementation
   type Event =
     { data: String
       eventType: String
@@ -728,7 +717,6 @@ module Sse =
   /// reallocate the whole buffer on every append. Worth revisiting if
   /// anyone profiles the SSE parser; could become Bytes with an
   /// internal append-segments representation.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.ParseState reason=compiler-implementation
   type ParseState =
     { lastId: String
       currentLines: List<String>
@@ -865,7 +853,6 @@ module Sse =
   /// Parse an SSE byte stream into a stream of Events. Lazy: events
   /// flow to the consumer as their terminating blank lines arrive,
   /// so a slow LLM response surfaces tokens as they're produced.
-  // @compiler replace: packages/darklang/stdlib/httpClient/sse.dark#Darklang.Stdlib.HttpClient.Sse.parse reason=compiler-implementation
   let parse(bytes: Stream<UInt8>): Stream<Event> =
     let initial = ParseState { lastId = "", currentLines = [], currentLine = [] }
     Stream.unfold<ParseState, Event>(initial, fun state -> __pullNextEvent(bytes, state))

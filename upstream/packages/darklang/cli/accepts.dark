@@ -133,7 +133,6 @@ let withValues(valueFlags: List<String>, accepts: Accepts): Accepts =
 
 /// <param accepts> with these flags accepted everywhere in it, every subcommand included: for a
 /// command that reads a flag like `--json` wherever it appears.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Accepts.everywhere: Record update requires a record value"
 let everywhere(flags: List<String>, valueFlags: List<String>, accepts: Accepts): Accepts =
   let add(s: Shape): Shape =
     { s with
@@ -157,7 +156,6 @@ let everywhere(flags: List<String>, valueFlags: List<String>, accepts: Accepts):
 /// a start reaches is a fetch from the store, about 30 KB each: as a chain of four (check, checkShape,
 /// countRefusal, isFlagUnder) it would cost three more fetches per start. Don't
 /// split it back into helpers; the allocation gate will notice.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Accepts.check: Field access requires a record value"
 let check(name: String, accepts: Accepts, args: List<String>): Option<String> =
   // A lone "-" is a word: it is how `fn` and `module` say "read standard input".
   let isFlag(s: Shape, a: String): Bool =

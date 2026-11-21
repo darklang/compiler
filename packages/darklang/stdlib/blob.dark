@@ -7,351 +7,351 @@ val empty = Builtin.blobEmpty
 // The native Blob layout is [refcount:8][length:8][data:N][padding to 8].
 // These Int64-based helpers are the private storage boundary beneath the
 // interpreter-compatible UInt8/Int public API.
-let __alignedDataSize (size: Int64) : Int64 =
-    ((size + 7L) / 8L) * 8L
+let __alignedDataSize(size: Int64): Int64 =
+    ((size + 7) / 8) * 8
 
-let __byteLength (blob: Blob) : Int64 =
-    __raw_get<Int64> (__blob_to_rawptr blob) 8L
+let __byteLength(blob: Blob): Int64 =
+    __raw_get<Int64>(__blob_to_rawptr(blob), 8)
 
-let __getByte (blob: Blob) (index: Int64) : Int64 =
-    __raw_get_byte (__blob_to_rawptr blob) (index + 16L)
+let __getByte(blob: Blob, index: Int64): Int64 =
+    __raw_get_byte(__blob_to_rawptr(blob), index + 16)
 
-let __copyBytes (src: RawPtr) (dest: RawPtr) (offset: Int64) (remaining: Int64) : Unit =
-    if remaining <= 0L then ()
+let __copyBytes(src: RawPtr, dest: RawPtr, offset: Int64, remaining: Int64): Unit =
+    if remaining <= 0 then ()
     else
-        let byte = __raw_get_byte src offset in
-        let _ = __raw_write_byte dest offset byte in
-        Stdlib.Blob.__copyBytes src dest (offset + 1L) (remaining - 1L)
+        let byte = __raw_get_byte(src, offset) in
+        let _ = __raw_write_byte(dest, offset, byte) in
+        Stdlib.Blob.__copyBytes(src, dest, offset + 1, remaining - 1)
 
-let __zeroBytes (ptr: RawPtr) (offset: Int64) (remaining: Int64) : Unit =
-    if remaining <= 0L then ()
+let __zeroBytes(ptr: RawPtr, offset: Int64, remaining: Int64): Unit =
+    if remaining <= 0 then ()
     else
-        let _ = __raw_write_byte ptr offset 0L in
-        Stdlib.Blob.__zeroBytes ptr (offset + 1L) (remaining - 1L)
+        let _ = __raw_write_byte(ptr, offset, 0) in
+        Stdlib.Blob.__zeroBytes(ptr, offset + 1, remaining - 1)
 
-let __createZeroed (size: Int64) : Blob =
-    let length = if size <= 0L then 0L else size in
-    let dataSize = Stdlib.Blob.__alignedDataSize length in
-    let ptr = __raw_alloc (16L + dataSize) in
-    let _ = __raw_write_word ptr 0L 1L in
-    let _ = __raw_write_word ptr 8L length in
-    let _ = Stdlib.Blob.__zeroBytes ptr 16L length in
-    __rawptr_to_blob ptr
+let __createZeroed(size: Int64): Blob =
+    let length = if size <= 0 then 0 else size in
+    let dataSize = Stdlib.Blob.__alignedDataSize(length) in
+    let ptr = __raw_alloc(16 + dataSize) in
+    let _ = __raw_write_word(ptr, 0, 1) in
+    let _ = __raw_write_word(ptr, 8, length) in
+    let _ = Stdlib.Blob.__zeroBytes(ptr, 16, length) in
+    __rawptr_to_blob(ptr)
 
-let __writeInt64List (ptr: RawPtr) (bytes: List<Int64>) (offset: Int64) : Int64 =
+let __writeInt64List(ptr: RawPtr, bytes: List<Int64>, offset: Int64): Int64 =
     match bytes with
     | [] -> offset
     | byte :: rest ->
-        let _ = __raw_write_byte ptr offset byte in
-        Stdlib.Blob.__writeInt64List ptr rest (offset + 1L)
+        let _ = __raw_write_byte(ptr, offset, byte) in
+        Stdlib.Blob.__writeInt64List(ptr, rest, offset + 1)
 
-let __fromInt64List (bytes: List<Int64>) : Blob =
-    let length = Stdlib.List.__length bytes in
-    if length == 0L then Stdlib.Blob.__createZeroed 0L
+let __fromInt64List(bytes: List<Int64>): Blob =
+    let length = Stdlib.List.__length(bytes) in
+    if length == 0 then Stdlib.Blob.__createZeroed(0)
     else
-        let dataSize = Stdlib.Blob.__alignedDataSize length in
-        let ptr = __raw_alloc (16L + dataSize) in
-        let _ = __raw_write_word ptr 0L 1L in
-        let _ = __raw_write_word ptr 8L length in
-        let _ = Stdlib.Blob.__writeInt64List ptr bytes 16L in
-        __rawptr_to_blob ptr
+        let dataSize = Stdlib.Blob.__alignedDataSize(length) in
+        let ptr = __raw_alloc(16 + dataSize) in
+        let _ = __raw_write_word(ptr, 0, 1) in
+        let _ = __raw_write_word(ptr, 8, length) in
+        let _ = Stdlib.Blob.__writeInt64List(ptr, bytes, 16) in
+        __rawptr_to_blob(ptr)
 
-let __toInt64ListHelper (blob: Blob) (index: Int64) (acc: List<Int64>) : List<Int64> =
-    if index < 0L then acc
+let __toInt64ListHelper(blob: Blob, index: Int64, acc: List<Int64>): List<Int64> =
+    if index < 0 then acc
     else
-        Stdlib.Blob.__toInt64ListHelper blob (index - 1L) (Stdlib.List.push acc (Stdlib.Blob.__getByte blob index))
+        Stdlib.Blob.__toInt64ListHelper(blob, index - 1, Stdlib.List.push(acc, Stdlib.Blob.__getByte(blob, index)))
 
-let __toInt64List (blob: Blob) : List<Int64> =
-    Stdlib.Blob.__toInt64ListHelper blob (Stdlib.Blob.__byteLength blob - (1L)) []
+let __toInt64List(blob: Blob): List<Int64> =
+    Stdlib.Blob.__toInt64ListHelper(blob, Stdlib.Blob.__byteLength(blob) - (1), [])
 
-let __hexDigit (value: Int64) : String =
-    Stdlib.String.__byteSlice "0123456789ABCDEF" value (value + 1L)
+let __hexDigit(value: Int64): String =
+    Stdlib.String.__byteSlice("0123456789ABCDEF", value, value + 1)
 
-let __byteToHex (byte: Int64) : String =
-    Stdlib.Blob.__hexDigit (byte / 16L) + Stdlib.Blob.__hexDigit (byte % 16L)
+let __byteToHex(byte: Int64): String =
+    Stdlib.Blob.__hexDigit(byte / 16) + Stdlib.Blob.__hexDigit(byte % 16)
 
-let __hexEncode (blob: Blob) (index: Int64) (length: Int64) (acc: String) : String =
+let __hexEncode(blob: Blob, index: Int64, length: Int64, acc: String): String =
     if index >= length then acc
     else
-        Stdlib.Blob.__hexEncode blob (index + 1L) length (acc + Stdlib.Blob.__byteToHex (Stdlib.Blob.__getByte blob index))
+        Stdlib.Blob.__hexEncode(blob, index + 1, length, acc + Stdlib.Blob.__byteToHex(Stdlib.Blob.__getByte(blob, index)))
 
-let __int64ToUInt8 (value: Int64) : UInt8 =
-    match Stdlib.Int.toUInt8 (Stdlib.Int.fromInt64 value) with
-    | Some converted -> converted
-    | None -> Builtin.crash "Blob byte did not fit UInt8"
+let __int64ToUInt8(value: Int64): UInt8 =
+    match Stdlib.Int.toUInt8(Stdlib.Int.fromInt64(value)) with
+    | Some(converted) -> converted
+    | None -> Builtin.crash("Blob byte did not fit UInt8")
 
-let __uint8ToInt64 (value: UInt8) : Int64 =
-    match Stdlib.Int.toInt64 (Stdlib.Int.fromUInt8 value) with
-    | Some converted -> converted
-    | None -> Builtin.crash "UInt8 did not fit Int64"
+let __uint8ToInt64(value: UInt8): Int64 =
+    match Stdlib.Int.toInt64(Stdlib.Int.fromUInt8(value)) with
+    | Some(converted) -> converted
+    | None -> Builtin.crash("UInt8 did not fit Int64")
 
-let __intToInt64 (value: Int) : Int64 =
-    match Stdlib.Int.toInt64 value with
-    | Some converted -> converted
-    | None -> Builtin.crash "Clamped Blob index did not fit Int64"
+let __intToInt64(value: Int): Int64 =
+    match Stdlib.Int.toInt64(value) with
+    | Some(converted) -> converted
+    | None -> Builtin.crash("Clamped Blob index did not fit Int64")
 
-let length (blob: Blob) : Int =
-    Stdlib.Int.fromInt64 (Stdlib.Blob.__byteLength blob)
+let length(blob: Blob): Int =
+    Stdlib.Int.fromInt64(Stdlib.Blob.__byteLength(blob))
 
-let __toList (blob: Blob) (index: Int64) (acc: List<UInt8>) : List<UInt8> =
-    if index < 0L then acc
+let __toList(blob: Blob, index: Int64, acc: List<UInt8>): List<UInt8> =
+    if index < 0 then acc
     else
-        Stdlib.Blob.__toList blob (index - 1L) (Stdlib.List.push acc (Stdlib.Blob.__int64ToUInt8 (Stdlib.Blob.__getByte blob index)))
+        Stdlib.Blob.__toList(blob, index - 1, Stdlib.List.push(acc, Stdlib.Blob.__int64ToUInt8(Stdlib.Blob.__getByte(blob, index))))
 
-let toList (blob: Blob) : List<UInt8> =
-    Stdlib.Blob.__toList blob (Stdlib.Blob.__byteLength blob - (1L)) []
+let toList(blob: Blob): List<UInt8> =
+    Stdlib.Blob.__toList(blob, Stdlib.Blob.__byteLength(blob) - (1), [])
 
-let __fromList (bytes: List<UInt8>) (acc: List<Int64>) : Blob =
+let __fromList(bytes: List<UInt8>, acc: List<Int64>): Blob =
     match bytes with
-    | [] -> Stdlib.Blob.__fromInt64List (Stdlib.List.reverse acc)
+    | [] -> Stdlib.Blob.__fromInt64List(Stdlib.List.reverse(acc))
     | byte :: rest ->
-        Stdlib.Blob.__fromList rest (Stdlib.List.push acc (Stdlib.Blob.__uint8ToInt64 byte))
+        Stdlib.Blob.__fromList(rest, Stdlib.List.push(acc, Stdlib.Blob.__uint8ToInt64(byte)))
 
-let fromList (bytes: List<UInt8>) : Blob =
-    Stdlib.Blob.__fromList bytes []
+let fromList(bytes: List<UInt8>): Blob =
+    Stdlib.Blob.__fromList(bytes, [])
 
 // Copy into the final immutable allocation, not a boxed list node per byte.
-let __copyRange (src: RawPtr) (start: Int64) (dest: RawPtr) (offset: Int64) (remaining: Int64) : Unit =
-    if remaining <= 0L then ()
+let __copyRange(src: RawPtr, start: Int64, dest: RawPtr, offset: Int64, remaining: Int64): Unit =
+    if remaining <= 0 then ()
     else
-        let _ = __raw_write_byte dest offset (__raw_get_byte src start) in
-        Stdlib.Blob.__copyRange src (start + 1L) dest (offset + 1L) (remaining - 1L)
+        let _ = __raw_write_byte(dest, offset, __raw_get_byte(src, start)) in
+        Stdlib.Blob.__copyRange(src, start + 1, dest, offset + 1, remaining - 1)
 
-let __fromBuffer (ptr: RawPtr) (start: Int64) (length: Int64) : Blob =
-    let blob = Stdlib.Blob.__createZeroed length in
-    let _ = Stdlib.Blob.__copyRange ptr start (__blob_to_rawptr blob) 16L length in
+let __fromBuffer(ptr: RawPtr, start: Int64, length: Int64): Blob =
+    let blob = Stdlib.Blob.__createZeroed(length) in
+    let _ = Stdlib.Blob.__copyRange(ptr, start, __blob_to_rawptr(blob), 16, length) in
     blob
 
-let __totalBytes (blobs: List<Blob>) (total: Int64) : Int64 =
+let __totalBytes(blobs: List<Blob>, total: Int64): Int64 =
     match blobs with
     | [] -> total
-    | blob :: rest -> Stdlib.Blob.__totalBytes rest (total + Stdlib.Blob.__byteLength blob)
+    | blob :: rest -> Stdlib.Blob.__totalBytes(rest, total + Stdlib.Blob.__byteLength(blob))
 
-let __concatInto (blobs: List<Blob>) (ptr: RawPtr) (offset: Int64) : Unit =
+let __concatInto(blobs: List<Blob>, ptr: RawPtr, offset: Int64): Unit =
     match blobs with
     | [] -> ()
     | blob :: rest ->
-        let length = Stdlib.Blob.__byteLength blob in
-        let _ = Stdlib.Blob.__copyRange (__blob_to_rawptr blob) 16L ptr offset length in
-        Stdlib.Blob.__concatInto rest ptr (offset + length)
+        let length = Stdlib.Blob.__byteLength(blob) in
+        let _ = Stdlib.Blob.__copyRange(__blob_to_rawptr(blob), 16, ptr, offset, length) in
+        Stdlib.Blob.__concatInto(rest, ptr, offset + length)
 
-let concat (blobs: List<Blob>) : Blob =
-    let blob = Stdlib.Blob.__createZeroed (Stdlib.Blob.__totalBytes blobs 0L) in
-    let _ = Stdlib.Blob.__concatInto blobs (__blob_to_rawptr blob) 16L in
+let concat(blobs: List<Blob>): Blob =
+    let blob = Stdlib.Blob.__createZeroed(Stdlib.Blob.__totalBytes(blobs, 0)) in
+    let _ = Stdlib.Blob.__concatInto(blobs, __blob_to_rawptr(blob), 16) in
     blob
 
-let slice (blob: Blob) (start: Int) (length: Int) : Blob =
-    let zero = Stdlib.Int.fromInt64 0L in
-    let blobLength = Stdlib.Blob.length blob in
+let slice(blob: Blob, start: Int, length: Int): Blob =
+    let zero = Stdlib.Int.fromInt64(0) in
+    let blobLength = Stdlib.Blob.length(blob) in
     let safeStart = if start < zero then zero else if start > blobLength then blobLength else start in
     let remaining = blobLength - safeStart in
     let safeLength = if length < zero then zero else if length > remaining then remaining else length in
-    Stdlib.Blob.__fromBuffer (__blob_to_rawptr blob)
-        (16L + Stdlib.Blob.__intToInt64 safeStart) (Stdlib.Blob.__intToInt64 safeLength)
+    Stdlib.Blob.__fromBuffer(__blob_to_rawptr(blob),
+        16 + Stdlib.Blob.__intToInt64(safeStart), Stdlib.Blob.__intToInt64(safeLength))
 
 // Blobs are equal when they hold the same bytes, as the interpreter's are.
-let __equals (left: Blob) (right: Blob) : Bool =
-    let length = Stdlib.Blob.__byteLength left in
-    length == Stdlib.Blob.__byteLength right && Stdlib.Blob.__equalsFrom left right 0L length
+let __equals(left: Blob, right: Blob): Bool =
+    let length = Stdlib.Blob.__byteLength(left) in
+    length == Stdlib.Blob.__byteLength(right) && Stdlib.Blob.__equalsFrom(left, right, 0, length)
 
-let __equalsFrom (left: Blob) (right: Blob) (index: Int64) (length: Int64) : Bool =
+let __equalsFrom(left: Blob, right: Blob, index: Int64, length: Int64): Bool =
     if index >= length then true
-    else if Stdlib.Blob.__getByte left index != Stdlib.Blob.__getByte right index then false
-    else Stdlib.Blob.__equalsFrom left right (index + 1L) length
+    else if Stdlib.Blob.__getByte(left, index) != Stdlib.Blob.__getByte(right, index) then false
+    else Stdlib.Blob.__equalsFrom(left, right, index + 1, length)
 
-let toHex (blob: Blob) : String =
-    Stdlib.Blob.__hexEncode blob 0L (Stdlib.Blob.__byteLength blob) ""
+let toHex(blob: Blob): String =
+    Stdlib.Blob.__hexEncode(blob, 0, Stdlib.Blob.__byteLength(blob), "")
 
-let __hexValue (byte: Int64) : Int64 =
-    if byte >= 48L && byte <= 57L then byte - 48L
-    else if byte >= 65L && byte <= 70L then byte - 55L
-    else if byte >= 97L && byte <= 102L then byte - 87L
-    else -1L
+let __hexValue(byte: Int64): Int64 =
+    if byte >= 48 && byte <= 57 then byte - 48
+    else if byte >= 65 && byte <= 70 then byte - 55
+    else if byte >= 97 && byte <= 102 then byte - 87
+    else -1
 
-let __fromHex (value: String) (index: Int64) (acc: List<Int64>) : Stdlib.Result.Result<Blob, String> =
-    if index >= Stdlib.String.__byteLength value then
-        Ok (Stdlib.Blob.__fromInt64List (Stdlib.List.reverse acc))
+let __fromHex(value: String, index: Int64, acc: List<Int64>): Stdlib.Result.Result<Blob, String> =
+    if index >= Stdlib.String.__byteLength(value) then
+        Ok(Stdlib.Blob.__fromInt64List(Stdlib.List.reverse(acc)))
     else
-        let high = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) in
-        let low = Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value (index + 1L)) in
-        Stdlib.Blob.__fromHex value (index + 2L) (Stdlib.List.push acc (high * 16L + low))
+        let high = Stdlib.Blob.__hexValue(Stdlib.String.__byteAtUnchecked(value, index)) in
+        let low = Stdlib.Blob.__hexValue(Stdlib.String.__byteAtUnchecked(value, index + 1)) in
+        Stdlib.Blob.__fromHex(value, index + 2, Stdlib.List.push(acc, high * 16 + low))
 
 // The byte index of the first character of value that is not a hex digit,
 // or -1. Every byte before it is ASCII, so it starts a character.
-let __firstNonHex (value: String) (index: Int64) : Int64 =
-    if index >= Stdlib.String.__byteLength value then -1L
-    else if Stdlib.Blob.__hexValue (Stdlib.String.__byteAtUnchecked value index) < 0L then index
-    else Stdlib.Blob.__firstNonHex value (index + 1L)
+let __firstNonHex(value: String, index: Int64): Int64 =
+    if index >= Stdlib.String.__byteLength(value) then -1
+    else if Stdlib.Blob.__hexValue(Stdlib.String.__byteAtUnchecked(value, index)) < 0 then index
+    else Stdlib.Blob.__firstNonHex(value, index + 1)
 
 // The character starting at a byte index, by its UTF-8 lead byte.
-let __characterAt (value: String) (index: Int64) : String =
-    let lead = Stdlib.String.__byteAtUnchecked value index in
-    let size = if lead < 128L then 1L else if lead < 224L then 2L else if lead < 240L then 3L else 4L in
-    let blob = Stdlib.String.toBlob value in
-    match Stdlib.String.fromBlob (Stdlib.Blob.__fromBuffer (__blob_to_rawptr blob) (16L + index) size) with
-    | Some character -> character
+let __characterAt(value: String, index: Int64): String =
+    let lead = Stdlib.String.__byteAtUnchecked(value, index) in
+    let size = if lead < 128 then 1 else if lead < 224 then 2 else if lead < 240 then 3 else 4 in
+    let blob = Stdlib.String.toBlob(value) in
+    match Stdlib.String.fromBlob(Stdlib.Blob.__fromBuffer(__blob_to_rawptr(blob), 16 + index, size)) with
+    | Some(character) -> character
     | None -> ""
 
 // As the interpreter words it: the first character that is not a hex digit,
 // and otherwise an odd number of digits.
-let fromHex (value: String) : Stdlib.Result.Result<Blob, String> =
-    let bad = Stdlib.Blob.__firstNonHex value 0L in
-    if bad >= 0L then
-        Error
-            ("Invalid hex string: '"
-             + Stdlib.Blob.__characterAt value bad
+let fromHex(value: String): Stdlib.Result.Result<Blob, String> =
+    let bad = Stdlib.Blob.__firstNonHex(value, 0) in
+    if bad >= 0 then
+        Error(
+            "Invalid hex string: '"
+             + Stdlib.Blob.__characterAt(value, bad)
              + "' is not a hex digit (0-9, a-f, A-F)")
-    else if Stdlib.String.__byteLength value % 2L != 0L then
-        Error
-            ("Invalid hex string: it has "
-             + Stdlib.Int64.toString (Stdlib.String.__byteLength value)
+    else if Stdlib.String.__byteLength(value) % 2 != 0 then
+        Error(
+            "Invalid hex string: it has "
+             + Stdlib.Int64.toString(Stdlib.String.__byteLength(value))
              + " digits, and each byte takes two")
-    else Stdlib.Blob.__fromHex value 0L []
+    else Stdlib.Blob.__fromHex(value, 0, [])
 
-let toBase64 (blob: Blob) : String =
-    Stdlib.Base64.encode blob
+let toBase64(blob: Blob): String =
+    Stdlib.Base64.encode(blob)
 
-let __removeBase64Whitespace (value: String) : String =
-    Stdlib.String.replaceAll (Stdlib.String.replaceAll (Stdlib.String.replaceAll (Stdlib.String.replaceAll value " " "") "\t" "") "\r" "") "\n" ""
+let __removeBase64Whitespace(value: String): String =
+    Stdlib.String.replaceAll(Stdlib.String.replaceAll(Stdlib.String.replaceAll(Stdlib.String.replaceAll(value, " ", ""), "\t", ""), "\r", ""), "\n", "")
 
-let fromBase64 (value: String) : Stdlib.Result.Result<Blob, String> =
+let fromBase64(value: String): Stdlib.Result.Result<Blob, String> =
     // Match the interpreter's ordering: normalize the URL alphabet and infer
     // padding before Convert-style whitespace removal.
     let alphabetNormalized =
-        Stdlib.String.replaceAll (Stdlib.String.replaceAll value "-" "+") "_" "/" in
-    let remainder = Stdlib.String.__byteLength alphabetNormalized % 4L in
+        Stdlib.String.replaceAll(Stdlib.String.replaceAll(value, "-", "+"), "_", "/") in
+    let remainder = Stdlib.String.__byteLength(alphabetNormalized) % 4 in
     let padded =
-        if remainder == 2L then alphabetNormalized + "=="
-        else if remainder == 3L then alphabetNormalized + "="
+        if remainder == 2 then alphabetNormalized + "=="
+        else if remainder == 3 then alphabetNormalized + "="
         else alphabetNormalized in
-    let normalized = Stdlib.Blob.__removeBase64Whitespace padded in
-    match Stdlib.Base64.__decodeHelper normalized 0L (Stdlib.String.__byteLength normalized) [] with
-    | Ok bytes -> Ok (Stdlib.Blob.__fromInt64List bytes)
-    | Error _ ->
-        Error "Invalid base64 string: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters."
+    let normalized = Stdlib.Blob.__removeBase64Whitespace(padded) in
+    match Stdlib.Base64.__decodeHelper(normalized, 0, Stdlib.String.__byteLength(normalized), []) with
+    | Ok(bytes) -> Ok(Stdlib.Blob.__fromInt64List(bytes))
+    | Error(_) ->
+        Error("Invalid base64 string: The input is not a valid Base-64 string as it contains a non-base 64 character, more than two padding characters, or an illegal character among the padding characters.")
 
-let fromString (value: String) : Blob =
-    Stdlib.Blob.__fromBuffer (__string_to_rawptr value) 16L (Stdlib.String.__byteLength value)
+let fromString(value: String): Blob =
+    Stdlib.Blob.__fromBuffer(__string_to_rawptr(value), 16, Stdlib.String.__byteLength(value))
 
-let __isContinuation (byte: Int64) : Bool =
-    byte >= 128L && byte <= 191L
+let __isContinuation(byte: Int64): Bool =
+    byte >= 128 && byte <= 191
 
-let __invalidUtf8 (byte: Int64) (index: Int64) : String =
+let __invalidUtf8(byte: Int64, index: Int64): String =
     "Invalid UTF-8: Unable to translate bytes [" +
-    Stdlib.Blob.__byteToHex byte +
+    Stdlib.Blob.__byteToHex(byte) +
     "] at index " +
-    Stdlib.Int64.toString index +
+    Stdlib.Int64.toString(index) +
     " from specified code page to Unicode."
 
 // Returns the first invalid byte index, or -1 when the complete Blob is valid UTF-8.
-let __validateUtf8 (blob: Blob) (index: Int64) (length: Int64) : Int64 =
-    if index >= length then -1L
+let __validateUtf8(blob: Blob, index: Int64, length: Int64): Int64 =
+    if index >= length then -1
     else
-        let b0 = Stdlib.Blob.__getByte blob index in
-        if b0 <= 127L then Stdlib.Blob.__validateUtf8 blob (index + 1L) length
-        else if b0 >= 194L && b0 <= 223L then
-            if index + 1L >= length || Stdlib.Bool.not (Stdlib.Blob.__isContinuation (Stdlib.Blob.__getByte blob (index + 1L))) then index
-            else Stdlib.Blob.__validateUtf8 blob (index + 2L) length
-        else if b0 >= 224L && b0 <= 239L then
-            if index + 2L >= length then index
+        let b0 = Stdlib.Blob.__getByte(blob, index) in
+        if b0 <= 127 then Stdlib.Blob.__validateUtf8(blob, index + 1, length)
+        else if b0 >= 194 && b0 <= 223 then
+            if index + 1 >= length || Stdlib.Bool.not(Stdlib.Blob.__isContinuation(Stdlib.Blob.__getByte(blob, index + 1))) then index
+            else Stdlib.Blob.__validateUtf8(blob, index + 2, length)
+        else if b0 >= 224 && b0 <= 239 then
+            if index + 2 >= length then index
             else
-                let b1 = Stdlib.Blob.__getByte blob (index + 1L) in
-                let b2 = Stdlib.Blob.__getByte blob (index + 2L) in
-                if Stdlib.Bool.not (Stdlib.Blob.__isContinuation b1) || Stdlib.Bool.not (Stdlib.Blob.__isContinuation b2) then index
-                else if b0 == 224L && b1 < 160L then index
-                else if b0 == 237L && b1 >= 160L then index
-                else Stdlib.Blob.__validateUtf8 blob (index + 3L) length
-        else if b0 >= 240L && b0 <= 244L then
-            if index + 3L >= length then index
+                let b1 = Stdlib.Blob.__getByte(blob, index + 1) in
+                let b2 = Stdlib.Blob.__getByte(blob, index + 2) in
+                if Stdlib.Bool.not(Stdlib.Blob.__isContinuation(b1)) || Stdlib.Bool.not(Stdlib.Blob.__isContinuation(b2)) then index
+                else if b0 == 224 && b1 < 160 then index
+                else if b0 == 237 && b1 >= 160 then index
+                else Stdlib.Blob.__validateUtf8(blob, index + 3, length)
+        else if b0 >= 240 && b0 <= 244 then
+            if index + 3 >= length then index
             else
-                let b1 = Stdlib.Blob.__getByte blob (index + 1L) in
-                let b2 = Stdlib.Blob.__getByte blob (index + 2L) in
-                let b3 = Stdlib.Blob.__getByte blob (index + 3L) in
-                if Stdlib.Bool.not (Stdlib.Blob.__isContinuation b1)
-                   || Stdlib.Bool.not (Stdlib.Blob.__isContinuation b2)
-                   || Stdlib.Bool.not (Stdlib.Blob.__isContinuation b3) then index
-                else if b0 == 240L && b1 < 144L then index
-                else if b0 == 244L && b1 >= 144L then index
-                else Stdlib.Blob.__validateUtf8 blob (index + 4L) length
+                let b1 = Stdlib.Blob.__getByte(blob, index + 1) in
+                let b2 = Stdlib.Blob.__getByte(blob, index + 2) in
+                let b3 = Stdlib.Blob.__getByte(blob, index + 3) in
+                if Stdlib.Bool.not(Stdlib.Blob.__isContinuation(b1))
+                   || Stdlib.Bool.not(Stdlib.Blob.__isContinuation(b2))
+                   || Stdlib.Bool.not(Stdlib.Blob.__isContinuation(b3)) then index
+                else if b0 == 240 && b1 < 144 then index
+                else if b0 == 244 && b1 >= 144 then index
+                else Stdlib.Blob.__validateUtf8(blob, index + 4, length)
         else index
 
-let __copyToString (blob: Blob) : String =
-    let length = Stdlib.Blob.__byteLength blob in
-    if length == 0L then ""
+let __copyToString(blob: Blob): String =
+    let length = Stdlib.Blob.__byteLength(blob) in
+    if length == 0 then ""
     else
-        let dataSize = Stdlib.Blob.__alignedDataSize length in
-        let ptr = __raw_alloc (16L + dataSize) in
-        let _ = __raw_write_word ptr 0L 1L in
-        let _ = __raw_write_word ptr 8L length in
-        let _ = Stdlib.Blob.__copyBytes (__blob_to_rawptr blob) ptr 16L length in
-        __rawptr_to_string ptr
+        let dataSize = Stdlib.Blob.__alignedDataSize(length) in
+        let ptr = __raw_alloc(16 + dataSize) in
+        let _ = __raw_write_word(ptr, 0, 1) in
+        let _ = __raw_write_word(ptr, 8, length) in
+        let _ = Stdlib.Blob.__copyBytes(__blob_to_rawptr(blob), ptr, 16, length) in
+        __rawptr_to_string(ptr)
 
-let toString (blob: Blob) : Stdlib.Result.Result<String, String> =
-    let invalidIndex = Stdlib.Blob.__validateUtf8 blob 0L (Stdlib.Blob.__byteLength blob) in
-    if invalidIndex < 0L then Ok (Stdlib.Blob.__copyToString blob)
-    else Error (Stdlib.Blob.__invalidUtf8 (Stdlib.Blob.__getByte blob invalidIndex) invalidIndex)
+let toString(blob: Blob): Stdlib.Result.Result<String, String> =
+    let invalidIndex = Stdlib.Blob.__validateUtf8(blob, 0, Stdlib.Blob.__byteLength(blob)) in
+    if invalidIndex < 0 then Ok(Stdlib.Blob.__copyToString(blob))
+    else Error(Stdlib.Blob.__invalidUtf8(Stdlib.Blob.__getByte(blob, invalidIndex), invalidIndex))
 
 // The interpreter's Bytes builtins that the Blob module had no counterpart for,
 // with the interpreter's Int64 indexes and counts.
 
 /// Some byte at <param index>, or None when it is out of range.
-let getAt (blob: Blob) (index: Int64) : Stdlib.Option.Option<UInt8> =
-    if index < 0L || index >= Stdlib.Blob.__byteLength blob then None
-    else Some (Stdlib.Blob.__int64ToUInt8 (Stdlib.Blob.__getByte blob index))
+let getAt(blob: Blob, index: Int64): Stdlib.Option.Option<UInt8> =
+    if index < 0 || index >= Stdlib.Blob.__byteLength(blob) then None
+    else Some(Stdlib.Blob.__int64ToUInt8(Stdlib.Blob.__getByte(blob, index)))
 
-let __indexOfFrom (blob: Blob) (byte: Int64) (index: Int64) (length: Int64) : Stdlib.Option.Option<Int64> =
+let __indexOfFrom(blob: Blob, byte: Int64, index: Int64, length: Int64): Stdlib.Option.Option<Int64> =
     if index >= length then None
-    else if Stdlib.Blob.__getByte blob index == byte then Some index
-    else Stdlib.Blob.__indexOfFrom blob byte (index + 1L) length
+    else if Stdlib.Blob.__getByte(blob, index) == byte then Some(index)
+    else Stdlib.Blob.__indexOfFrom(blob, byte, index + 1, length)
 
 /// Some index of the first <param byte> at or after <param start>, or None
 /// when there is none or <param start> is out of range.
-let indexOf (blob: Blob) (byte: UInt8) (start: Int64) : Stdlib.Option.Option<Int64> =
-    let length = Stdlib.Blob.__byteLength blob in
-    if start < 0L || start >= length then None
-    else Stdlib.Blob.__indexOfFrom blob (Stdlib.Blob.__uint8ToInt64 byte) start length
+let indexOf(blob: Blob, byte: UInt8, start: Int64): Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength(blob) in
+    if start < 0 || start >= length then None
+    else Stdlib.Blob.__indexOfFrom(blob, Stdlib.Blob.__uint8ToInt64(byte), start, length)
 
-let __segmentAt (blob: Blob) (segment: Blob) (at: Int64) (offset: Int64) (count: Int64) : Bool =
+let __segmentAt(blob: Blob, segment: Blob, at: Int64, offset: Int64, count: Int64): Bool =
     if offset >= count then true
-    else if Stdlib.Blob.__getByte blob (at + offset) != Stdlib.Blob.__getByte segment offset then false
-    else Stdlib.Blob.__segmentAt blob segment at (offset + 1L) count
+    else if Stdlib.Blob.__getByte(blob, at + offset) != Stdlib.Blob.__getByte(segment, offset) then false
+    else Stdlib.Blob.__segmentAt(blob, segment, at, offset + 1, count)
 
-let __indexOfSegmentFrom (blob: Blob) (segment: Blob) (at: Int64) (last: Int64) (count: Int64) : Stdlib.Option.Option<Int64> =
+let __indexOfSegmentFrom(blob: Blob, segment: Blob, at: Int64, last: Int64, count: Int64): Stdlib.Option.Option<Int64> =
     if at > last then None
-    else if Stdlib.Blob.__segmentAt blob segment at 0L count then Some at
-    else Stdlib.Blob.__indexOfSegmentFrom blob segment (at + 1L) last count
+    else if Stdlib.Blob.__segmentAt(blob, segment, at, 0, count) then Some(at)
+    else Stdlib.Blob.__indexOfSegmentFrom(blob, segment, at + 1, last, count)
 
 /// Some index of the first <param segment> at or after <param start>, or None
 /// when there is none or <param start> is out of range. An empty segment is
 /// found at <param start>.
-let indexOfSegment (blob: Blob) (segment: Blob) (start: Int64) : Stdlib.Option.Option<Int64> =
-    let length = Stdlib.Blob.__byteLength blob in
-    let count = Stdlib.Blob.__byteLength segment in
-    if start < 0L || start > length then None
-    else Stdlib.Blob.__indexOfSegmentFrom blob segment start (length - count) count
+let indexOfSegment(blob: Blob, segment: Blob, start: Int64): Stdlib.Option.Option<Int64> =
+    let length = Stdlib.Blob.__byteLength(blob) in
+    let count = Stdlib.Blob.__byteLength(segment) in
+    if start < 0 || start > length then None
+    else Stdlib.Blob.__indexOfSegmentFrom(blob, segment, start, length - count, count)
 
 /// The first <param count> bytes. Every Blob here is in memory, so this is
 /// always Some.
-let peek (blob: Blob) (count: Int64) : Stdlib.Option.Option<Blob> =
-    let length = Stdlib.Blob.__byteLength blob in
-    let n = if count < 0L then 0L else if count > length then length else count in
-    Some (Stdlib.Blob.slice blob (Stdlib.Int.fromInt64 0L) (Stdlib.Int.fromInt64 n))
+let peek(blob: Blob, count: Int64): Stdlib.Option.Option<Blob> =
+    let length = Stdlib.Blob.__byteLength(blob) in
+    let n = if count < 0 then 0 else if count > length then length else count in
+    Some(Stdlib.Blob.slice(blob, Stdlib.Int.fromInt64(0), Stdlib.Int.fromInt64(n)))
 
-let __previewPairs (blob: Blob) (index: Int64) (stop: Int64) : String =
+let __previewPairs(blob: Blob, index: Int64, stop: Int64): String =
     if index >= stop then ""
     else
-        let byte = Stdlib.Blob.__getByte blob index in
-        let pair = Stdlib.String.toLowercase (Stdlib.Blob.__byteToHex byte) in
-        let rest = Stdlib.Blob.__previewPairs blob (index + 1L) stop in
+        let byte = Stdlib.Blob.__getByte(blob, index) in
+        let pair = Stdlib.String.toLowercase(Stdlib.Blob.__byteToHex(byte)) in
+        let rest = Stdlib.Blob.__previewPairs(blob, index + 1, stop) in
         if rest == "" then pair else pair + " " + rest
 
 // How the current interpreter prints unsaved Bytes:
 // the length, then the first 16 bytes in lower-case hex pairs.
-let __evalDisplay (blob: Blob) : String =
-    let n = Stdlib.Blob.__byteLength blob in
-    let size = Stdlib.Int64.toString n + (if n == 1L then " byte" else " bytes") in
-    if n == 0L then "<Bytes: " + size + ">"
+let __evalDisplay(blob: Blob): String =
+    let n = Stdlib.Blob.__byteLength(blob) in
+    let size = Stdlib.Int64.toString(n) + (if n == 1 then " byte" else " bytes") in
+    if n == 0 then "<Bytes: " + size + ">"
     else
-        let shown = if n > 16L then 16L else n in
-        let more = if n > 16L then " ..." else "" in
-        "<Bytes: " + size + " " + Stdlib.Blob.__previewPairs blob 0L shown + more + ">"
+        let shown = if n > 16 then 16 else n in
+        let more = if n > 16 then " ..." else "" in
+        "<Bytes: " + size + " " + Stdlib.Blob.__previewPairs(blob, 0, shown) + more + ">"

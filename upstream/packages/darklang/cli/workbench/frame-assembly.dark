@@ -5,7 +5,6 @@
 /// Part of `Darklang.Cli.Workbench`.
 module Darklang.Cli.Workbench
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderFull(state: State, size: Stdlib.Cli.Tui.Size): List<Stdlib.Cli.UI.Layout.Span> =
   // Clamp to sane minimums - mid-resize the terminal reports 0/tiny sizes; without this the region math
   // goes negative and the whole view crashes back to the prompt. A safe default renders one off frame; the
@@ -194,7 +193,6 @@ let renderFull(state: State, size: Stdlib.Cli.Tui.Size): List<Stdlib.Cli.UI.Layo
 /// argument, from the shared CLI completion engine (so the bar has the same typeahead as the classic prompt).
 /// Empty when there's nothing to suggest. Only called while the command bar is open, so the per-frame cost of
 /// building a throwaway AppState is bounded to that.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let commandCompletionHint(state: State, text: String): String =
   if text == "" then
     ""
@@ -205,7 +203,6 @@ let commandCompletionHint(state: State, text: String): String =
 
 /// The full list of completions for the `:` command bar's current text - the same engine the classic prompt's
 /// picker used. Backs the live dropdown so you see the options, not just the ghost of the top one.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let commandCompletions(state: State, text: String): List<Completion.CompletionItem> =
   if text == "" then
     []
@@ -226,7 +223,6 @@ let applyCompletionValue(text: String, value: String): String =
 /// A live dropdown of command completions anchored just above the `:` input line - the "pretty typeahead" menu
 /// from the classic prompt. Shown only while the command bar is open and there are matches. Drawn as an overlay
 /// (the full frame redraws each keystroke, so it clears itself when the bar closes).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderCommandCompletions(
   state: State,
   screen: Stdlib.Cli.UI.Layout.Region)
@@ -270,7 +266,6 @@ let renderCommandCompletions(
 /// Render the workbench. Below a usable size, show an explicit "too small" hint instead of a garbled frame
 /// (per the TUI rule: degrade with a message, never render garbage). A real 0/tiny size mid-resize still falls
 /// through to renderFull's clamp, which draws one safe frame until the next keypress.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let viewAtSize(state: State, size: Stdlib.Cli.Tui.Size): Stdlib.Cli.Tui.View =
   let tooSmall = size.width >= 24 && size.width < 56 || size.height >= 8 && size.height < 12
   let spans =

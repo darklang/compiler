@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.Tests.Trees
 // The tree `Builtin.parse` hands to Dark: its shape, and the source ranges the
 // highlighter and the LSP read off it. Positions are 0-based (row, column).
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.SourceFile.SourceFile'"
 let fileIn(
   kind: LanguageTools.Parser.FileKind,
   source: String)
@@ -14,14 +13,12 @@ let fileIn(
 
 
 /// The trailing expressions of a script.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.Expr'"
 let exprs(source: String): List<WrittenTypes.Expr> =
   match fileIn(LanguageTools.Parser.FileKind.Script, source) with
   | Some(file) -> file.exprsToEval
   | None -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.SourceFile.SourceFileDeclaration'"
 let decls(source: String): List<WrittenTypes.SourceFile.SourceFileDeclaration> =
   match fileIn(LanguageTools.Parser.FileKind.Script, source) with
   | Some(file) -> file.declarations
@@ -29,7 +26,6 @@ let decls(source: String): List<WrittenTypes.SourceFile.SourceFileDeclaration> =
 
 
 /// The declarations inside the one module a source declares.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ModuleDeclaration.Declaration'"
 let moduleDecls(
   kind: LanguageTools.Parser.FileKind,
   source: String)
@@ -42,14 +38,12 @@ let moduleDecls(
   | None -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ModuleDeclaration.Declaration'"
 let scriptModule(
   source: String)
   : List<WrittenTypes.ModuleDeclaration.Declaration> =
   moduleDecls(LanguageTools.Parser.FileKind.Script, source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.ModuleDeclaration.Declaration'"
 let packageModule(
   source: String)
   : List<WrittenTypes.ModuleDeclaration.Declaration> =
@@ -57,7 +51,6 @@ let packageModule(
 
 
 /// The type a `type X = <source>` alias declares.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeReference.TypeReference'"
 let typeOf(
   source: String)
   : Stdlib.Option.Option<WrittenTypes.TypeReference.TypeReference> =
@@ -70,7 +63,6 @@ let typeOf(
 
 
 /// The body of the one fn a source declares.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.Expr'"
 let fnBody(source: String): Stdlib.Option.Option<WrittenTypes.Expr> =
   match decls(source) with
   | [Function(f)] -> Stdlib.Option.Option.Some(f.body)
@@ -78,7 +70,6 @@ let fnBody(source: String): Stdlib.Option.Option<WrittenTypes.Expr> =
 
 
 /// The type of the one parameter of the one fn a source declares.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeReference.TypeReference'"
 let fnParamType(
   source: String)
   : Stdlib.Option.Option<WrittenTypes.TypeReference.TypeReference> =
@@ -91,7 +82,6 @@ let fnParamType(
 
 
 /// The pattern of each arm of the one `match` a script holds.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Trees.armPatterns: Unknown function or value 'exprs'"
 let armPatterns(source: String): List<WrittenTypes.MatchPattern> =
   match exprs(source) with
   | [EMatch(_, _, cases, _, _)] ->
@@ -99,7 +89,6 @@ let armPatterns(source: String): List<WrittenTypes.MatchPattern> =
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Trees.lambdaPats: Unknown function or value 'exprs'"
 let lambdaPats(source: String): List<WrittenTypes.LetPattern> =
   match exprs(source) with
   | [ELambda(_, pats, _, _, _)] -> pats
@@ -123,7 +112,6 @@ let quoteColumns(
   [ columns(openQuote), columns(contents), columns(closeQuote) ]
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Trees.calls: Unknown function or value 'exprs'"
 let calls(source: String): Stdlib.Option.Option<(String * Int64)> =
   match exprs(source) with
   | [EApply(_, EFnName(_, name), [], args)] ->
@@ -145,7 +133,6 @@ let ok(): Stdlib.Test.Result =
 
 // --- ranges ---
 
-// @compiler xfail compile: "Unknown function or value 'scriptModule'" class=missing-support reason=upstream-dependency
 test valueDeclarationRanges =
   // row 1 `  val x = 1 + 2`: val=2..5  x=6  ==8  1=10  +=12  2=14
   match scriptModule("module M =\n  val x = 1 + 2") with
@@ -167,7 +154,6 @@ test valueDeclarationRanges =
   | _ -> unexpected("module M =\n  val x = 1 + 2")
 
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test numericLiteralRangesSplitDigitsFromSuffix =
   let signed =
     match exprs("-1s64") with
@@ -201,7 +187,6 @@ test numericLiteralRangesSplitDigitsFromSuffix =
   Stdlib.Test.all([ signed, unsigned, pattern, bare ])
 
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test quotedLiteralRangesSplitDelimiters =
   let string =
     match exprs("\"hi\"") with
@@ -234,7 +219,6 @@ test quotedLiteralRangesSplitDelimiters =
   Stdlib.Test.all([ string, char, triple, pattern ])
 
 
-// @compiler xfail compile: "Unknown function or value 'typeOf'" class=missing-support reason=upstream-dependency
 test closingDelimitersEndTheRange =
   let generic =
     match typeOf("Result<Int64, String>") with
@@ -264,7 +248,6 @@ test closingDelimitersEndTheRange =
   Stdlib.Test.all([ generic, ctor, unterminated, question ])
 
 
-// @compiler xfail compile: "Unknown function or value 'packageModule'" class=missing-support reason=upstream-dependency
 test namedTestRanges =
   let source = "module M =\n  test doubles = Stdlib.Test.equal(8, 8)"
   match packageModule(source) with
@@ -276,7 +259,6 @@ test namedTestRanges =
   | _ -> unexpected(source)
 
 
-// @compiler xfail compile: "Unknown function or value 'packageModule'" class=missing-support reason=upstream-dependency
 test namedTestOutcomes =
   let raisesSource =
     "module M =\n  test divisionByZero =\n    1 / 0\n"
@@ -313,7 +295,6 @@ test namedTestOutcomes =
 
 // --- expressions ---
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test simpleExpressions =
   Stdlib.Test.all(
     [ match exprs("\"hi\"") with
@@ -364,7 +345,6 @@ test simpleExpressions =
 
 
 // A no-param `let` at a script's top level is a statement over what follows.
-// @compiler xfail compile: "Unknown function or value 'decls'" class=missing-support reason=upstream-dependency
 test topLevelLetSequences =
   let source = "let x = 1\nx"
   match decls(source), exprs(source) with
@@ -373,7 +353,6 @@ test topLevelLetSequences =
   | _ -> unexpected(source)
 
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test enumConstructors =
   Stdlib.Test.all(
     [ match exprs("Some(5)") with
@@ -396,7 +375,6 @@ test enumConstructors =
       | _ -> unexpected("Pair (1, 2)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'armPatterns'" class=missing-support reason=upstream-dependency
 test matchPatterns =
   Stdlib.Test.all(
     [ match armPatterns("match x with | Ok(v) -> v | Error(e) -> e") with
@@ -452,7 +430,6 @@ test matchPatterns =
       | _ -> unexpected("cons chains") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test operators =
   Stdlib.Test.all(
     [ // unary minus binds looser than application: `-f x` is `-(f x)`
@@ -505,7 +482,6 @@ test operators =
       | _ -> unexpected("[...xs]") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test unwrapBindsTight =
   Stdlib.Test.all(
     [ match exprs("fun x -> f(x?)") with
@@ -519,7 +495,6 @@ test unwrapBindsTight =
       | _ -> unexpected("x?.field??") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'lambdaPats'" class=missing-support reason=upstream-dependency
 test lambdaParameters =
   Stdlib.Test.all(
     [ Stdlib.List.length(lambdaPats("fun x -> x")) |> Stdlib.Test.equal(1)
@@ -540,7 +515,6 @@ test lambdaParameters =
 
 // --- layout ---
 
-// @compiler xfail compile: "Unknown function or value 'fnBody'" class=missing-support reason=upstream-dependency
 test offside =
   Stdlib.Test.all(
     [ // the tree keeps `a\n b` as a statement; folding it is the lowering's job
@@ -576,7 +550,6 @@ test offside =
 
 // --- declarations ---
 
-// @compiler xfail compile: "Unknown function or value 'decls'" class=missing-support reason=upstream-dependency
 test declarations =
   Stdlib.Test.all(
     [ match decls("let add(x: Int64, y: Int64): Int64 = x + y") with
@@ -623,7 +596,6 @@ test declarations =
       | _ -> unexpected("private record fn") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'decls'" class=missing-support reason=upstream-dependency
 test typeDeclarations =
   Stdlib.Test.all(
     [ match decls("type Point = { x: Int64, y: Int64 }") with
@@ -646,7 +618,6 @@ test typeDeclarations =
 
 
 // The lexer attaches a `///` to the next token; the parser has to keep it there.
-// @compiler xfail compile: "Unknown function or value 'decls'" class=missing-support reason=upstream-dependency
 test docComments =
   Stdlib.Test.all(
     [ match decls("type T =\n  { /// how far along\n    x: Int64 }") with
@@ -685,7 +656,6 @@ test docComments =
 
 // --- types ---
 
-// @compiler xfail compile: "Unknown function or value 'typeOf'" class=missing-support reason=upstream-dependency
 test typeReferences =
   Stdlib.Test.all(
     [ match typeOf("Int64"), typeOf("String"), typeOf("Bool"), typeOf(
@@ -756,7 +726,6 @@ test typeReferences =
       | _ -> unexpected("generic fn") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'fnParamType'" class=missing-support reason=upstream-dependency
 test functionTypes =
   Stdlib.Test.all(
     [ match fnParamType("let f(g: Int64 -> String): Int64 = 1") with
@@ -793,7 +762,6 @@ test functionTypes =
 
 // --- literals ---
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test literalValues =
   Stdlib.Test.all(
     [ match exprs("-128s8") with
@@ -821,7 +789,6 @@ test literalValues =
 
 // --- recovery ---
 
-// @compiler xfail compile: "Unknown function or value 'exprs'" class=missing-support reason=upstream-dependency
 test recoveryKeepsTheTree =
   let resync =
     "module Test\n"
@@ -868,21 +835,18 @@ let typeParamNames(
   Stdlib.List.map(params, Stdlib.Tuple2.second)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TypeParamBound'"
 let boundNames(
   bounds: List<WrittenTypes.TypeParamBound>)
   : List<(String * String)> =
   Stdlib.List.map(bounds, fun b -> (b.param, b.trait_.typ.name))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'WrittenTypes.TraitDeclaration.TraitDeclaration'"
 let methodNames(
   t: WrittenTypes.TraitDeclaration.TraitDeclaration)
   : List<String> =
   Stdlib.List.map(t.methods, fun m -> m.name.name)
 
 
-// @compiler xfail compile: "Unknown function or value 'decls'" class=missing-support reason=upstream-dependency
 test traits =
   Stdlib.Test.all(
     [ match decls("trait Show<'a> =\n  let show(value: 'a): String") with

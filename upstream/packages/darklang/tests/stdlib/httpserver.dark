@@ -29,7 +29,6 @@ let routeNotes(
 
 // The request's `method` picks the handler, and a header that looks like a
 // method does not.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test routeRequestByMethod =
   Stdlib.Test.all(
     [ routeNotes("GET", []) |> Stdlib.Test.equal((200, "list"))
@@ -66,7 +65,6 @@ test routes =
       |> Stdlib.Test.equal("POST") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test getPath =
   [ ("/users/42?x=1", "/users/42")
     ("http://localhost:9000/a/b?x=1", "/a/b")

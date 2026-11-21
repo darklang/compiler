@@ -321,7 +321,6 @@ test map5 =
       |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
 
-// @compiler xfail compile: "Expected TInt64, got TSum" class=aot-rejection reason=aot-type-error
 test mapWithDefault =
   Stdlib.Test.all(
     [ Stdlib.Option.mapWithDefault(Stdlib.Option.Option.Some(5), 6, fun x ->

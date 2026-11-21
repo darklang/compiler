@@ -30,43 +30,43 @@ type ErrorSegment =
 type ES = ErrorSegment
 type ErrorSegments = List<ErrorSegment>
 
-let segmentsToString (branchId: Uuid) (segments: ErrorSegments) : String =
-  let reversed = Stdlib.List.reverse segments in
+let segmentsToString(branchId: Uuid, segments: ErrorSegments): String =
+  let reversed = Stdlib.List.reverse(segments) in
   let parts =
-    Stdlib.List.fold reversed [] (fun prevSegments segment ->
+    Stdlib.List.fold(reversed, [], fun(prevSegments, segment) ->
       let rendered =
         match segment with
-        | String value -> value
-        | Int value -> Stdlib.Int.toString value
-        | Ordinal value -> Stdlib.String.toOrdinal value
-        | Count (count, singular, plural) ->
-            let selected = if count == 1 then singular else plural in
-            Stdlib.Int.toString count + " " + Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.segmentsToString branchId [selected]
+        | String(value) -> value
+        | Int(value) -> Stdlib.Int.toString(value)
+        | Ordinal(value) -> Stdlib.String.toOrdinal(value)
+        | Count(count, singular, plural) ->
+            let selected = if count == 1z then singular else plural in
+            Stdlib.Int.toString(count) + " " + Darklang.PrettyPrinter.RuntimeTypes.RuntimeError.segmentsToString(branchId, [selected])
         | IndefiniteArticle ->
-            match Stdlib.List.head prevSegments with
+            match Stdlib.List.head(prevSegments) with
             | None -> ""
-            | Some following -> Stdlib.English.articleFor following + " "
-        | FunctionName name -> Darklang.PrettyPrinter.RuntimeTypes.fnName branchId name
-        | Description value -> value
-        | ParamName value -> "`" + value + "`"
-        | InlineParamName value -> value
-        | TypeName name -> Darklang.PrettyPrinter.RuntimeTypes.typeName branchId name
-        | ShortTypeName name -> Darklang.PrettyPrinter.RuntimeTypes.shortTypeName branchId name
-        | TypeReference typ -> Darklang.PrettyPrinter.RuntimeTypes.typeReference branchId typ
-        | TypeOfValue value -> Darklang.PrettyPrinter.RuntimeTypes.Dval.valueTypeName branchId value
-        | ValueType typ -> Darklang.PrettyPrinter.RuntimeTypes.valueType branchId typ
-        | DeclaredValueType (declared, typ) -> Darklang.PrettyPrinter.RuntimeTypes.declaredValueType branchId declared typ
-        | FieldName value -> "`" + value + "`"
-        | InlineFieldName value -> value
-        | ValueName name -> Darklang.PrettyPrinter.RuntimeTypes.valueName branchId name
-        | VarName value -> "`" + value + "`"
-        | InlineVarName value -> value
-        | InlineValue value ->
-            Darklang.PrettyPrinter.RuntimeTypes.dval branchId value
-            |> Stdlib.String.ellipsis 10
+            | Some(following) -> Stdlib.English.articleFor(following) + " "
+        | FunctionName(name) -> Darklang.PrettyPrinter.RuntimeTypes.fnName(branchId, name)
+        | Description(value) -> value
+        | ParamName(value) -> "`" + value + "`"
+        | InlineParamName(value) -> value
+        | TypeName(name) -> Darklang.PrettyPrinter.RuntimeTypes.typeName(branchId, name)
+        | ShortTypeName(name) -> Darklang.PrettyPrinter.RuntimeTypes.shortTypeName(branchId, name)
+        | TypeReference(typ) -> Darklang.PrettyPrinter.RuntimeTypes.typeReference(branchId, typ)
+        | TypeOfValue(value) -> Darklang.PrettyPrinter.RuntimeTypes.Dval.valueTypeName(branchId, value)
+        | ValueType(typ) -> Darklang.PrettyPrinter.RuntimeTypes.valueType(branchId, typ)
+        | DeclaredValueType(declared, typ) -> Darklang.PrettyPrinter.RuntimeTypes.declaredValueType(branchId, declared, typ)
+        | FieldName(value) -> "`" + value + "`"
+        | InlineFieldName(value) -> value
+        | ValueName(name) -> Darklang.PrettyPrinter.RuntimeTypes.valueName(branchId, name)
+        | VarName(value) -> "`" + value + "`"
+        | InlineVarName(value) -> value
+        | InlineValue(value) ->
+            Darklang.PrettyPrinter.RuntimeTypes.dval(branchId, value)
+            |> Stdlib.String.ellipsis(10z)
             |> Stdlib.String.splitOnNewline
-            |> fun lines -> Stdlib.String.join lines ""
-        | FullValue value -> Darklang.PrettyPrinter.RuntimeTypes.dval branchId value
-        | LetPattern pattern -> Darklang.PrettyPrinter.RuntimeTypes.letPattern pattern in
-      Stdlib.List.push prevSegments rendered) in
-  Stdlib.String.join parts ""
+            |> fun lines -> Stdlib.String.join(lines, "")
+        | FullValue(value) -> Darklang.PrettyPrinter.RuntimeTypes.dval(branchId, value)
+        | LetPattern(pattern) -> Darklang.PrettyPrinter.RuntimeTypes.letPattern(pattern) in
+      Stdlib.List.push(prevSegments, rendered)) in
+  Stdlib.String.join(parts, "")

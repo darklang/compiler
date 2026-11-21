@@ -1772,7 +1772,13 @@ let parseE2ETestFile path =
   in
   let* inventory =
     if canonical then
-      SourceInventory.parse ~interpreterSource:true ~reasons text |> Result.map Option.some
+      let* sidecar =
+        CompilerAnnotations.parseSidecar EmbeddedStdlib.upstreamAnnotations
+      in
+      SourceInventory.parse
+        ~annotations:(CompilerAnnotations.forSource sidecar path)
+        ~reasons text
+      |> Result.map Option.some
     else Ok None
   in
   let* tests =
@@ -1780,33 +1786,33 @@ let parseE2ETestFile path =
     | Some inventory -> parseCanonicalE2ETestFile path raw inventory
     | None -> parseE2ETestFileUnannotated path raw
   in
-  let items =
+  let* annotations =
     match inventory with
     | Some inventory ->
-        List.map
-          (fun entry ->
-            {
-              CompilerAnnotations.position = entry.SourceInventory.position;
-              isTest = SourceInventory.isTest entry.SourceInventory.kind;
-            })
-          inventory.SourceInventory.entries
-    | None ->
-        List.map
-          (fun test ->
-            {
-              CompilerAnnotations.position =
-                {
-                  Tokenizer.row = test.sourceLine - 1;
-                  column = countLeadingSpaces raw.(test.sourceLine - 1);
-                };
-              isTest = true;
-            })
-          tests
-  in
-  let* annotations =
-    if Text.contains text "// @compiler" then
-      CompilerAnnotations.read ~reasons ~items text
-    else Ok []
+        Ok
+          (List.map
+             (fun entry ->
+               {
+                 CompilerAnnotations.position = entry.SourceInventory.position;
+                 disposition = entry.SourceInventory.disposition;
+               })
+             inventory.SourceInventory.entries)
+    | None when Text.contains text "// @compiler" ->
+        CompilerAnnotations.read ~reasons
+          ~items:
+            (List.map
+               (fun test ->
+                 {
+                   CompilerAnnotations.position =
+                     {
+                       Tokenizer.row = test.sourceLine - 1;
+                       column = countLeadingSpaces raw.(test.sourceLine - 1);
+                     };
+                   isTest = true;
+                 })
+               tests)
+          text
+    | None -> Ok []
   in
   ResultList.traverse
     (fun test ->

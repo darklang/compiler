@@ -9,7 +9,6 @@ type Harmful =
 
 /// Evaluate an expression and hand back the value it produced, not its printed text. A fn's name
 /// evaluates to the fn.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let evaluateValue(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -20,7 +19,6 @@ let evaluateValue(
 
 
 /// <fn evaluateValue> with <param grants> allowed for this evaluation only (`eval --allow`).
-// @compiler blocked: upstream-dependency diagnostic="evaluateValueUnder: Unknown type 'ExecutionError.ExecutionError'"
 let evaluateValueUnder(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -41,7 +39,6 @@ let noGrants(): LanguageTools.Permissions.Policy =
 
 
 /// Evaluate an expression, keeping errors structured for the caller.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let evaluateRaw(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -53,7 +50,6 @@ let evaluateRaw(
 
 
 /// <fn evaluateRaw> with <param grants> allowed for this evaluation only.
-// @compiler blocked: upstream-dependency diagnostic="evaluateRawUnder: Unknown type 'ExecutionError.ExecutionError'"
 let evaluateRawUnder(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -84,12 +80,10 @@ let evaluateRawUnder(
 /// that printed nothing, `Error message` for a failure. What the `eval`/REPL path uses - `execute` prints
 /// what this returns, and the workbench REPL keeps it as state. Takes the whole expression as one string,
 /// so a multi-line let-chain survives.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let evaluate(state: AppState, expr: String, harmful: Harmful): Result<Option<String>, String> =
   evaluateUnder(state, expr, harmful, noGrants())
 
 
-// @compiler blocked: upstream-dependency diagnostic="evaluateUnder: Unknown type 'AppState'"
 let evaluateUnder(
   state: AppState,
   expr: String,
@@ -110,7 +104,6 @@ let evaluateUnder(
     Result.Error(ExecutionError.formatForTerminal(state.accountID, state.currentBranchId, err))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let harmful =
     if Stdlib.List.contains(args, "--allow-harmful") then
@@ -139,7 +132,6 @@ let allowRules(rules: List<String>, args: List<String>): (List<String> * List<St
   | _ -> (rules, args)
 
 
-// @compiler blocked: upstream-dependency diagnostic="executeUnder: Unknown type 'AppState'"
 let executeUnder(
   state: AppState,
   args: List<String>,
@@ -201,12 +193,10 @@ let executeUnder(
       | None -> newState
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: eval [--allow <rules>] <expression>"
     "       eval -    (read expression from stdin, for multi-line input)"

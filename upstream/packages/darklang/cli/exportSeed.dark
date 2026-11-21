@@ -1,6 +1,5 @@
 module Darklang.Cli.ExportSeed
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   // Explicit, because the only other argument shape is a PATH: without this arm a bare `help` is taken
@@ -22,7 +21,6 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Export a minimal seed.db from the current database."
     ""
@@ -34,6 +32,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   []

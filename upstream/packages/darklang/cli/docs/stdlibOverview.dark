@@ -19,7 +19,6 @@ let topLevelBucket(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   | [] -> "(root)"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, _args: List<String>): AppState =
   let branchId = state.currentBranchId
   let rootPath = [ "Darklang", "Stdlib" ]

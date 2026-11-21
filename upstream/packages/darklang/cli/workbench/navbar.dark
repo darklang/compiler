@@ -36,7 +36,6 @@ type NavbarRow =
 /// The extension view's absolute index by id (see `extensionViews`); -1 if
 /// there's no such view, which is never in `visibleViews`, so an item
 /// pointing at it simply doesn't show.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.extViewIndex: Unknown function or value 'extensionViews'"
 let extViewIndex(id: String): Int64 =
   match Stdlib.List.findFirstIndex(extensionViews(), fun vd -> vd.id == id) with
   | Some(i) -> baseViewCount + i
@@ -55,7 +54,6 @@ let mkDest(view: Int64, section: Int64): Dest =
 /// Home (History, Branches), a row in the view (Conflicts), or a view you
 /// step to from its parent (`B` builtins from the tree, `E` errors from
 /// traces).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.workspaces: Unknown function or value 'extViewIndex'"
 val workspaces =
   [ Workspace { name = "Home", dest = mkDest(vHome, 0), covers = [] }
     // Builtins are part of the tree - the bottom tier of it - not
@@ -82,7 +80,6 @@ let workspaceVisibleIn(vis: List<Int64>, ws: Workspace): Bool =
   Stdlib.List.contains(vis, ws.dest.view)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.visibleWorkspacesIn: Unbound local variable 'workspaces'"
 let visibleWorkspacesIn(vis: List<Int64>): List<(Int64 * Workspace)> =
   workspaces
   |> Stdlib.List.indexedMap(fun(i, w) -> (i, w))
@@ -92,19 +89,16 @@ let visibleWorkspacesIn(vis: List<Int64>): List<(Int64 * Workspace)> =
 
 
 /// The section `view` is currently on, in `Dest` terms. Only AI has any.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let sectionOf(state: State, view: Int64): Int64 =
   0
 
 
 /// Where you are, as a destination.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let activeDest(state: State): Dest =
   mkDest(state.activeView, sectionOf(state, state.activeView))
 
 
 /// The item that is, or covers, `d`'s view; Home if none does.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Workbench.workspaceOf: Field access requires a record value"
 let workspaceOf(d: Dest): Int64 =
   let holds(w: Workspace): Bool = w.dest.view == d.view || Stdlib.List.contains(w.covers, d.view)
   match Stdlib.List.findFirstIndex(workspaces, holds) with
@@ -119,7 +113,6 @@ let workspaceOf(d: Dest): Int64 =
 /// is remembered too, so the strip knows where you are, but the number key
 /// always lands on the item's own view: `2` means the tree, wherever in Code
 /// you were.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let workspaceEntryIn(vis: List<Int64>, state: State, wsIdx: Int64): Option<Dest> =
   match Stdlib.List.getAt(workspaces, wsIdx) with
   | None -> Option.None
@@ -141,7 +134,6 @@ let workspaceEntryIn(vis: List<Int64>, state: State, wsIdx: Int64): Option<Dest>
       | None -> Option.Some(w.dest)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let workspaceEntry(state: State, wsIdx: Int64): Option<Dest> =
   workspaceEntryIn(visibleViews(state), state, wsIdx)
 
@@ -149,7 +141,6 @@ let workspaceEntry(state: State, wsIdx: Int64): Option<Dest> =
 /// The rows the nav draws: every visible item, flat. `wip` and `conflicts`
 /// are the frame's already-computed counts, for the badges; pass 0s when
 /// only the shape matters (the key handler does).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navbarRows(state: State, wip: Int64, conflicts: Int64): List<NavbarRow> =
   let count(n: Int64): String = Stdlib.display(n)
   // Once, not once per workspace and again per row.
@@ -176,7 +167,6 @@ let navbarRows(state: State, wip: Int64, conflicts: Int64): List<NavbarRow> =
 
 
 /// The row for where you are, so the nav and the body agree.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let activeRow(state: State, rows: List<NavbarRow>): Int64 =
   let ws = workspaceOf(activeDest(state))
   match Stdlib.List.findFirstIndex(rows, fun r -> r.ws == ws) with
@@ -185,7 +175,6 @@ let activeRow(state: State, rows: List<NavbarRow>): Int64 =
 
 
 /// Put the nav cursor on the row for where you are.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let withNavbarCursorOnActive(state: State): State =
   { state with navbarSel = activeRow(state, navbarRows(state, 0, 0)) }
 
@@ -206,7 +195,6 @@ let navFits(cols: Int64): Bool =
 
 
 /// Does the nav currently own the keyboard?
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let navbarFocused(state: State): Bool =
   state.focus == Stdlib.Cli.UI.SplitPane.Focus.Neither
 
@@ -222,13 +210,11 @@ let navFitsNow(): Bool =
 
 /// Hand the keyboard to the nav, cursor on where you are. On a narrow
 /// terminal this is what opens the overlay.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let focusNavbar(state: State): State =
   withNavbarCursorOnActive({ state with focus = Stdlib.Cli.UI.SplitPane.Focus.Neither })
 
 
 /// Hand the keyboard to the content: its first pane.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let focusContent(state: State): State =
   { state with focus = Stdlib.Cli.UI.SplitPane.Focus.First }
 
@@ -237,7 +223,6 @@ let focusContent(state: State): State =
 /// hopping around doesn't lose your place), drop the filter and scroll, and
 /// remember `d` as where you were in its item. Focus lands on the content.
 /// The place left is pushed for esc.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let goTo(state: State, d: Dest): State =
   let point =
     { returnPointOf(state) with
@@ -249,7 +234,6 @@ let goTo(state: State, d: Dest): State =
 
 
 /// Jump to an item's view. Its number again, on it already, does nothing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let jumpToWorkspace(state: State, n: Int64): State =
   match workspaceEntry(state, n - 1) with
   | None -> state
@@ -263,7 +247,6 @@ let jumpToWorkspace(state: State, n: Int64): State =
 /// keyboard back to the content (esc is one step back everywhere, and
 /// taking the nav was the step). Anything global (`/`, `:`, `?`, numbers,
 /// `q`) still works.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let handleNavbarKey(state: State, key: Stdlib.Cli.Stdin.Key.Key, keyChar: Option<String>): Step =
   // Every one of these is a function, not a value. `let` is eager, so binding them would compute
   // the outcome of keys that were not pressed on every keypress -- including `openSel`, which calls
@@ -326,7 +309,6 @@ let handleNavbarKey(state: State, key: Stdlib.Cli.Stdin.Key.Key, keyChar: Option
 /// row is a purple bar while the nav has the keyboard; otherwise the row for
 /// where you are is bright and the rest dim, so it reads as a map, not a
 /// menu.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderNavbarRows(
   state: State,
   rows: List<NavbarRow>,
@@ -379,7 +361,6 @@ let renderNavbarRows(
 /// highlight - a purple block with the label in white - so where you are
 /// reads at a glance and the frame under it never has to repeat the name.
 /// While the nav has the keyboard its cursor is reverse video instead.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderNavStrip(
   state: State,
   wip: Int64,
@@ -435,7 +416,6 @@ let renderNavStrip(
 /// The same rows as a centred overlay, vertical, for a terminal too narrow
 /// for the strip. Drawn only while the nav has the keyboard, so it opens on `
 /// (or esc from the top of a list) and closes when you go.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderNavbarOverlay(
   state: State,
   wip: Int64,

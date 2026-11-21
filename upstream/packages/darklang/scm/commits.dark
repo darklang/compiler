@@ -48,32 +48,27 @@ type CommitPage =
 
 /// The commits <param filter> selects, at most <param limit> of them; a negative limit means all of them,
 /// and 0 asks only for the count.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Commits.query: Unknown function or value 'Builtin.scmCommits'"
 let query(filter: CommitFilter, limit: Int64): CommitPage =
   Builtin.scmCommits(filter, limit)
 
 
 /// Number of commits across the store, matching the unfiltered recent listing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Commits.count: Unknown function or value 'query'"
 let count(): Int64 =
   (query(CommitFilter.Recent, 0)).total
 
 
 /// The most recent commits, newest first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Commits.recent: Unknown function or value 'query'"
 let recent(limit: Int64): List<Commit> =
   (query(CommitFilter.Recent, limit)).commits
 
 
 /// The commit whose hash starts with <param prefix>. Newest wins if a short prefix matches more than one,
 /// which is the same rule `dark ops show` uses for op ids.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Commits.byHashPrefix: Unknown function or value 'query'"
 let byHashPrefix(prefix: String): Option<Commit> =
   Stdlib.List.head((query(CommitFilter.HashPrefix(prefix), 1)).commits)
 
 
 /// The commits that follow <param hash> on some line. Empty when nothing does, which is what makes a
 /// commit the tip of its own chain.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Commits.children: Unknown function or value 'query'"
 let children(hash: String): List<String> =
   (query(CommitFilter.ChildrenOf(hash), -1)).commits |> Stdlib.List.map(fun c -> c.hash)

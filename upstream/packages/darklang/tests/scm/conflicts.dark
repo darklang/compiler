@@ -42,7 +42,6 @@ module Helpers =
       { owner = "Zz", modules = "W", name = name, baseHash = hash }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Conflicts.Helpers.detectCount: Unknown function or value 'Darklang.SCM.Conflicts.detect'"
   let detectCount(
     local: List<SCM.Conflicts.Binding>,
     incoming: List<SCM.Conflicts.Binding>,
@@ -54,7 +53,6 @@ module Helpers =
 
 module Detect =
   // BOTH sides moved a name since a recorded base -- the one case that IS a conflict.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test bothSidesMoved =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -65,7 +63,6 @@ module Detect =
 
   // Same hash on both sides: not a divergence at all. A re-pull, or two machines that independently
   // authored identical bytes.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test sameHashBothSides =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -75,7 +72,6 @@ module Detect =
 
 
   // Only LOCAL moved: our own update, and the peer is simply behind.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test onlyLocalMoved =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -85,7 +81,6 @@ module Detect =
 
 
   // Only INCOMING moved: an ordinary peer update of a name we never touched. Take it, quietly.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test onlyIncomingMoved =
     Helpers.detectCount(
       [ Helpers.binding("f", "ooo", "2026-01-02T00:00:00.000Z") ],
@@ -98,7 +93,6 @@ module Detect =
   // case and the one below reach the detector as the same three inputs apart from `previous`, so that
   // field is the only thing separating them; guessing instead would false-alarm on every ordinary
   // peer update.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test independentCreations =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -109,7 +103,6 @@ module Detect =
 
   // The other side of that coin: no base either, but the incoming binding NAMES ours as what it replaced.
   // Their version descends from ours, so taking it is collaborating, not a conflict.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test incomingDescendsFromOurs =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -119,7 +112,6 @@ module Detect =
 
 
   // And when OURS is the edit: still no conflict. Only both-created-from-nothing qualifies.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test oursIsTheEdit =
     Helpers.detectCount(
       [ Helpers.editOf("f", "aaa", "2026-01-02T00:00:00.000Z", "ooo") ],
@@ -130,7 +122,6 @@ module Detect =
 
   // A base for a DIFFERENT name says nothing about this one, so this falls to the same
   // both-created-from-nothing rule as above rather than to the base comparison.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test baseForOtherName =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z") ],
@@ -140,7 +131,6 @@ module Detect =
 
 
   // An incoming name we hold nothing for is a creation, not a collision.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test incomingCreation =
     Helpers.detectCount(
       [],
@@ -150,7 +140,6 @@ module Detect =
 
 
   // Two diverged names, two conflicts. (Detection is per name, not per batch.)
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test perNameDetection =
     Helpers.detectCount(
       [ Helpers.binding("f", "aaa", "2026-01-02T00:00:00.000Z")
@@ -171,7 +160,6 @@ module BothMovedTheSameParent =
   // stays base-agnostic because a wrong base is worse than none.
   //
   // No base at all: both replaced `parent`, so both moved.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test sameParentDiverged =
     Helpers.detectCount(
       [ Helpers.editOf("f", "mine", "2026-01-02T00:00:00.000Z", "parent") ],
@@ -182,7 +170,6 @@ module BothMovedTheSameParent =
 
   // A base that says only ONE side moved. Without the parent test this reads as an ordinary update
   // and the divergence is never reported at all.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test baseSaysOneSideMoved =
     Helpers.detectCount(
       [ Helpers.editOf("f", "mine", "2026-01-02T00:00:00.000Z", "parent") ],
@@ -194,7 +181,6 @@ module BothMovedTheSameParent =
   // AN ORDINARY UPDATE IS STILL SILENT. They edited the version you are holding, so their `previous` is
   // your CURRENT hash while yours is whatever came before it. The two cannot match, and this is the case
   // that would have made the whole rule too noisy to want.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test ordinaryUpdateSilent =
     Helpers.detectCount(
       [ Helpers.editOf(
@@ -213,7 +199,6 @@ module BothMovedTheSameParent =
   // having moved; their `previous` being my current hash is what says otherwise, and it has to win.
   // Lose that precedence and a colleague's ordinary edit on top of mine arrives as a conflict per
   // name, every one of them resolving to the version I would have taken anyway.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test ordinaryUpdateOlderBase =
     Helpers.detectCount(
       [ Helpers.editOf(
@@ -227,7 +212,6 @@ module BothMovedTheSameParent =
 
 
   // Same predecessor AND same hash is not a divergence, it is the same edit arriving twice.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test sameEditTwice =
     Helpers.detectCount(
       [ Helpers.editOf("f", "same", "2026-01-02T00:00:00.000Z", "parent") ],
@@ -239,7 +223,6 @@ module BothMovedTheSameParent =
   // `None` on both sides is NOT treated as a shared parent. It also means "no predecessor recorded", so
   // firing on it would manufacture conflicts between unrelated items. The independent-creation rule below
   // still covers the genuine case, and only where there is no base.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test noneIsNotSharedParent =
     Helpers.detectCount(
       [ Helpers.binding("f", "mine", "2026-01-02T00:00:00.000Z") ],
@@ -249,7 +232,6 @@ module BothMovedTheSameParent =
 
 
   // One side records a predecessor and the other does not: no shared parent to have moved from.
-  // @compiler xfail compile: "Unknown function or value 'Helpers.detectCount'" class=missing-support reason=upstream-dependency
   test oneSidedPredecessor =
     Helpers.detectCount(
       [ Helpers.binding("f", "mine", "2026-01-02T00:00:00.000Z") ],
@@ -261,7 +243,6 @@ module BothMovedTheSameParent =
 module AutoResolution =
   // The recorded winner must be the one the FOLD picks, or a recorded conflict names a winner that
   // isn't live. Later origin_ts wins.
-  // @compiler xfail compile: "Unknown function or value 'SCM.Conflicts.detect'" class=missing-support reason=upstream-dependency
   test laterStampRecordedWinner =
     (SCM.Conflicts.detect(
        "yours",
@@ -275,7 +256,6 @@ module AutoResolution =
 
 
   // ... and the older incoming loses to the newer local.
-  // @compiler xfail compile: "Unknown function or value 'SCM.Conflicts.detect'" class=missing-support reason=upstream-dependency
   test olderIncomingLoses =
     (SCM.Conflicts.detect(
        "yours",
@@ -289,7 +269,6 @@ module AutoResolution =
 
 
   // An exact stamp tie breaks by the HIGHER hash, so every instance converges on the same winner.
-  // @compiler xfail compile: "Unknown function or value 'SCM.Conflicts.detect'" class=missing-support reason=upstream-dependency
   test tieBreaksByHash =
     (SCM.Conflicts.detect(
        "yours",
@@ -312,7 +291,6 @@ module LargeNameLists =
   // bound parameters, so a sync bundle with more names than SQLite will bind in
   // one statement still reads. A failed read raises, so a cap would fail this
   // rather than read as "nothing bound".
-  // @compiler xfail compile: "Unknown function or value 'SCM.Conflicts.localBindingsFor'" class=missing-support reason=upstream-dependency
   test pastTheParameterCap =
     SCM.Conflicts.localBindingsFor(
       Stdlib.List.map(Stdlib.List.range(1, 33000), fun i ->

@@ -15,7 +15,6 @@ let formatHash(hash: LanguageTools.ProgramTypes.Hash, long: Bool): String =
     LanguageTools.ProgramTypes.hashToShort(hash)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let long = Stdlib.List.any(args, fun a -> a == "--long" || a == "--full")
   let filteredArgs = args |> Stdlib.List.filter(fun a -> a != "--long" && a != "--full")
@@ -71,7 +70,6 @@ let execute(state: AppState, args: List<String>): AppState =
           { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Usage: hash [--long] <location>"
     "Show the hash of a package type, function, value, or test."
@@ -88,7 +86,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   let branchId = state.currentBranchId
   match Stdlib.List.last(args) with

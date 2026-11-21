@@ -20,33 +20,24 @@ in F# are outside this Dark source import.
 
 ## Per-item compiler annotations
 
-Compiler dispositions are ordinary line comments before the affected item,
-at the same indentation. There are no file-level annotations. No annotation
-means the item is selected normally, not that an execution has passed.
+`upstream/` holds the pinned files unchanged. Compiler dispositions are rows of
+`porting/upstream-annotations.tsv`: the path below `upstream/`, the qualified
+item name and the disposition, separated by tabs. There are no file-level
+annotations. No row means the item is selected normally, not that an execution
+has passed.
 
-```dark
-// @compiler blocked: test-counter
-test evaluatesOnce =
-  ...
-
-// @compiler blocked: upstream-dependency diagnostic="Unknown function or value 'Stdlib.LocalStore.path'"
-let localDb () : String = Stdlib.LocalStore.path ()
-
-// @compiler excluded: runtime-reflection
-let inspect ... = ...
-
-// @compiler replace: packages/darklang/stdlib/base64.dark#Darklang.Stdlib.Base64.decode reason=interpreter-intrinsic
-let decode ... = ...
-
-// @compiler xfail compile: "Unknown function" class=missing-support reason=test-counter
-test unavailable =
-  ...
+```text
+packages/darklang/tests/x.dark	Darklang.Tests.X.evaluatesOnce	blocked: test-counter
+packages/darklang/x.dark	Darklang.X.localDb	blocked: upstream-dependency diagnostic="Unknown function or value 'Stdlib.LocalStore.path'"
+packages/darklang/x.dark	Darklang.X.inspect	excluded: runtime-reflection
+packages/darklang/stdlib/base64.dark	Darklang.Stdlib.Base64.decode	replace: packages/darklang/stdlib/base64.dark#Darklang.Stdlib.Base64.decode reason=interpreter-intrinsic
+packages/darklang/tests/x.dark	Darklang.Tests.X.unavailable	xfail compile: "Unknown function" class=missing-support reason=test-counter
 ```
 
-Reasons are short tags defined in `porting/compiler-reasons.json`. Annotation
-validation rejects unknown tags, duplicate dispositions, annotations inside
-bodies or after an item, and orphaned annotations. Only real line comments are
-read: text inside strings, doc comments and block comments is not metadata.
+Reasons are short tags defined in `porting/compiler-reasons.json`. Loading
+rejects unknown tags, two rows for one item, and rows naming an item the file
+does not have. Compiler test fixtures outside `upstream/` keep the same
+dispositions as `// @compiler` line comments before the item.
 Blocked items may carry a nonempty JSON-quoted `diagnostic=` field recording
 the observed compiler error. It is investigation evidence, not an executed
 expected-failure contract. The native inventory preserves it. Use this to name
@@ -67,7 +58,7 @@ satisfy a runtime expected failure. Compiler expectation overrides remain
 separate from expected failures and can coexist with an annotation.
 
 For an accepted diagnostic difference, use a per-test annotation such as
-`// @compiler error-message compile: "Cannot parse JSON into function type" reason=diagnostic-difference`.
+`error-message compile: "Cannot parse JSON into function type" reason=diagnostic-difference`.
 Use `runtime:` when rejection depends on the value. The upstream test must
 already expect an error. These are runnable negative tests, not expected
 failures: compilation or execution must fail in the annotated phase with the
@@ -121,8 +112,8 @@ reference to the deliberately nonexistent `functionWhichDoesntExist` is an AOT
 name rejection, not a missing upstream dependency. Nested forward calls are
 outside the supported scope in both implementations and are name rejections.
 
-When reclassifying, preserve the pinned source body. Change only the real
-annotation comment, require the relevant diagnostic, and regenerate the ledger.
+When reclassifying, preserve the pinned source body. Change only the
+annotation row, require the relevant diagnostic, and regenerate the ledger.
 Signals, timeouts, leaks, unrelated errors and unexpected passes cannot satisfy
 either class. AOT annotations describe verified *contracts*; only execution
 receipts establish that a particular revision actually met those contracts.

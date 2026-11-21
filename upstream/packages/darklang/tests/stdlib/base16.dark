@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Base16.Tests
 
 // hex of various UTF-8 strings (Arabic / emoji / long mixed).
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test encodeUtf8 =
   Stdlib.Test.all(
     [ Stdlib.Utf8.encode("اختبار النص")
@@ -21,7 +20,6 @@ test encodeUtf8 =
 
 
 // decode returns Result<Bytes,String>; length of decoded deadbeef = 4 bytes
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.decode'" class=missing-support reason=upstream-dependency
 test decode =
   Stdlib.Base16.decode("deadbeef")
   |> Stdlib.Result.map(Stdlib.Bytes.length)
@@ -30,7 +28,6 @@ test decode =
 
 // What is wrong with the input, in words: a character that isn't a hex digit, or a digit
 // left over at the end.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.decode'" class=missing-support reason=upstream-dependency
 test decodeErrors =
   Stdlib.Test.all(
     [ Stdlib.Base16.decode("zz")
@@ -53,7 +50,6 @@ test decodeErrors =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(0)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.decode'" class=missing-support reason=upstream-dependency
 test decodeToUtf8 =
   Stdlib.Base16.decode("48656c6c6f")
   |> Stdlib.Result.andThen(Stdlib.Utf8.decode)
@@ -61,7 +57,6 @@ test decodeToUtf8 =
 
 
 // uppercase output
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Base16.encode'" class=missing-support reason=upstream-dependency
 test encode =
   Stdlib.Test.all(
     [ Stdlib.Utf8.encode("ok")

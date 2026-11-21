@@ -49,7 +49,6 @@ module MissingFile =
 
 
   // `Stdlib.display` takes the error as it comes out of a failed read.
-  // @compiler blocked: upstream-dependency diagnostic="MissingFile / test fileErrorHasToString: Unknown type 'File'"
   test fileErrorHasToString =
     Stdlib.Test.all(
       [ Stdlib.display(Stdlib.Cli.FileSystem.FileError.NotFound)
@@ -93,7 +92,6 @@ module WriteErrors =
 
 
   // Parent creation succeeds, but opening a directory as a file fails.
-  // @compiler xfail runtime: "expected Error(Stdlib.Cli.FileSystem.FileError.Other(\"Is a directory\")), got Error(Stdlib.Cli.FileSystem.FileError.OsAcc" class=missing-support reason=compiler-gap
   test targetIsDirectory =
     Stdlib.Cli.File.withTemp(fun filename ->
       let directory = filename + "-dir"
@@ -110,7 +108,6 @@ module WriteErrors =
 
 module ReadErrors =
   // a directory is not a permission problem
-  // @compiler xfail runtime: "expected Error(\"Is a directory\"), got Error(\"Permission denied\")" class=missing-support reason=compiler-gap
   test readingADirectory =
     Stdlib.Cli.Dir.withTemp(fun dir ->
       Stdlib.Cli.FileSystem.readFileAsString(dir)

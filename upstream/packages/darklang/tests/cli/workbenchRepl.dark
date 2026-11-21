@@ -220,7 +220,6 @@ test uncapturedRebindMovesLast =
 
 
 // --- capturing a value, and reading `captureValue` back ---
-// @compiler xfail compile: "Unknown function or value 'Cli.Repl.captureValue'" class=missing-support reason=upstream-dependency
 test capturesRealValues =
   // The end of the round-trip that matters: a value goes out as source you could paste back in. Enums are
   // in here because they're what a REPL actually produces, and they only render as names because

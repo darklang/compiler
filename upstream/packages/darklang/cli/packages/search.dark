@@ -42,7 +42,6 @@ let operatorAlias(query: String): Option<String> =
 
 /// For a query that names an operator as a function, `Int64.mod`, the operator it is: there is no
 /// such function to find, and what the results hold instead is the trait's own method.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.operatorHint: Unknown function or value 'Packages.Errors.operatorSuggestion'"
 let operatorHint(branchId: Uuid, query: String): Unit =
   match Errors.operatorSuggestion(
           branchId,
@@ -210,7 +209,6 @@ let rankerWith(query: String, synonyms: List<String>, uses: Dict<String, Int64>)
       uses = uses }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.rankerFor: Unknown function or value 'rankerWith'"
 let rankerFor(query: String): Ranker =
   rankerWith(query, [], Stdlib.Dict.empty)
 
@@ -238,7 +236,6 @@ let rankName(ranker: Ranker, name: String): Int64 =
   rankLowered(ranker, Stdlib.String.toLowercase(name))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.nameRank: Unknown function or value 'rankerFor'"
 let nameRank(query: String, name: String): Int64 =
   rankName(rankerFor(query), name)
 
@@ -307,7 +304,6 @@ let usageKey(uses: Dict<String, Int64>, path: String): String =
 // then the tier, then how many items call it, and finally the full path for
 // deterministic ordering. Each part is fixed-width, so plain string ordering under
 // `sortBy` gives the intended result.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.rankKey: Unknown function or value 'tier'"
 let rankKey(ranker: Ranker, owner: String, modules: List<String>, name: String): String =
   let lowerName = Stdlib.String.toLowercase(name)
   let mr = Stdlib.display(rankInModule(ranker, modules, lowerName))
@@ -325,7 +321,6 @@ let rankKey(ranker: Ranker, owner: String, modules: List<String>, name: String):
 val rankKeyHead = 9
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.sortKey: Unknown function or value 'rankKey'"
 let sortKey(query: String, owner: String, modules: List<String>, name: String): String =
   rankKey(rankerFor(query), owner, modules, name)
 
@@ -343,7 +338,6 @@ let showsTestHelpers(query: String, currentModule: List<String>): Bool =
 
 
 // How many types, values, fns, traits and impls the results hold.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 let itemCount(results: LanguageTools.ProgramTypes.Search.SearchResults): Int64 =
   Stdlib.List.length(results.types)
   + Stdlib.List.length(results.values)
@@ -353,7 +347,6 @@ let itemCount(results: LanguageTools.ProgramTypes.Search.SearchResults): Int64 =
 
 
 // The results without test helpers, and how many were left out.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 let withoutTestHelpers(
   results: LanguageTools.ProgramTypes.Search.SearchResults)
   : (LanguageTools.ProgramTypes.Search.SearchResults * Int64) =
@@ -382,7 +375,6 @@ let withoutTestHelpers(
 
 
 // <param items> best first, each ranked once.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.ranked: Unknown function or value 'rankKey'"
 let ranked(
   ranker: Ranker,
   items: List<LanguageTools.ProgramTypes.LocatedItem<'a>>)
@@ -396,7 +388,6 @@ let ranked(
 // module hit, tier, usage), so a section led by a much-called Stdlib function prints
 // before one led by a CLI internal that matches as well. Takes the items <fn ranked>.
 // Empty sections sort last.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.bestItemKey: Unknown function or value 'rankKey'"
 let bestItemKey(ranker: Ranker, items: List<LanguageTools.ProgramTypes.LocatedItem<'a>>): String =
   match items with
   | [] -> Stdlib.String.checkedRepeat("9", rankKeyHead) |> Stdlib.Result.withDefault("")
@@ -407,7 +398,6 @@ let bestItemKey(ranker: Ranker, items: List<LanguageTools.ProgramTypes.LocatedIt
 
 
 // Whether nothing found is named by the query, so every hit matched on its doc comment.
-// @compiler blocked: upstream-dependency diagnostic="onlyDocMatches: Unknown type 'Packages.PackageLocation'"
 let onlyDocMatches(
   ranker: Ranker,
   locations: List<LanguageTools.ProgramTypes.PackageLocation>)
@@ -475,7 +465,6 @@ let typeWord(word: String): Option<String> =
 
 
 // The <fn typeWord> spelling of a type, for the types a word can name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let typeWordOf(t: LanguageTools.ProgramTypes.TypeReference): Option<String> =
   match t with
   | TString -> Option.Some("string")
@@ -547,7 +536,6 @@ let typeQuery(query: String): Option<(String * String)> =
 
 // Whether a function's result is <param target>, bare or as the first type
 // argument of what it returns: `Result<Int64, _>` or `Option<Int64>`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TypeReference'"
 let returnsType(target: String, t: LanguageTools.ProgramTypes.TypeReference): Bool =
   if typeWordOf(t) == Option.Some(target) then
     true
@@ -568,7 +556,6 @@ let convertsByName(name: String): Bool =
 
 // Whether a function takes <param source> first and returns <param target>, bare
 // or in a Result or Option.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let takesAndReturns(
   source: String,
   target: String,
@@ -582,7 +569,6 @@ let takesAndReturns(
 
 // The sort key of a function for a by-type query. One named for converting comes
 // first, then one taking nothing else, then the most called.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let typeMatchKey(
   uses: Dict<String, Int64>,
   item: LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>)
@@ -600,7 +586,6 @@ let typeMatchKey(
 
 // The Stdlib functions a by-type query asks for, in no order: they are ranked once
 // their callers are counted.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let byType(
   branchId: Uuid,
   source: String,
@@ -646,7 +631,6 @@ let nearNames(word: String, names: List<String>): List<String> =
 
 
 // The names of everything a search from <param currentModule> could find.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.namesUnder: Unknown function or value 'LanguageTools.PackageManager.Search.searchNames'"
 let namesUnder(branchId: Uuid, currentModule: List<String>): List<String> =
   let query =
     LanguageTools.ProgramTypes.Search.SearchQuery
@@ -680,7 +664,6 @@ val nothingToTry = NothingFound { wordCounts = [], didYouMean = [] }
 // What to try when <param query> found nothing. Each word of a several-word query
 // on its own, since every word has to match and one may be what ruled everything
 // out; and for a word that finds nothing alone, the names it is a typo of.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.nothingFound: Unknown function or value 'Query.withoutInternal'"
 let nothingFound(
   branchId: Uuid,
   query: LanguageTools.ProgramTypes.Search.SearchQuery)
@@ -784,7 +767,6 @@ let fullPathOf(item: LanguageTools.ProgramTypes.LocatedItem<'a>): String =
 // abbreviated relative to the item's own module, so `Stdlib.Option.Option` shows
 // as `Option.Option` for a Stdlib hit, and a package hit's types collapse to its
 // own root rather than being forced through the Stdlib namespace.
-// @compiler blocked: upstream-dependency diagnostic="contextFor: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 let contextFor(
   branchId: Uuid,
   item: LanguageTools.ProgramTypes.LocatedItem<'a>)
@@ -797,7 +779,6 @@ let contextFor(
 // (one line each via `renderItem`), and an overflow footer. Nothing is printed
 // for an empty section. `renderItem` does the per-entity formatting at the call
 // site, so this stays generic over the entity type.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.renderSection: Unknown function or value 'rankKey'"
 let renderSection(
   header: String,
   cap: Int64,
@@ -885,7 +866,6 @@ let parseArgs(args: List<String>): ParsedArgs =
       parseErrors = p.errors }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 val usage =
   "Usage: search <query> [--batch] [--limit N] [--type] [--fn] [--val] [--trait] [--impl] [--test] [--exact] [--shallow] [--with-docs] [--include-deprecated] [--include-internal] [--include-tests]"
 
@@ -894,7 +874,6 @@ val usage =
 // same rendering the human view shows, minus color. `alsoSearched` is the synonym queries that ran
 // too; `wordCounts` and `didYouMean` are what the human view hints when nothing matched, and are
 // empty otherwise.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Search.SearchResults'"
 let jsonOutput(
   branchId: Uuid,
   queryText: String,
@@ -1027,7 +1006,6 @@ let hiddenHelpersHint(count: Int64): Unit =
 /// `Darklang.Stdlib.List`, and `search Stdlib.List.ma --shallow` (from `Darklang`) what
 /// in `Darklang.Stdlib.List` matches `ma`. The module is resolved from <param location>,
 /// the way `nav` resolves it. Any other query searches <param location> itself.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let shallowScope(
   branchId: Uuid,
   location: PackageLocation,
@@ -1061,7 +1039,6 @@ let shallowScope(
 
 
 // <param extra> after <param have>, leaving out what <param have> holds already.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.addItems: Unknown function or value 'Stdlib.Dict.containsKey'"
 let addItems(
   have: List<LanguageTools.ProgramTypes.LocatedItem<'a>>,
   extra: List<LanguageTools.ProgramTypes.LocatedItem<'a>>)
@@ -1079,7 +1056,6 @@ let addItems(
 
 
 // <param more> added to <param results>, leaving out what is there already.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.mergeResults: Unknown function or value 'addItems'"
 let mergeResults(
   results: LanguageTools.ProgramTypes.Search.SearchResults,
   more: LanguageTools.ProgramTypes.Search.SearchResults)
@@ -1112,7 +1088,6 @@ let calledPath(
 // How many items call each of <param results> and <param typed>, by full path, from the
 // store's dependency rows. One read for the whole search, and a path only for an item
 // something calls.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Search.callerUses: Unknown function or value 'Builtin.pmCallerCounts'"
 let callerUses(
   results: LanguageTools.ProgramTypes.Search.SearchResults,
   typed:
@@ -1147,7 +1122,6 @@ let callerUses(
           results.tests |> Stdlib.List.filterMap(fun i -> calledPath(byHash, i.entity.hash, i)) ]))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let executeQuery(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -1522,7 +1496,6 @@ let executeQuery(state: AppState, args: List<String>): AppState =
         state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] -> executeQuery(state, args)
@@ -1568,7 +1541,6 @@ let execute(state: AppState, args: List<String>): AppState =
       state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(state: AppState): String =
   [ "Search modules, types, functions, values, traits, implementations and tests"
     ""
@@ -1623,7 +1595,6 @@ let help(state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   // Offer flag completions when typing --
   match Stdlib.List.last(args) with

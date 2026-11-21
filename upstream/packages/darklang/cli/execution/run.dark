@@ -14,7 +14,6 @@ type Approval =
 
 
 /// Unit succeeds; BigInt and Int64 supply the script's exit code.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let exitCode(value: LanguageTools.RuntimeTypes.Dval): Result<Int64, ExecutionError.ExecutionError> =
   match value with
   | DUnit -> Result.Ok(0)
@@ -31,7 +30,6 @@ let exitCode(value: LanguageTools.RuntimeTypes.Dval): Result<Int64, ExecutionErr
 
 
 /// Run a script under its permissions and return its exit code.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError.ExecutionError'"
 let parseAndExecute(
   accountID: Option<Uuid>,
   branchId: Uuid,
@@ -91,7 +89,6 @@ let isFlag(arg: String): Bool =
   Stdlib.String.getByteAt(arg, 0) == Option.Some(45u8)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let (options, script) = splitArguments(args)
   let asksForHelp =
@@ -116,7 +113,6 @@ let execute(state: AppState, args: List<String>): AppState =
 /// Parse the options before the script path. <param stats> is `--stats`: kept out of
 /// `ScriptOptions` because those are saved with the trace for replay, and a replay has no reason
 /// to report what the original cost.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeOptions(
   state: AppState,
   flags: List<String>,
@@ -167,7 +163,6 @@ let looksLikePackageName(path: String): Bool =
   && (Stdlib.String.endsWith(path, ".dark") |> Stdlib.Bool.not)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeScript(
   state: AppState,
   scriptPath: String,
@@ -195,7 +190,6 @@ let executeScript(
 /// Run the package function <param name> the way a script runs: under the same policy, with
 /// <param args> as its argument, and its Int64 result as the exit code. A function that takes
 /// nothing is called with `()`; one with other parameters is refused with its signature.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executePackageFn(
   state: AppState,
   name: String,
@@ -235,7 +229,6 @@ let executePackageFn(
 
 
 /// <fn executePackageFn> for a function that takes nothing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Run.runNullary: Unknown function or value 'runScriptMeasured'"
 let runNullary(
   state: AppState,
   name: String,
@@ -252,7 +245,6 @@ let runNullary(
 
 
 /// The host supplies these exact requests; guest text cannot supply approval rules.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Run.askPermission: Unknown function or value 'LanguageTools.Permissions.parseRuleText'"
 let askPermission(request: (String * List<String>)): Int64 =
   let (name, rules) = request
   Stdlib.printErrorLine($"{name} needs access:")
@@ -308,7 +300,6 @@ let askPermission(request: (String * List<String>)): Int64 =
     0
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let printScriptError(state: AppState, e: ExecutionError.ExecutionError): AppState =
   match e with
   // The prompt already said so.
@@ -323,7 +314,6 @@ let printScriptError(state: AppState, e: ExecutionError.ExecutionError): AppStat
 
 /// Run a script with exact access review before protected operations.
 /// Interactive grants never restart the script or repeat earlier work.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let runScript(
   state: AppState,
   scriptPath: String,
@@ -344,7 +334,6 @@ let runScript(
 /// <fn runScript>, and with <param stats> also what the run cost, the same block `eval --stats`
 /// prints. Interactive permission review time is included; use pre-approved access
 /// when measuring execution.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let runScriptMeasured(
   state: AppState,
   scriptPath: String,
@@ -392,7 +381,6 @@ let runScriptMeasured(
 
 /// A failed run whose arguments hold `--allow` most likely meant it for `run`: everything after
 /// the name goes to the program, so the access was never granted.
-// @compiler blocked: upstream-dependency diagnostic="noteMisplacedAllow: Unknown type 'AppState'"
 let noteMisplacedAllow(state: AppState, name: String, args: List<String>): Unit =
   let misplaced =
     Stdlib.List.any(args, fun arg -> arg == "--allow" || Stdlib.String.startsWith(arg, "--allow="))
@@ -405,7 +393,6 @@ let noteMisplacedAllow(state: AppState, name: String, args: List<String>): Unit 
 
 
 /// Report the completed run. Permission review happens before the operation.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let handleResult(state: AppState, result: Result<Int64, ExecutionError.ExecutionError>): AppState =
   match result with
   | Ok(exitCode) ->
@@ -414,7 +401,6 @@ let handleResult(state: AppState, result: Result<Int64, ExecutionError.Execution
   | Error(e) -> printScriptError(state, e)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] ->
@@ -432,7 +418,6 @@ let complete(_state: AppState, args: List<String>): List<Completion.CompletionIt
   | _ -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: run-script [options] <function or path> [args...]"
     "Run a package function by name, or a Dark script file."

@@ -7,25 +7,24 @@ type Host =
 
 /// Identifies and returns the operating system and architecture of the runtime host.
 /// Returns {{Ok <Host>}} on success, or an {{Error}} with combined stderr if it fails
-let getRuntimeHost () : Stdlib.Result.Result<Host.Host, String> =
-  let os = OS.getOS ()
-  let arch = Architecture.getArchitecture ()
-  let defaultShell = Shell.getDefaultShell ()
+let getRuntimeHost(): Stdlib.Result.Result<Host.Host, String> =
+  let os = OS.getOS()
+  let arch = Architecture.getArchitecture()
+  let defaultShell = Shell.getDefaultShell()
 
   match os, arch, defaultShell with
-  | Ok os, Ok arch, Ok defaultShell ->
+  | Ok(os), Ok(arch), Ok(defaultShell) ->
     Stdlib.Result.Result.Ok(
       Host.Host
         { os = os
           arch = arch
-          defaultShell = defaultShell }
-    )
+          defaultShell = defaultShell })
 
-  | Error os, _, _ ->
-    Stdlib.Result.Result.Error $"Couldn't determine host OS: ${os}"
-  | _, Error arch, _ ->
-    Stdlib.Result.Result.Error
-      $"Couldn't determine host architecture: ${arch}"
-  | _, _, Error defaultShell ->
-    Stdlib.Result.Result.Error
-      $"Couldn't determine host default shell ${defaultShell}"
+  | Error(os), _, _ ->
+    Stdlib.Result.Result.Error($"Couldn't determine host OS: ${os}")
+  | _, Error(arch), _ ->
+    Stdlib.Result.Result.Error(
+      $"Couldn't determine host architecture: ${arch}")
+  | _, _, Error(defaultShell) ->
+    Stdlib.Result.Result.Error(
+      $"Couldn't determine host default shell ${defaultShell}")

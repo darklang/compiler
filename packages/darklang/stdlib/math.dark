@@ -6,13 +6,13 @@ val pi = 3.141592653589793
 val tau = 6.283185307179586
 
 val e = 2.718281828459045
-let degrees (angleInDegrees: Float) : Float =
+let degrees(angleInDegrees: Float): Float =
   (angleInDegrees * Stdlib.Math.pi)
   |> (/) 180.0
 
-let turns (angleInTurns: Float) : Float =
+let turns(angleInTurns: Float): Float =
   Stdlib.Math.tau * angleInTurns
-let radians (angleInRadians: Float) : Float = angleInRadians
+let radians(angleInRadians: Float): Float = angleInRadians
 
 // sin and cos as glibc 2.39 computes them with FMA, which is what .NET's Math.Sin
 // and Math.Cos return under the interpreter on Linux x64 (and what the same
@@ -23,1677 +23,1677 @@ let radians (angleInRadians: Float) : Float = angleInRadians
 // that nothing is allocated, except the rare __branred path.
 
 // The rounding error of a + b.
-let __sumError (a: Float) (b: Float) : Float =
+let __sumError(a: Float, b: Float): Float =
     let s = a + b in
     let bb = s - a in
     (a - (s - bb)) + (b - bb)
 
-let __splitHigh (a: Float) : Float =
+let __splitHigh(a: Float): Float =
     let c = 134217729.0 * a in
     c - (c - a)
 
 // The rounding error of a * b.
-let __productError (a: Float) (b: Float) : Float =
-    let ah = Stdlib.Math.__splitHigh a in
+let __productError(a: Float, b: Float): Float =
+    let ah = Stdlib.Math.__splitHigh(a) in
     let al = a - ah in
-    let bh = Stdlib.Math.__splitHigh b in
+    let bh = Stdlib.Math.__splitHigh(b) in
     let bl = b - bh in
     ((ah * bh - a * b) + ah * bl + al * bh) + al * bl
 
 // a * b + c rounded once. The exact sum p + pl + c is summed as th + (tl + pl);
 // the second rounding can only go wrong when th + v is exactly halfway between
 // two Floats, and the bits lost from v then decide it.
-let __fma (a: Float) (b: Float) (c: Float) : Float =
+let __fma(a: Float, b: Float, c: Float): Float =
     let p = a * b in
-    let pl = Stdlib.Math.__productError a b in
+    let pl = Stdlib.Math.__productError(a, b) in
     let th = c + p in
-    let tl = Stdlib.Math.__sumError c p in
+    let tl = Stdlib.Math.__sumError(c, p) in
     let v = tl + pl in
-    let lost = Stdlib.Math.__sumError tl pl in
+    let lost = Stdlib.Math.__sumError(tl, pl) in
     let r = th + v in
-    let err = Stdlib.Math.__sumError th v in
+    let err = Stdlib.Math.__sumError(th, v) in
     let step = 2.0 * err in
-    if lost != 0.0 && err != 0.0 && r + step != r && Stdlib.Math.__sumError r step == 0.0 && (lost > 0.0) == (err > 0.0) then
+    if lost != 0.0 && err != 0.0 && r + step != r && Stdlib.Math.__sumError(r, step) == 0.0 && (lost > 0.0) == (err > 0.0) then
         r + step
     else r
 
-let __copySign (magnitude: Float) (sign: Float) : Float =
-    let m = Stdlib.Float64.absoluteValue magnitude in
-    if sign < 0.0 then Stdlib.Float64.negate m else m
+let __copySign(magnitude: Float, sign: Float): Float =
+    let m = Stdlib.Float64.absoluteValue(magnitude) in
+    if sign < 0.0 then Stdlib.Float64.negate(m) else m
 
 // glibc's __sincostab: sin and cos of i/128 for i in 0..109, each as a value and
 // a correction.
-let __sinCosTable (i: Int64) : Float =
-    if i < 220L then
-        if i < 110L then
-            if i < 55L then
-                if i < 27L then
-                    if i < 13L then
-                        if i < 6L then
-                            if i < 3L then
-                                if i < 1L then
+let __sinCosTable(i: Int64): Float =
+    if i < 220 then
+        if i < 110 then
+            if i < 55 then
+                if i < 27 then
+                    if i < 13 then
+                        if i < 6 then
+                            if i < 3 then
+                                if i < 1 then
                                     0.0
                                 else
-                                    if i < 2L then
+                                    if i < 2 then
                                         0.0
                                     else
                                         1.0
                             else
-                                if i < 4L then
+                                if i < 4 then
                                     0.0
                                 else
-                                    if i < 5L then
+                                    if i < 5 then
                                         0.0078124205273828315
                                     else
                                         -4.102755709382617e-19
                         else
-                            if i < 9L then
-                                if i < 7L then
+                            if i < 9 then
+                                if i < 7 then
                                     0.9999694825770951
                                 else
-                                    if i < 8L then
+                                    if i < 8 then
                                         5.427791428371788e-17
                                     else
                                         0.015624364224883372
                             else
-                                if i < 11L then
-                                    if i < 10L then
+                                if i < 11 then
+                                    if i < 10 then
                                         -1.265093755275982e-19
                                     else
                                         0.9998779321710066
                                 else
-                                    if i < 12L then
+                                    if i < 12 then
                                         3.216122229972341e-17
                                     else
                                         0.02343535429172257
                     else
-                        if i < 20L then
-                            if i < 16L then
-                                if i < 14L then
+                        if i < 20 then
+                            if i < 16 then
+                                if i < 14 then
                                     1.0500785515068913e-19
                                 else
-                                    if i < 15L then
+                                    if i < 15 then
                                         0.9997253543694995
                                     else
                                         4.666714544113391e-17
                             else
-                                if i < 18L then
-                                    if i < 17L then
+                                if i < 18 then
+                                    if i < 17 then
                                         0.03124491398532608
                                     else
                                         -1.562781562225433e-18
                                 else
-                                    if i < 19L then
+                                    if i < 19 then
                                         0.9995117584851364
                                     else
                                         -3.418806487972947e-17
                         else
-                            if i < 23L then
-                                if i < 21L then
+                            if i < 23 then
+                                if i < 21 then
                                     0.03905256665042215
                                 else
-                                    if i < 22L then
+                                    if i < 22 then
                                         1.1342467037138512e-18
                                     else
                                         0.999237157554709
                             else
-                                if i < 25L then
-                                    if i < 24L then
+                                if i < 25 then
+                                    if i < 24 then
                                         1.1089280858439994e-17
                                     else
                                         0.04685783574813424
                                 else
-                                    if i < 26L then
+                                    if i < 26 then
                                         -2.3419368365610254e-18
                                     else
                                         0.9989015683384429
                 else
-                    if i < 41L then
-                        if i < 34L then
-                            if i < 30L then
-                                if i < 28L then
+                    if i < 41 then
+                        if i < 34 then
+                            if i < 30 then
+                                if i < 28 then
                                     -2.1425557800399754e-17
                                 else
-                                    if i < 29L then
+                                    if i < 29 then
                                         0.05466024488506646
                                     else
                                         3.373831935351774e-19
                             else
-                                if i < 32L then
-                                    if i < 31L then
+                                if i < 32 then
+                                    if i < 31 then
                                         0.9985050113189741
                                     else
                                         1.779930870620664e-17
                                 else
-                                    if i < 33L then
+                                    if i < 33 then
                                         0.0624593178423802
                                     else
                                         -2.040259504585711e-18
                         else
-                            if i < 37L then
-                                if i < 35L then
+                            if i < 37 then
+                                if i < 35 then
                                     0.9980475107000991
                                 else
-                                    if i < 36L then
+                                    if i < 36 then
                                         3.3232291674141346e-17
                                     else
                                         0.07025457860486005
                             else
-                                if i < 39L then
-                                    if i < 38L then
+                                if i < 39 then
+                                    if i < 38 then
                                         -6.773890900301373e-18
                                     else
                                         0.9975290944052978
                                 else
-                                    if i < 40L then
+                                    if i < 40 then
                                         5.112086057887235e-18
                                     else
                                         0.07804555138996731
                     else
-                        if i < 48L then
-                            if i < 44L then
-                                if i < 42L then
+                        if i < 48 then
+                            if i < 44 then
+                                if i < 42 then
                                     -5.4494437820057936e-18
                                 else
-                                    if i < 43L then
+                                    if i < 43 then
                                         0.9969497940760287
                                     else
                                         -1.2467075728553626e-17
                             else
-                                if i < 46L then
-                                    if i < 45L then
+                                if i < 46 then
+                                    if i < 45 then
                                         0.08583176067687935
                                     else
                                         -3.490037167231825e-18
                                 else
-                                    if i < 47L then
+                                    if i < 47 then
                                         0.996309645069798
                                     else
                                         -1.1743657041590172e-18
                         else
-                            if i < 51L then
-                                if i < 49L then
+                            if i < 51 then
+                                if i < 49 then
                                     0.09361273123551289
                                 else
-                                    if i < 50L then
+                                    if i < 50 then
                                         1.4628632005878733e-18
                                     else
                                         0.9956086864580017
                             else
-                                if i < 53L then
-                                    if i < 52L then
+                                if i < 53 then
+                                    if i < 52 then
                                         3.312922430932991e-17
                                     else
                                         0.10138798815552964
                                 else
-                                    if i < 54L then
+                                    if i < 54 then
                                         3.99242856835807e-18
                                     else
                                         0.9948469610235406
             else
-                if i < 82L then
-                    if i < 68L then
-                        if i < 61L then
-                            if i < 58L then
-                                if i < 56L then
+                if i < 82 then
+                    if i < 68 then
+                        if i < 61 then
+                            if i < 58 then
+                                if i < 56 then
                                     -8.198278333258706e-18
                                 else
-                                    if i < 57L then
+                                    if i < 57 then
                                         0.10915705687532236
                                     else
                                         6.6284699502736666e-18
                             else
-                                if i < 59L then
+                                if i < 59 then
                                     0.9940245152582091
                                 else
-                                    if i < 60L then
+                                    if i < 60 then
                                         1.3287985046260087e-17
                                     else
                                         0.11691946321097965
                         else
-                            if i < 64L then
-                                if i < 62L then
+                            if i < 64 then
+                                if i < 62 then
                                     -2.283412536970096e-18
                                 else
-                                    if i < 63L then
+                                    if i < 63 then
                                         0.9931413993598577
                                     else
                                         2.8553964189785565e-17
                             else
-                                if i < 66L then
-                                    if i < 65L then
+                                if i < 66 then
+                                    if i < 65 then
                                         0.12467473338522769
                                     else
                                         -2.925947496057858e-18
                                 else
-                                    if i < 67L then
+                                    if i < 67 then
                                         0.992197667229329
                                     else
                                         4.754870575189364e-17
                     else
-                        if i < 75L then
-                            if i < 71L then
-                                if i < 69L then
+                        if i < 75 then
+                            if i < 71 then
+                                if i < 69 then
                                     0.13242239405634718
                                 else
-                                    if i < 70L then
+                                    if i < 70 then
                                         1.2801053067990684e-17
                                     else
                                         0.9911933764671682
                             else
-                                if i < 73L then
-                                    if i < 72L then
+                                if i < 73 then
+                                    if i < 72 then
                                         3.1426138811726996e-17
                                     else
                                         0.1401619723470637
                                 else
-                                    if i < 74L then
+                                    if i < 74 then
                                         -9.946847113883478e-18
                                     else
                                         0.9901285883701071
                         else
-                            if i < 78L then
-                                if i < 76L then
+                            if i < 78 then
+                                if i < 76 then
                                     -4.589906353553811e-18
                                 else
-                                    if i < 77L then
+                                    if i < 77 then
                                         0.14789299587340962
                                     else
                                         -1.3140968557128452e-17
                             else
-                                if i < 80L then
-                                    if i < 79L then
+                                if i < 80 then
+                                    if i < 79 then
                                         0.9890033679273229
                                     else
                                         1.7676104005868335e-18
                                 else
-                                    if i < 81L then
+                                    if i < 81 then
                                         0.15561499277355603
                                     else
                                         8.886053372342288e-18
                 else
-                    if i < 96L then
-                        if i < 89L then
-                            if i < 85L then
-                                if i < 83L then
+                    if i < 96 then
+                        if i < 89 then
+                            if i < 85 then
+                                if i < 83 then
                                     0.9878177838164719
                                 else
-                                    if i < 84L then
+                                    if i < 84 then
                                         4.91917302237681e-17
                                     else
                                         0.16332749173661285
                             else
-                                if i < 87L then
-                                    if i < 86L then
+                                if i < 87 then
+                                    if i < 86 then
                                         5.483569430347159e-18
                                     else
                                         0.9865719083994976
                                 else
-                                    if i < 88L then
+                                    if i < 88 then
                                         -1.0327444588275446e-17
                                     else
                                         0.17103002203139503
                         else
-                            if i < 92L then
-                                if i < 90L then
+                            if i < 92 then
+                                if i < 90 then
                                     -9.954774726452923e-18
                                 else
-                                    if i < 91L then
+                                    if i < 91 then
                                         0.9852658177182139
                                     else
                                         -4.925721262944555e-17
                             else
-                                if i < 94L then
-                                    if i < 93L then
+                                if i < 94 then
+                                    if i < 93 then
                                         0.17872211353515366
                                     else
                                         -1.6240405901074e-20
                                 else
-                                    if i < 95L then
+                                    if i < 95 then
                                         0.983899591489664
                                     else
                                         -2.1647988531644275e-17
                     else
-                        if i < 103L then
-                            if i < 99L then
-                                if i < 97L then
+                        if i < 103 then
+                            if i < 99 then
+                                if i < 97 then
                                     0.18640329676226988
                                 else
-                                    if i < 98L then
+                                    if i < 98 then
                                         2.3493796901281573e-18
                                     else
                                         0.9824733131012553
                             else
-                                if i < 101L then
-                                    if i < 100L then
+                                if i < 101 then
+                                    if i < 100 then
                                         -3.919920375420088e-17
                                     else
                                         0.1940731028929098
                                 else
-                                    if i < 102L then
+                                    if i < 102 then
                                         -7.832741210198615e-18
                                     else
                                         0.9809870696056692
                         else
-                            if i < 106L then
-                                if i < 104L then
+                            if i < 106 then
+                                if i < 104 then
                                     1.967841180870303e-17
                                 else
-                                    if i < 105L then
+                                    if i < 105 then
                                         0.2017310638016388
                                     else
                                         5.587232815460113e-18
                             else
-                                if i < 108L then
-                                    if i < 107L then
+                                if i < 108 then
+                                    if i < 107 then
                                         0.9794409517155483
                                     else
                                         1.310876952152676e-17
                                 else
-                                    if i < 109L then
+                                    if i < 109 then
                                         0.20937671208599365
                                     else
                                         -5.536403693172164e-18
         else
-            if i < 165L then
-                if i < 137L then
-                    if i < 123L then
-                        if i < 116L then
-                            if i < 113L then
-                                if i < 111L then
+            if i < 165 then
+                if i < 137 then
+                    if i < 123 then
+                        if i < 116 then
+                            if i < 113 then
+                                if i < 111 then
                                     0.9778350537979598
                                 else
-                                    if i < 112L then
+                                    if i < 112 then
                                         2.9910028492769484e-17
                                     else
                                         0.21700958109501015
                             else
-                                if i < 114L then
+                                if i < 114 then
                                     1.1170071073364376e-17
                                 else
-                                    if i < 115L then
+                                    if i < 115 then
                                         0.9761694738686353
                                     else
                                         -7.850690609285027e-18
                         else
-                            if i < 119L then
-                                if i < 117L then
+                            if i < 119 then
+                                if i < 117 then
                                     0.2246292049577053
                                 else
-                                    if i < 118L then
+                                    if i < 118 then
                                         -1.058590416432903e-17
                                     else
                                         0.9744443135859889
                             else
-                                if i < 121L then
-                                    if i < 120L then
+                                if i < 121 then
+                                    if i < 120 then
                                         4.990128834921396e-17
                                     else
                                         0.23223511861151147
                                 else
-                                    if i < 122L then
+                                    if i < 122 then
                                         -8.318080852687206e-18
                                     else
                                         0.9726596782449127
                     else
-                        if i < 130L then
-                            if i < 126L then
-                                if i < 124L then
+                        if i < 130 then
+                            if i < 126 then
+                                if i < 124 then
                                     2.3920264546490165e-17
                                 else
-                                    if i < 125L then
+                                    if i < 125 then
                                         0.23982685783066157
                                     else
                                         -7.260810660979712e-18
                             else
-                                if i < 128L then
-                                    if i < 127L then
+                                if i < 128 then
+                                    if i < 127 then
                                         0.9708156767703494
                                     else
                                         5.1285792532153653e-17
                                 else
-                                    if i < 129L then
+                                    if i < 129 then
                                         0.24740395925452294
                                     else
                                         -7.53102495590706e-18
                         else
-                            if i < 133L then
-                                if i < 131L then
+                            if i < 133 then
+                                if i < 131 then
                                     0.9689124217106447
                                 else
-                                    if i < 132L then
+                                    if i < 132 then
                                         5.071436662403936e-17
                                     else
                                         0.2549659604158785
                             else
-                                if i < 135L then
-                                    if i < 134L then
+                                if i < 135 then
+                                    if i < 134 then
                                         -2.2310035435425957e-17
                                     else
                                         0.9669500292306779
                                 else
-                                    if i < 136L then
+                                    if i < 136 then
                                         -3.237770297707692e-17
                                     else
                                         0.2625123997691533
                 else
-                    if i < 151L then
-                        if i < 144L then
-                            if i < 140L then
-                                if i < 138L then
+                    if i < 151 then
+                        if i < 144 then
+                            if i < 140 then
+                                if i < 138 then
                                     -2.2534597527902128e-17
                                 else
-                                    if i < 139L then
+                                    if i < 139 then
                                         0.964928619104771
                                     else
                                         -3.0345542681018625e-18
                             else
-                                if i < 142L then
-                                    if i < 141L then
+                                if i < 142 then
+                                    if i < 141 then
                                         0.27004281671858504
                                     else
                                         -1.2103265097887777e-17
                                 else
-                                    if i < 143L then
+                                    if i < 143 then
                                         0.9628483147093797
                                     else
                                         -4.646009771724241e-18
                         else
-                            if i < 147L then
-                                if i < 145L then
+                            if i < 147 then
+                                if i < 145 then
                                     0.2775567516463363
                                 else
-                                    if i < 146L then
+                                    if i < 146 then
                                         1.7674070262791825e-17
                                     else
                                         0.9607092430155619
                             else
-                                if i < 149L then
-                                    if i < 148L then
+                                if i < 149 then
+                                    if i < 148 then
                                         -2.807827063516729e-17
                                     else
                                         0.28505374594054744
                                 else
-                                    if i < 150L then
+                                    if i < 150 then
                                         -1.8162083107618118e-17
                                     else
                                         0.9585115345812286
                     else
-                        if i < 158L then
-                            if i < 154L then
-                                if i < 152L then
+                        if i < 158 then
+                            if i < 154 then
+                                if i < 152 then
                                     8.134621492946255e-18
                                 else
-                                    if i < 153L then
+                                    if i < 153 then
                                         0.29253334202332754
                                     else
                                         7.516944930327352e-18
                             else
-                                if i < 156L then
-                                    if i < 155L then
+                                if i < 156 then
+                                    if i < 155 then
                                         0.9562553235431753
                                     else
                                         -3.148450868841629e-17
                                 else
-                                    if i < 157L then
+                                    if i < 157 then
                                         0.299995083378683
                                     else
                                         2.606392777930734e-17
                         else
-                            if i < 161L then
-                                if i < 159L then
+                            if i < 161 then
+                                if i < 159 then
                                     0.9539407476088947
                                 else
-                                    if i < 160L then
+                                    if i < 160 then
                                         4.3757589471734985e-17
                                     else
                                         0.30743851458038085
                             else
-                                if i < 163L then
-                                    if i < 162L then
+                                if i < 163 then
+                                    if i < 162 then
                                         1.1004366442765292e-19
                                     else
                                         0.9515679480481722
                                 else
-                                    if i < 164L then
+                                    if i < 164 then
                                         -3.8614834675674123e-17
                                     else
                                         0.3148631813197453
             else
-                if i < 192L then
-                    if i < 178L then
-                        if i < 171L then
-                            if i < 168L then
-                                if i < 166L then
+                if i < 192 then
+                    if i < 178 then
+                        if i < 171 then
+                            if i < 168 then
+                                if i < 166 then
                                     -2.6921345305772252e-17
                                 else
-                                    if i < 167L then
+                                    if i < 167 then
                                         0.949137069684463
                                     else
                                         4.149148046099445e-17
                             else
-                                if i < 169L then
+                                if i < 169 then
                                     0.3222686304333866
                                 else
-                                    if i < 170L then
+                                    if i < 170 then
                                         2.093773358126606e-17
                                     else
                                         0.9466482608860534
                         else
-                            if i < 174L then
-                                if i < 172L then
+                            if i < 174 then
+                                if i < 172 then
                                     -3.911683334934152e-17
                                 else
-                                    if i < 173L then
+                                    if i < 173 then
                                         0.32965440993086015
                                     else
                                         2.35998378957031e-17
                             else
-                                if i < 176L then
-                                    if i < 175L then
+                                if i < 176 then
+                                    if i < 175 then
                                         0.9441016735570044
                                     else
                                         -1.6017653284545848e-17
                                 else
-                                    if i < 177L then
+                                    if i < 177 then
                                         0.33702006902225307
                                     else
                                         1.0312279860787216e-17
                     else
-                        if i < 185L then
-                            if i < 181L then
-                                if i < 179L then
+                        if i < 185 then
+                            if i < 181 then
+                                if i < 179 then
                                     0.9414974631278811
                                 else
-                                    if i < 180L then
+                                    if i < 180 then
                                         -4.85238302367971e-18
                                     else
                                         0.3443651581456984
                             else
-                                if i < 183L then
-                                    if i < 182L then
+                                if i < 183 then
+                                    if i < 182 then
                                         5.881664587517989e-18
                                     else
                                         0.9388357885462655
                                 else
-                                    if i < 184L then
+                                    if i < 184 then
                                         6.919329459921788e-18
                                     else
                                         0.3516892289948141
                         else
-                            if i < 188L then
-                                if i < 186L then
+                            if i < 188 then
+                                if i < 186 then
                                     -2.5616208736069942e-17
                                 else
-                                    if i < 187L then
+                                    if i < 187 then
                                         0.9361168122670553
                                     else
                                         -5.2350302039683216e-17
                             else
-                                if i < 190L then
-                                    if i < 189L then
+                                if i < 190 then
+                                    if i < 189 then
                                         0.35899183454606504
                                     else
                                         1.7495482840158848e-17
                                 else
-                                    if i < 191L then
+                                    if i < 191 then
                                         0.9333407002425484
                                     else
                                         -1.322859547778088e-17
                 else
-                    if i < 206L then
-                        if i < 199L then
-                            if i < 195L then
-                                if i < 193L then
+                    if i < 206 then
+                        if i < 199 then
+                            if i < 195 then
+                                if i < 193 then
                                     0.36627252908604757
                                 else
-                                    if i < 194L then
+                                    if i < 194 then
                                         -9.938814562106524e-18
                                     else
                                         0.9305076219123143
                             else
-                                if i < 197L then
-                                    if i < 196L then
+                                if i < 197 then
+                                    if i < 196 then
                                         4.488760003328074e-18
                                     else
                                         0.37353086823869297
                                 else
-                                    if i < 198L then
+                                    if i < 198 then
                                         -2.375669144106189e-17
                                     else
                                         0.9276177501928519
                         else
-                            if i < 202L then
-                                if i < 200L then
+                            if i < 202 then
+                                if i < 200 then
                                     4.5350942573591974e-17
                                 else
-                                    if i < 201L then
+                                    if i < 201 then
                                         0.38076640899239017
                                     else
                                         2.1372528646211374e-17
                             else
-                                if i < 204L then
-                                    if i < 203L then
+                                if i < 204 then
+                                    if i < 203 then
                                         0.924671261467036
                                     else
                                         5.5444125388034563e-17
                                 else
-                                    if i < 205L then
+                                    if i < 205 then
                                         0.38797870972702503
                                     else
                                         1.759799510335953e-17
                     else
-                        if i < 213L then
-                            if i < 209L then
-                                if i < 207L then
+                        if i < 213 then
+                            if i < 209 then
+                                if i < 207 then
                                     0.9216683355733519
                                 else
-                                    if i < 208L then
+                                    if i < 208 then
                                         -8.550693097867243e-18
                                     else
                                         0.39516733024093426
                             else
-                                if i < 211L then
-                                    if i < 210L then
+                                if i < 211 then
+                                    if i < 210 then
                                         -1.9613487871414228e-17
                                     else
                                         0.9186091557949183
                                 else
-                                    if i < 212L then
+                                    if i < 212 then
                                         -4.0564150104514996e-17
                                     else
                                         0.4023318317777731
                         else
-                            if i < 216L then
-                                if i < 214L then
+                            if i < 216 then
+                                if i < 214 then
                                     1.4413875452702007e-17
                                 else
-                                    if i < 215L then
+                                    if i < 215 then
                                         0.9154939088483012
                                     else
                                         5.413375566838042e-17
                             else
-                                if i < 218L then
-                                    if i < 217L then
+                                if i < 218 then
+                                    if i < 217 then
                                         0.40947177705329507
                                     else
                                         -5.679403000091266e-18
                                 else
-                                    if i < 219L then
+                                    if i < 219 then
                                         0.9123227848721178
                                     else
                                         2.6349040211413332e-17
     else
-        if i < 330L then
-            if i < 275L then
-                if i < 247L then
-                    if i < 233L then
-                        if i < 226L then
-                            if i < 223L then
-                                if i < 221L then
+        if i < 330 then
+            if i < 275 then
+                if i < 247 then
+                    if i < 233 then
+                        if i < 226 then
+                            if i < 223 then
+                                if i < 221 then
                                     0.41658673028204113
                                 else
-                                    if i < 222L then
+                                    if i < 222 then
                                         -9.610850682533715e-18
                                     else
                                         0.909095977415431
                             else
-                                if i < 224L then
+                                if i < 224 then
                                     2.920006113841211e-17
                                 else
-                                    if i < 225L then
+                                    if i < 225 then
                                         0.42367625720393803
                                     else
                                         -2.331800700068871e-17
                         else
-                            if i < 229L then
-                                if i < 227L then
+                            if i < 229 then
+                                if i < 227 then
                                     0.9058136834259364
                                 else
-                                    if i < 228L then
+                                    if i < 228 then
                                         4.2864666490805214e-17
                                     else
                                         0.4307399251108032
                             else
-                                if i < 231L then
-                                    if i < 230L then
+                                if i < 231 then
+                                    if i < 230 then
                                         -2.6212879607476533e-17
                                     else
                                         0.9024761032379415
                                 else
-                                    if i < 232L then
+                                    if i < 232 then
                                         3.112490674651326e-17
                                     else
                                         0.4377773028727551
                     else
-                        if i < 240L then
-                            if i < 236L then
-                                if i < 234L then
+                        if i < 240 then
+                            if i < 236 then
+                                if i < 234 then
                                     7.64345629962023e-18
                                 else
-                                    if i < 235L then
+                                    if i < 235 then
                                         0.8990834405601384
                                     else
                                         9.076951775075616e-18
                             else
-                                if i < 238L then
-                                    if i < 237L then
+                                if i < 238 then
+                                    if i < 237 then
                                         0.4447879609645272
                                     else
                                         -6.655392977344925e-18
                                 else
-                                    if i < 239L then
+                                    if i < 239 then
                                         0.8956359024631707
                                     else
                                         -8.854043885762716e-18
                         else
-                            if i < 243L then
-                                if i < 241L then
+                            if i < 243 then
+                                if i < 241 then
                                     0.4517714714916838
                                 else
-                                    if i < 242L then
+                                    if i < 242 then
                                         -8.234073942098903e-18
                                     else
                                         0.8921336993669944
                             else
-                                if i < 245L then
-                                    if i < 244L then
+                                if i < 245 then
+                                    if i < 244 then
                                         2.3160655211380166e-17
                                     else
                                         0.4587274082167366
                                 else
-                                    if i < 246L then
+                                    if i < 246 then
                                         1.6080982096218356e-17
                                     else
                                         0.8885770450280356
                 else
-                    if i < 261L then
-                        if i < 254L then
-                            if i < 250L then
-                                if i < 248L then
+                    if i < 261 then
+                        if i < 254 then
+                            if i < 250 then
+                                if i < 248 then
                                     -4.034491998357167e-17
                                 else
-                                    if i < 249L then
+                                    if i < 249 then
                                         0.46565534658516017
                                     else
                                         1.459870391051426e-17
                             else
-                                if i < 252L then
-                                    if i < 251L then
+                                if i < 252 then
+                                    if i < 251 then
                                         0.8849661565261433
                                     else
                                         -7.690557775987357e-18
                                 else
-                                    if i < 253L then
+                                    if i < 253 then
                                         0.47255486375130445
                                     else
                                         -3.608790703790546e-18
                         else
-                            if i < 257L then
-                                if i < 255L then
+                            if i < 257 then
+                                if i < 255 then
                                     0.8813012542513406
                                 else
-                                    if i < 256L then
+                                    if i < 256 then
                                         -4.973073189306066e-17
                                     else
                                         0.479425538604203
                             else
-                                if i < 259L then
-                                    if i < 258L then
+                                if i < 259 then
+                                    if i < 258 then
                                         -5.103969860556013e-18
                                     else
                                         0.8775825618903728
                                 else
-                                    if i < 260L then
+                                    if i < 260 then
                                         -4.2623149864279997e-17
                                     else
                                         0.48626695179327556
                     else
-                        if i < 268L then
-                            if i < 264L then
-                                if i < 262L then
+                        if i < 268 then
+                            if i < 264 then
+                                if i < 262 then
                                     1.5131647652857083e-17
                                 else
-                                    if i < 263L then
+                                    if i < 263 then
                                         0.8738103064130545
                                     else
                                         4.767670756525657e-17
                             else
-                                if i < 266L then
-                                    if i < 265L then
+                                if i < 266 then
+                                    if i < 265 then
                                         0.49307868575392305
                                     else
                                         5.605083973871755e-18
                                 else
-                                    if i < 267L then
+                                    if i < 267 then
                                         0.8699847180584174
                                     else
                                         1.657385110740923e-17
                         else
-                            if i < 271L then
-                                if i < 269L then
+                            if i < 271 then
+                                if i < 269 then
                                     0.49986032473301345
                                 else
-                                    if i < 270L then
+                                    if i < 270 then
                                         1.3570481487732128e-17
                                     else
                                         0.8661060303206567
                             else
-                                if i < 273L then
-                                    if i < 272L then
+                                if i < 273 then
+                                    if i < 272 then
                                         2.0097792543831333e-17
                                     else
                                         0.5066114548142574
                                 else
-                                    if i < 274L then
+                                    if i < 274 then
                                         -3.269413423618168e-17
                                     else
                                         0.8621744799348805
             else
-                if i < 302L then
-                    if i < 288L then
-                        if i < 281L then
-                            if i < 278L then
-                                if i < 276L then
+                if i < 302 then
+                    if i < 288 then
+                        if i < 281 then
+                            if i < 278 then
+                                if i < 276 then
                                     4.4132427578105805e-18
                                 else
-                                    if i < 277L then
+                                    if i < 277 then
                                         0.5133316639434712
                                     else
                                         3.462454351928195e-17
                             else
-                                if i < 279L then
+                                if i < 279 then
                                     0.8581903068626604
                                 else
-                                    if i < 280L then
+                                    if i < 280 then
                                         -5.4374664844403745e-17
                                     else
                                         0.520020541953727
                         else
-                            if i < 284L then
-                                if i < 282L then
+                            if i < 284 then
+                                if i < 282 then
                                     -3.983266745698455e-17
                                 else
-                                    if i < 283L then
+                                    if i < 283 then
                                         0.8541537542773854
                                     else
                                         5.420565102675287e-18
                             else
-                                if i < 286L then
-                                    if i < 285L then
+                                if i < 286 then
+                                    if i < 285 then
                                         0.5266776805903868
                                     else
                                         -4.570502275386202e-17
                                 else
-                                    if i < 287L then
+                                    if i < 287 then
                                         0.8500650685494202
                                     else
                                         5.317093455811416e-17
                     else
-                        if i < 295L then
-                            if i < 291L then
-                                if i < 289L then
+                        if i < 295 then
+                            if i < 291 then
+                                if i < 289 then
                                     0.5333026735360201
                                 else
-                                    if i < 290L then
+                                    if i < 290 then
                                         5.129318115032044e-17
                                     else
                                         0.8459244992310679
                             else
-                                if i < 293L then
-                                    if i < 292L then
+                                if i < 293 then
+                                    if i < 292 then
                                         1.549506647350329e-17
                                     else
                                         0.5398951164352044
                                 else
-                                    if i < 294L then
+                                    if i < 294 then
                                         2.4263515104613218e-17
                                     else
                                         0.8417322990413384
                         else
-                            if i < 298L then
-                                if i < 296L then
+                            if i < 298 then
+                                if i < 296 then
                                     -2.7333362440269662e-17
                                 else
-                                    if i < 297L then
+                                    if i < 297 then
                                         0.5464546069192036
                                     else
                                         8.399754840929507e-18
                             else
-                                if i < 300L then
-                                    if i < 299L then
+                                if i < 300 then
+                                    if i < 299 then
                                         0.8374887238505236
                                     else
                                         4.3337026043948396e-17
                                 else
-                                    if i < 301L then
+                                    if i < 301 then
                                         0.5529807446305274
                                     else
                                         -6.743270455611733e-18
                 else
-                    if i < 316L then
-                        if i < 309L then
-                            if i < 305L then
-                                if i < 303L then
+                    if i < 316 then
+                        if i < 309 then
+                            if i < 305 then
+                                if i < 303 then
                                     0.8331940326645814
                                 else
-                                    if i < 304L then
+                                    if i < 304 then
                                         -1.8644878796734315e-19
                                     else
                                         0.5594731312473669
                             else
-                                if i < 307L then
-                                    if i < 306L then
+                                if i < 307 then
+                                    if i < 306 then
                                         1.575565514488728e-17
                                     else
                                         0.8288484876093257
                                 else
-                                    if i < 308L then
+                                    if i < 308 then
                                         1.1163935406617444e-17
                                     else
                                         0.565931370507906
                         else
-                            if i < 312L then
-                                if i < 310L then
+                            if i < 312 then
+                                if i < 310 then
                                     6.582459440388572e-18
                                 else
-                                    if i < 311L then
+                                    if i < 311 then
                                         0.8244523539144292
                                     else
                                         3.731817754380378e-17
                             else
-                                if i < 314L then
-                                    if i < 313L then
+                                if i < 314 then
+                                    if i < 313 then
                                         0.5723550682345072
                                     else
                                         2.6575872357215316e-17
                                 else
-                                    if i < 315L then
+                                    if i < 315 then
                                         0.820005899897234
                                     else
                                         -3.912431748209128e-17
                     else
-                        if i < 323L then
-                            if i < 319L then
-                                if i < 317L then
+                        if i < 323 then
+                            if i < 319 then
+                                if i < 317 then
                                     0.5787438323577704
                                 else
-                                    if i < 318L then
+                                    if i < 318 then
                                         -2.7958488978746924e-17
                                     else
                                         0.8155093969463755
                             else
-                                if i < 321L then
-                                    if i < 320L then
+                                if i < 321 then
+                                    if i < 320 then
                                         1.3751889684983784e-18
                                     else
                                         0.5850972729404622
                                 else
-                                    if i < 322L then
+                                    if i < 322 then
                                         -5.4883972461161805e-17
                                     else
                                         0.8109631195052179
                         else
-                            if i < 326L then
-                                if i < 324L then
+                            if i < 326 then
+                                if i < 324 then
                                     -3.091333486122179e-17
                                 else
-                                    if i < 325L then
+                                    if i < 325 then
                                         0.5914150022013163
                                     else
                                         5.0668448898504805e-17
                             else
-                                if i < 328L then
-                                    if i < 327L then
+                                if i < 328 then
+                                    if i < 327 then
                                         0.8063673450551039
                                     else
                                         3.4650875715584734e-17
                                 else
-                                    if i < 329L then
+                                    if i < 329 then
                                         0.5976966345387015
                                     else
                                         5.450323593054385e-17
         else
-            if i < 385L then
-                if i < 357L then
-                    if i < 343L then
-                        if i < 336L then
-                            if i < 333L then
-                                if i < 331L then
+            if i < 385 then
+                if i < 357 then
+                    if i < 343 then
+                        if i < 336 then
+                            if i < 333 then
+                                if i < 331 then
                                     0.8017223540984184
                                 else
-                                    if i < 332L then
+                                    if i < 332 then
                                         4.0134533311087014e-17
                                     else
                                         0.6039417865541566
                             else
-                                if i < 334L then
+                                if i < 334 then
                                     1.1794923733511837e-17
                                 else
-                                    if i < 335L then
+                                    if i < 335 then
                                         0.7970284301414683
                                     else
                                         5.0523609948487484e-17
                         else
-                            if i < 339L then
-                                if i < 337L then
+                            if i < 339 then
+                                if i < 337 then
                                     0.6101500770757914
                                 else
-                                    if i < 338L then
+                                    if i < 338 then
                                         -1.479826990758988e-17
                                     else
                                         0.7922858596771786
                             else
-                                if i < 341L then
-                                    if i < 340L then
+                                if i < 341 then
+                                    if i < 340 then
                                         -2.9049779312834576e-17
                                     else
                                         0.616321127181551
                                 else
-                                    if i < 342L then
+                                    if i < 342 then
                                         -2.20849501729641e-17
                                     else
                                         0.7874949321676061
                     else
-                        if i < 350L then
-                            if i < 346L then
-                                if i < 344L then
+                        if i < 350 then
+                            if i < 346 then
+                                if i < 344 then
                                     -4.8080555050456574e-17
                                 else
-                                    if i < 345L then
+                                    if i < 345 then
                                         0.6224545602223437
                                     else
                                         -6.049035765709707e-18
                             else
-                                if i < 348L then
-                                    if i < 347L then
+                                if i < 348 then
+                                    if i < 347 then
                                         0.7826559400262728
                                     else
                                         -1.474071641211487e-17
                                 else
-                                    if i < 349L then
+                                    if i < 349 then
                                         0.6285500018450296
                                     else
                                         3.5348797769901485e-17
                         else
-                            if i < 353L then
-                                if i < 351L then
+                            if i < 353 then
+                                if i < 351 then
                                     0.7777691786003179
                                 else
-                                    if i < 352L then
+                                    if i < 352 then
                                         -8.842419849333787e-18
                                     else
                                         0.6346070800152693
                             else
-                                if i < 355L then
-                                    if i < 354L then
+                                if i < 355 then
+                                    if i < 354 then
                                         -3.4568582392624965e-17
                                     else
                                         0.7728349461524715
                                 else
-                                    if i < 356L then
+                                    if i < 356 then
                                         4.231014921891023e-17
                                     else
                                         0.6406254250402305
                 else
-                    if i < 371L then
-                        if i < 364L then
-                            if i < 360L then
-                                if i < 358L then
+                    if i < 371 then
+                        if i < 364 then
+                            if i < 360 then
+                                if i < 358 then
                                     -4.700891123899386e-17
                                 else
-                                    if i < 359L then
+                                    if i < 359 then
                                         0.7678535438428503
                                     else
                                         4.9065912521116424e-17
                             else
-                                if i < 362L then
-                                    if i < 361L then
+                                if i < 362 then
+                                    if i < 361 then
                                         0.6466046695911524
                                     else
                                         4.567647714393287e-19
                                 else
-                                    if i < 363L then
+                                    if i < 363 then
                                         0.7628252757105762
                                     else
                                         1.6672995021546628e-17
                         else
-                            if i < 367L then
-                                if i < 365L then
+                            if i < 367 then
+                                if i < 365 then
                                     0.652544448725766
                                 else
-                                    if i < 366L then
+                                    if i < 366 then
                                         -4.5598735935930497e-17
                                     else
                                         0.7577504486552193
                             else
-                                if i < 369L then
-                                    if i < 368L then
+                                if i < 369 then
+                                    if i < 368 then
                                         -1.878215121154204e-18
                                     else
                                         0.6584443999105676
                                 else
-                                    if i < 370L then
+                                    if i < 370 then
                                         -3.7736386700306717e-17
                                     else
                                         0.7526293724180665
                     else
-                        if i < 378L then
-                            if i < 374L then
-                                if i < 372L then
+                        if i < 378 then
+                            if i < 374 then
+                                if i < 372 then
                                     -1.2970993013150526e-17
                                 else
-                                    if i < 373L then
+                                    if i < 373 then
                                         0.6643041630429463
                                     else
                                         1.5784492324431575e-17
                             else
-                                if i < 376L then
-                                    if i < 375L then
+                                if i < 376 then
+                                    if i < 375 then
                                         0.7474623595632162
                                     else
                                         5.6627515613726676e-18
                                 else
-                                    if i < 377L then
+                                    if i < 377 then
                                         0.6701233804731629
                                     else
                                         6.18353672557496e-18
                         else
-                            if i < 381L then
-                                if i < 379L then
+                            if i < 381 then
+                                if i < 379 then
                                     0.7422497254585013
                                 else
-                                    if i < 380L then
+                                    if i < 380 then
                                         -1.2339303604869521e-17
                                     else
                                         0.6759016970261789
                             else
-                                if i < 383L then
-                                    if i < 382L then
+                                if i < 383 then
+                                    if i < 382 then
                                         -5.119389624609889e-17
                                     else
                                         0.7369917882562408
                                 else
-                                    if i < 384L then
+                                    if i < 384 then
                                         -4.631213290368497e-17
                                     else
                                         0.6816387600233341
             else
-                if i < 412L then
-                    if i < 398L then
-                        if i < 391L then
-                            if i < 388L then
-                                if i < 386L then
+                if i < 412 then
+                    if i < 398 then
+                        if i < 391 then
+                            if i < 388 then
+                                if i < 386 then
                                     4.410467313197903e-17
                                 else
-                                    if i < 387L then
+                                    if i < 387 then
                                         0.7316888688738209
                                     else
                                         -1.0475824306512768e-17
                             else
-                                if i < 389L then
+                                if i < 389 then
                                     0.6873342193038735
                                 else
-                                    if i < 390L then
+                                    if i < 390 then
                                         2.8994333996809586e-17
                                     else
                                         0.7263412909741086
                         else
-                            if i < 394L then
-                                if i < 392L then
+                            if i < 394 then
+                                if i < 392 then
                                     -9.465899179857832e-18
                                 else
-                                    if i < 393L then
+                                    if i < 393 then
                                         0.692987727246318
                                     else
                                         -5.3543290798909455e-17
                             else
-                                if i < 396L then
-                                    if i < 395L then
+                                if i < 396 then
+                                    if i < 395 then
                                         0.7209493809456964
                                     else
                                         3.494986701478816e-17
                                 else
-                                    if i < 397L then
+                                    if i < 397 then
                                         0.6985989387896817
                                     else
                                         2.975439919188114e-17
                     else
-                        if i < 405L then
-                            if i < 401L then
-                                if i < 399L then
+                        if i < 405 then
+                            if i < 401 then
+                                if i < 399 then
                                     0.7155134678829815
                                 else
-                                    if i < 400L then
+                                    if i < 400 then
                                         3.8181038992157035e-17
                                     else
                                         0.7041675114545337
                             else
-                                if i < 403L then
-                                    if i < 402L then
+                                if i < 403 then
+                                    if i < 402 then
                                         -3.94095700584825e-17
                                     else
                                         0.7100338835660797
                                 else
-                                    if i < 404L then
+                                    if i < 404 then
                                         1.505272211891291e-17
                                     else
                                         0.7096931053638997
                         else
-                            if i < 408L then
-                                if i < 406L then
+                            if i < 408 then
+                                if i < 406 then
                                     -9.468276958542117e-18
                                 else
-                                    if i < 407L then
+                                    if i < 407 then
                                         0.7045109624405747
                                     else
                                         -4.451398614976226e-17
                             else
-                                if i < 410L then
-                                    if i < 409L then
+                                if i < 410 then
+                                    if i < 409 then
                                         0.7151753832640076
                                     else
                                         -1.466099578328228e-17
                                 else
-                                    if i < 411L then
+                                    if i < 411 then
                                         0.6989450415971057
                                     else
                                         -5.5261332036460915e-18
                 else
-                    if i < 426L then
-                        if i < 419L then
-                            if i < 415L then
-                                if i < 413L then
+                    if i < 426 then
+                        if i < 419 then
+                            if i < 415 then
+                                if i < 413 then
                                     0.7206140105448711
                                 else
-                                    if i < 414L then
+                                    if i < 414 then
                                         1.105694456137362e-17
                                     else
                                         0.6933364607507934
                             else
-                                if i < 417L then
-                                    if i < 416L then
+                                if i < 417 then
+                                    if i < 416 then
                                         1.2822831674529969e-17
                                     else
                                         0.7260086552607126
                                 else
-                                    if i < 418L then
+                                    if i < 418 then
                                         -1.573621815339587e-17
                                     else
                                         0.6876855622205048
                         else
-                            if i < 422L then
-                                if i < 420L then
+                            if i < 422 then
+                                if i < 420 then
                                     3.5430696752823923e-17
                                 else
-                                    if i < 421L then
+                                    if i < 421 then
                                         0.7313589881502236
                                     else
                                         2.6553630314845697e-17
                             else
-                                if i < 424L then
-                                    if i < 423L then
+                                if i < 424 then
+                                    if i < 423 then
                                         0.6819926909079606
                                     else
                                         2.8089333561212785e-17
                                 else
-                                    if i < 425L then
+                                    if i < 425 then
                                         0.7366646826566614
                                     else
                                         -4.639723374875429e-17
                     else
-                        if i < 433L then
-                            if i < 429L then
-                                if i < 427L then
+                        if i < 433 then
+                            if i < 429 then
+                                if i < 427 then
                                     0.6762581942766833
                                 else
-                                    if i < 428L then
+                                    if i < 428 then
                                         3.497002399394248e-17
                                     else
                                         0.7419254149477796
                             else
-                                if i < 431L then
-                                    if i < 430L then
+                                if i < 431 then
+                                    if i < 430 then
                                         2.907482756987512e-18
                                     else
                                         0.6704824223307908
                                 else
-                                    if i < 432L then
+                                    if i < 432 then
                                         5.425808997571648e-17
                                     else
                                         0.7471408639355942
                         else
-                            if i < 436L then
-                                if i < 434L then
+                            if i < 436 then
+                                if i < 434 then
                                     2.937498788028212e-17
                                 else
-                                    if i < 435L then
+                                    if i < 435 then
                                         0.6646657275936333
                                     else
                                         -5.2874573286772266e-17
                             else
-                                if i < 438L then
-                                    if i < 437L then
+                                if i < 438 then
+                                    if i < 437 then
                                         0.7523107112959804
                                     else
                                         -4.07866182575664e-17
                                 else
-                                    if i < 439L then
+                                    if i < 439 then
                                         0.6588084650862769
                                     else
                                         1.7760805237087262e-17
 
 // The table entry for the multiple of 1/128 nearest |x|, given big + |x|.
-let __tableIndex (u: Float) : Int64 =
-    Stdlib.Float64.__toInt64Unchecked ((u - 52776558133248.0) * 128.0) * 4L
+let __tableIndex(u: Float): Int64 =
+    Stdlib.Float64.__toInt64Unchecked((u - 52776558133248.0) * 128.0) * 4
 
 // glibc's TAYLOR_SIN.
-let __taylorSin (xx: Float) (x: Float) (dx: Float) : Float =
-    let p = Stdlib.Math.__fma -2.5022014848318398e-08 xx 2.755729806860771e-06 in
-    let p = Stdlib.Math.__fma p xx -0.00019841269834414642 in
-    let p = Stdlib.Math.__fma p xx 0.008333333333332329 in
-    let p = Stdlib.Math.__fma p xx -0.16666666666666666 in
-    x + Stdlib.Math.__fma (Stdlib.Math.__fma p x (-0.5 * dx)) xx dx
+let __taylorSin(xx: Float, x: Float, dx: Float): Float =
+    let p = Stdlib.Math.__fma(-2.5022014848318398e-08, xx, 2.755729806860771e-06) in
+    let p = Stdlib.Math.__fma(p, xx, -0.00019841269834414642) in
+    let p = Stdlib.Math.__fma(p, xx, 0.008333333333332329) in
+    let p = Stdlib.Math.__fma(p, xx, -0.16666666666666666) in
+    x + Stdlib.Math.__fma(Stdlib.Math.__fma(p, x, -0.5 * dx), xx, dx)
 
 // glibc's do_cos.
-let __doCos (x0: Float) (dx0: Float) : Float =
-    let dx = if x0 < 0.0 then Stdlib.Float64.negate dx0 else dx0 in
-    let u = 52776558133248.0 + Stdlib.Float64.absoluteValue x0 in
-    let x = Stdlib.Float64.absoluteValue x0 - (u - 52776558133248.0) + dx in
+let __doCos(x0: Float, dx0: Float): Float =
+    let dx = if x0 < 0.0 then Stdlib.Float64.negate(dx0) else dx0 in
+    let u = 52776558133248.0 + Stdlib.Float64.absoluteValue(x0) in
+    let x = Stdlib.Float64.absoluteValue(x0) - (u - 52776558133248.0) + dx in
     let xx = x * x in
-    let s = Stdlib.Math.__fma (x * xx) (Stdlib.Math.__fma xx 0.008333332142857223 -0.16666666666666488) x in
-    let c = xx * Stdlib.Math.__fma xx (Stdlib.Math.__fma xx 0.001388888740079376 -0.04166666666666644) 0.5 in
-    let k = Stdlib.Math.__tableIndex u in
-    let sn = Stdlib.Math.__sinCosTable k in
-    let ssn = Stdlib.Math.__sinCosTable (k + 1L) in
-    let cs = Stdlib.Math.__sinCosTable (k + 2L) in
-    let ccs = Stdlib.Math.__sinCosTable (k + 3L) in
-    let cor = Stdlib.Math.__fma (Stdlib.Float64.negate sn) s (Stdlib.Math.__fma (Stdlib.Float64.negate cs) c (Stdlib.Math.__fma (Stdlib.Float64.negate s) ssn ccs)) in
+    let s = Stdlib.Math.__fma(x * xx, Stdlib.Math.__fma(xx, 0.008333332142857223, -0.16666666666666488), x) in
+    let c = xx * Stdlib.Math.__fma(xx, Stdlib.Math.__fma(xx, 0.001388888740079376, -0.04166666666666644), 0.5) in
+    let k = Stdlib.Math.__tableIndex(u) in
+    let sn = Stdlib.Math.__sinCosTable(k) in
+    let ssn = Stdlib.Math.__sinCosTable(k + 1) in
+    let cs = Stdlib.Math.__sinCosTable(k + 2) in
+    let ccs = Stdlib.Math.__sinCosTable(k + 3) in
+    let cor = Stdlib.Math.__fma(Stdlib.Float64.negate(sn), s, Stdlib.Math.__fma(Stdlib.Float64.negate(cs), c, Stdlib.Math.__fma(Stdlib.Float64.negate(s), ssn, ccs))) in
     cs + cor
 
 // glibc's do_sin.
-let __doSin (x0: Float) (dx0: Float) : Float =
-    if Stdlib.Float64.absoluteValue x0 < 0.126 then Stdlib.Math.__taylorSin (x0 * x0) x0 dx0
+let __doSin(x0: Float, dx0: Float): Float =
+    if Stdlib.Float64.absoluteValue(x0) < 0.126 then Stdlib.Math.__taylorSin(x0 * x0, x0, dx0)
     else
-        let dx = if x0 <= 0.0 then Stdlib.Float64.negate dx0 else dx0 in
-        let u = 52776558133248.0 + Stdlib.Float64.absoluteValue x0 in
-        let x = Stdlib.Float64.absoluteValue x0 - (u - 52776558133248.0) in
+        let dx = if x0 <= 0.0 then Stdlib.Float64.negate(dx0) else dx0 in
+        let u = 52776558133248.0 + Stdlib.Float64.absoluteValue(x0) in
+        let x = Stdlib.Float64.absoluteValue(x0) - (u - 52776558133248.0) in
         let xx = x * x in
-        let s = x + Stdlib.Math.__fma (x * xx) (Stdlib.Math.__fma xx 0.008333332142857223 -0.16666666666666488) dx in
-        let c = Stdlib.Math.__fma x dx (xx * Stdlib.Math.__fma xx (Stdlib.Math.__fma xx 0.001388888740079376 -0.04166666666666644) 0.5) in
-        let k = Stdlib.Math.__tableIndex u in
-        let sn = Stdlib.Math.__sinCosTable k in
-        let ssn = Stdlib.Math.__sinCosTable (k + 1L) in
-        let cs = Stdlib.Math.__sinCosTable (k + 2L) in
-        let ccs = Stdlib.Math.__sinCosTable (k + 3L) in
-        let cor = Stdlib.Math.__fma cs s (Stdlib.Math.__fma (Stdlib.Float64.negate sn) c (Stdlib.Math.__fma s ccs ssn)) in
-        Stdlib.Math.__copySign (sn + cor) x0
+        let s = x + Stdlib.Math.__fma(x * xx, Stdlib.Math.__fma(xx, 0.008333332142857223, -0.16666666666666488), dx) in
+        let c = Stdlib.Math.__fma(x, dx, xx * Stdlib.Math.__fma(xx, Stdlib.Math.__fma(xx, 0.001388888740079376, -0.04166666666666644), 0.5)) in
+        let k = Stdlib.Math.__tableIndex(u) in
+        let sn = Stdlib.Math.__sinCosTable(k) in
+        let ssn = Stdlib.Math.__sinCosTable(k + 1) in
+        let cs = Stdlib.Math.__sinCosTable(k + 2) in
+        let ccs = Stdlib.Math.__sinCosTable(k + 3) in
+        let cor = Stdlib.Math.__fma(cs, s, Stdlib.Math.__fma(Stdlib.Float64.negate(sn), c, Stdlib.Math.__fma(s, ccs, ssn))) in
+        Stdlib.Math.__copySign(sn + cor, x0)
 
 // glibc's do_sincos: quadrant n of the reduced argument a + da.
-let __doSinCos (a: Float) (da: Float) (n: Int64) : Float =
-    let value = if Stdlib.Int64.bitwiseAnd n 1L == 1L then Stdlib.Math.__doCos a da else Stdlib.Math.__doSin a da in
-    if Stdlib.Int64.bitwiseAnd n 2L == 2L then Stdlib.Float64.negate value else value
+let __doSinCos(a: Float, da: Float, n: Int64): Float =
+    let value = if Stdlib.Int64.bitwiseAnd(n, 1) == 1 then Stdlib.Math.__doCos(a, da) else Stdlib.Math.__doSin(a, da) in
+    if Stdlib.Int64.bitwiseAnd(n, 2) == 2 then Stdlib.Float64.negate(value) else value
 
 // glibc's reduce_sincos, then do_sincos with the quadrant moved by offset (1 for
 // cos).
-let __reduceAndEvaluate (x: Float) (offset: Int64) : Float =
-    let t = Stdlib.Math.__fma x 0.6366197723675814 6755399441055744.0 in
+let __reduceAndEvaluate(x: Float, offset: Int64): Float =
+    let t = Stdlib.Math.__fma(x, 0.6366197723675814, 6755399441055744.0) in
     let xn = t - 6755399441055744.0 in
-    let y = Stdlib.Math.__fma (Stdlib.Float64.negate xn) -1.3909067564377153e-08 (Stdlib.Math.__fma (Stdlib.Float64.negate xn) 1.5707963407039642 x) in
-    let n = Stdlib.Float64.__toInt64Unchecked xn + offset in
+    let y = Stdlib.Math.__fma(Stdlib.Float64.negate(xn), -1.3909067564377153e-08, Stdlib.Math.__fma(Stdlib.Float64.negate(xn), 1.5707963407039642, x)) in
+    let n = Stdlib.Float64.__toInt64Unchecked(xn) + offset in
     let t1 = xn * -4.97899623147991e-17 in
     let t2 = y - t1 in
     let db = (y - t2) - t1 in
     let t1 = xn * -1.9034889620193266e-25 in
     let b = t2 - t1 in
     let db = db + ((t2 - b) - t1) in
-    Stdlib.Math.__doSinCos b db n
+    Stdlib.Math.__doSinCos(b, db, n)
 
 // 2/pi in base 2^24, for __branred.
-let __twoOverPiDigit (i: Int64) : Float =
-    if i < 37L then
-        if i < 18L then
-            if i < 9L then
-                if i < 4L then
-                    if i < 2L then
-                        if i < 1L then
+let __twoOverPiDigit(i: Int64): Float =
+    if i < 37 then
+        if i < 18 then
+            if i < 9 then
+                if i < 4 then
+                    if i < 2 then
+                        if i < 1 then
                             10680707.0
                         else
                             7228996.0
                     else
-                        if i < 3L then
+                        if i < 3 then
                             1387004.0
                         else
                             2578385.0
                 else
-                    if i < 6L then
-                        if i < 5L then
+                    if i < 6 then
+                        if i < 5 then
                             16069853.0
                         else
                             12639074.0
                     else
-                        if i < 7L then
+                        if i < 7 then
                             9804092.0
                         else
-                            if i < 8L then
+                            if i < 8 then
                                 4427841.0
                             else
                                 16666979.0
             else
-                if i < 13L then
-                    if i < 11L then
-                        if i < 10L then
+                if i < 13 then
+                    if i < 11 then
+                        if i < 10 then
                             11263675.0
                         else
                             12935607.0
                     else
-                        if i < 12L then
+                        if i < 12 then
                             2387514.0
                         else
                             4345298.0
                 else
-                    if i < 15L then
-                        if i < 14L then
+                    if i < 15 then
+                        if i < 14 then
                             14681673.0
                         else
                             3074569.0
                     else
-                        if i < 16L then
+                        if i < 16 then
                             13734428.0
                         else
-                            if i < 17L then
+                            if i < 17 then
                                 16653803.0
                             else
                                 1880361.0
         else
-            if i < 27L then
-                if i < 22L then
-                    if i < 20L then
-                        if i < 19L then
+            if i < 27 then
+                if i < 22 then
+                    if i < 20 then
+                        if i < 19 then
                             10960616.0
                         else
                             8533493.0
                     else
-                        if i < 21L then
+                        if i < 21 then
                             3062596.0
                         else
                             8710556.0
                 else
-                    if i < 24L then
-                        if i < 23L then
+                    if i < 24 then
+                        if i < 23 then
                             7349940.0
                         else
                             6258241.0
                     else
-                        if i < 25L then
+                        if i < 25 then
                             3772886.0
                         else
-                            if i < 26L then
+                            if i < 26 then
                                 3769171.0
                             else
                                 3798172.0
             else
-                if i < 32L then
-                    if i < 29L then
-                        if i < 28L then
+                if i < 32 then
+                    if i < 29 then
+                        if i < 28 then
                             8675211.0
                         else
                             12450088.0
                     else
-                        if i < 30L then
+                        if i < 30 then
                             3874808.0
                         else
-                            if i < 31L then
+                            if i < 31 then
                                 9961438.0
                             else
                                 366607.0
                 else
-                    if i < 34L then
-                        if i < 33L then
+                    if i < 34 then
+                        if i < 33 then
                             15675153.0
                         else
                             9132554.0
                     else
-                        if i < 35L then
+                        if i < 35 then
                             7151469.0
                         else
-                            if i < 36L then
+                            if i < 36 then
                                 3571407.0
                             else
                                 2607881.0
     else
-        if i < 56L then
-            if i < 46L then
-                if i < 41L then
-                    if i < 39L then
-                        if i < 38L then
+        if i < 56 then
+            if i < 46 then
+                if i < 41 then
+                    if i < 39 then
+                        if i < 38 then
                             12013382.0
                         else
                             4155038.0
                     else
-                        if i < 40L then
+                        if i < 40 then
                             6285869.0
                         else
                             7677882.0
                 else
-                    if i < 43L then
-                        if i < 42L then
+                    if i < 43 then
+                        if i < 42 then
                             13102053.0
                         else
                             15825725.0
                     else
-                        if i < 44L then
+                        if i < 44 then
                             473591.0
                         else
-                            if i < 45L then
+                            if i < 45 then
                                 9065106.0
                             else
                                 15363067.0
             else
-                if i < 51L then
-                    if i < 48L then
-                        if i < 47L then
+                if i < 51 then
+                    if i < 48 then
+                        if i < 47 then
                             6271263.0
                         else
                             9264392.0
                     else
-                        if i < 49L then
+                        if i < 49 then
                             5636912.0
                         else
-                            if i < 50L then
+                            if i < 50 then
                                 4652155.0
                             else
                                 7056368.0
                 else
-                    if i < 53L then
-                        if i < 52L then
+                    if i < 53 then
+                        if i < 52 then
                             13614112.0
                         else
                             10155062.0
                     else
-                        if i < 54L then
+                        if i < 54 then
                             1944035.0
                         else
-                            if i < 55L then
+                            if i < 55 then
                                 9527646.0
                             else
                                 15080200.0
         else
-            if i < 65L then
-                if i < 60L then
-                    if i < 58L then
-                        if i < 57L then
+            if i < 65 then
+                if i < 60 then
+                    if i < 58 then
+                        if i < 57 then
                             6658437.0
                         else
                             6231200.0
                     else
-                        if i < 59L then
+                        if i < 59 then
                             6832269.0
                         else
                             16767104.0
                 else
-                    if i < 62L then
-                        if i < 61L then
+                    if i < 62 then
+                        if i < 61 then
                             5075751.0
                         else
                             3212806.0
                     else
-                        if i < 63L then
+                        if i < 63 then
                             1398474.0
                         else
-                            if i < 64L then
+                            if i < 64 then
                                 7579849.0
                             else
                                 6349435.0
             else
-                if i < 70L then
-                    if i < 67L then
-                        if i < 66L then
+                if i < 70 then
+                    if i < 67 then
+                        if i < 66 then
                             12618859.0
                         else
                             4703257.0
                     else
-                        if i < 68L then
+                        if i < 68 then
                             12806093.0
                         else
-                            if i < 69L then
+                            if i < 69 then
                                 14477321.0
                             else
                                 2786137.0
                 else
-                    if i < 72L then
-                        if i < 71L then
+                    if i < 72 then
+                        if i < 71 then
                             12875403.0
                         else
                             9837734.0
                     else
-                        if i < 73L then
+                        if i < 73 then
                             14528324.0
                         else
-                            if i < 74L then
+                            if i < 74 then
                                 13719321.0
                             else
                                 343717.0
 
-let __scaleDownBy24 (value: Float) (times: Int64) : Float =
-    if times <= 0L then value else Stdlib.Math.__scaleDownBy24 (value * 5.9604644775390625e-08) (times - 1L)
+let __scaleDownBy24(value: Float, times: Int64): Float =
+    if times <= 0 then value else Stdlib.Math.__scaleDownBy24(value * 5.9604644775390625e-08, times - 1)
 
 // One half of __branred's product: x times 2/pi, as (b, bb, sum).
-let __branredHalf (x: Float) : (Float * Float * Float) =
-    let exponent = Stdlib.Float64.__smallUInt64ToInt64 (Stdlib.UInt64.bitwiseAnd (Stdlib.UInt64.shiftRight (Stdlib.Float64.__toBits x) 52UL) 2047UL) in
-    let k = if exponent < 450L then 0L else (exponent - 450L) / 24L in
-    let gor = Stdlib.Math.__scaleDownBy24 2.4733040147310453e+173 k in
-    let r0 = x * Stdlib.Math.__twoOverPiDigit k * gor in
+let __branredHalf(x: Float): (Float * Float * Float) =
+    let exponent = Stdlib.Float64.__smallUInt64ToInt64(Stdlib.UInt64.bitwiseAnd(Stdlib.UInt64.shiftRight(Stdlib.Float64.__toBits(x), 52u64), 2047u64)) in
+    let k = if exponent < 450 then 0 else (exponent - 450) / 24 in
+    let gor = Stdlib.Math.__scaleDownBy24(2.4733040147310453e+173, k) in
+    let r0 = x * Stdlib.Math.__twoOverPiDigit(k) * gor in
     let gor = gor * 5.9604644775390625e-08 in
-    let r1 = x * Stdlib.Math.__twoOverPiDigit (k + 1L) * gor in
+    let r1 = x * Stdlib.Math.__twoOverPiDigit(k + 1) * gor in
     let gor = gor * 5.9604644775390625e-08 in
-    let r2 = x * Stdlib.Math.__twoOverPiDigit (k + 2L) * gor in
+    let r2 = x * Stdlib.Math.__twoOverPiDigit(k + 2) * gor in
     let gor = gor * 5.9604644775390625e-08 in
-    let r3 = x * Stdlib.Math.__twoOverPiDigit (k + 3L) * gor in
+    let r3 = x * Stdlib.Math.__twoOverPiDigit(k + 3) * gor in
     let gor = gor * 5.9604644775390625e-08 in
-    let r4 = x * Stdlib.Math.__twoOverPiDigit (k + 4L) * gor in
+    let r4 = x * Stdlib.Math.__twoOverPiDigit(k + 4) * gor in
     let gor = gor * 5.9604644775390625e-08 in
-    let r5 = x * Stdlib.Math.__twoOverPiDigit (k + 5L) * gor in
+    let r5 = x * Stdlib.Math.__twoOverPiDigit(k + 5) * gor in
     let s = (r0 + 6755399441055744.0) - 6755399441055744.0 in
     let sum = s in
     let r0 = r0 - s in
@@ -1716,16 +1716,16 @@ let __branredHalf (x: Float) : (Float * Float * Float) =
 
 // glibc's __branred: the quadrant and x - n * pi/2 as a head and a tail, for
 // |x| from 2^27 * pi/2. It is built without FMA.
-let __branred (x0: Float) : (Int64 * Float * Float) =
+let __branred(x0: Float): (Int64 * Float * Float) =
     let x = x0 * 2.409919865102884e-181 in
     let t = x * 134217729.0 in
     let x1 = t - (t - x) in
     let x2 = x - x1 in
-    let (b1, bb1, sum1) = Stdlib.Math.__branredHalf x1 in
-    let (b2, bb2, sum2) = Stdlib.Math.__branredHalf x2 in
+    let (b1, bb1, sum1) = Stdlib.Math.__branredHalf(x1) in
+    let (b2, bb2, sum2) = Stdlib.Math.__branredHalf(x2) in
     let sum = sum1 + sum2 in
     let b = b1 + b2 in
-    let bb = if Stdlib.Float64.absoluteValue b1 > Stdlib.Float64.absoluteValue b2 then (b1 - b) + b2 else (b2 - b) + b1 in
+    let bb = if Stdlib.Float64.absoluteValue(b1) > Stdlib.Float64.absoluteValue(b2) then (b1 - b) + b2 else (b2 - b) + b1 in
     let (b, sum) =
         if b > 0.5 then (b - 1.0, sum + 1.0)
         else if b < -0.5 then (b + 1.0, sum - 1.0)
@@ -1738,116 +1738,116 @@ let __branred (x0: Float) : (Int64 * Float * Float) =
     let b = s * 1.5707963267948966 in
     let bb = (((t1 * 1.5707963407039642 - b) + t1 * -1.3909067675399456e-08) + t2 * 1.5707963407039642) + (t2 * -1.3909067675399456e-08 + s * 6.123233995736766e-17 + t * 1.5707963267948966) in
     let s = b + bb in
-    (Stdlib.Int64.bitwiseAnd (Stdlib.Float64.__toInt64Unchecked sum) 3L, s, (b - s) + bb)
+    (Stdlib.Int64.bitwiseAnd(Stdlib.Float64.__toInt64Unchecked(sum), 3), s, (b - s) + bb)
 
-let sin (value: Float) : Float =
-    let m = Stdlib.Float64.absoluteValue value in
+let sin(value: Float): Float =
+    let m = Stdlib.Float64.absoluteValue(value) in
     if m < 1.4901161193847656e-08 then value
-    else if m < 0.85546875 then Stdlib.Math.__doSin value 0.0
-    else if m < 2.4262638092041016 then Stdlib.Math.__copySign (Stdlib.Math.__doCos (1.5707963267948966 - m) 6.123233995736766e-17) value
-    else if m < 105414336.0 then Stdlib.Math.__reduceAndEvaluate value 0L
+    else if m < 0.85546875 then Stdlib.Math.__doSin(value, 0.0)
+    else if m < 2.4262638092041016 then Stdlib.Math.__copySign(Stdlib.Math.__doCos(1.5707963267948966 - m, 6.123233995736766e-17), value)
+    else if m < 105414336.0 then Stdlib.Math.__reduceAndEvaluate(value, 0)
     else if value - value != 0.0 then value - value
     else
-        let (n, a, da) = Stdlib.Math.__branred value in
-        Stdlib.Math.__doSinCos a da n
+        let (n, a, da) = Stdlib.Math.__branred(value) in
+        Stdlib.Math.__doSinCos(a, da, n)
 
-let cos (value: Float) : Float =
-    let m = Stdlib.Float64.absoluteValue value in
+let cos(value: Float): Float =
+    let m = Stdlib.Float64.absoluteValue(value) in
     if m < 7.450580596923828e-09 then 1.0
-    else if m < 0.85546875 then Stdlib.Math.__doCos value 0.0
+    else if m < 0.85546875 then Stdlib.Math.__doCos(value, 0.0)
     else if m < 2.4262638092041016 then
         let y = 1.5707963267948966 - m in
         let a = y + 6.123233995736766e-17 in
-        Stdlib.Math.__doSin a ((y - a) + 6.123233995736766e-17)
-    else if m < 105414336.0 then Stdlib.Math.__reduceAndEvaluate value 1L
+        Stdlib.Math.__doSin(a, (y - a) + 6.123233995736766e-17)
+    else if m < 105414336.0 then Stdlib.Math.__reduceAndEvaluate(value, 1)
     else if value - value != 0.0 then value - value
     else
-        let (n, a, da) = Stdlib.Math.__branred value in
-        Stdlib.Math.__doSinCos a da (n + 1L)
+        let (n, a, da) = Stdlib.Math.__branred(value) in
+        Stdlib.Math.__doSinCos(a, da, n + 1)
 
-let tan (value: Float) : Float = Stdlib.Math.sin value / Stdlib.Math.cos value
+let tan(value: Float): Float = Stdlib.Math.sin(value) / Stdlib.Math.cos(value)
 
-let __atanSeries (value: Float) (squared: Float) (term: Float) (index: Int64) (remaining: Int64) (total: Float) : Float =
-    if remaining == 0L then total
+let __atanSeries(value: Float, squared: Float, term: Float, index: Int64, remaining: Int64, total: Float): Float =
+    if remaining == 0 then total
     else
         let nextTerm = 0.0 - term * squared in
-        Stdlib.Math.__atanSeries value squared nextTerm (index + 1L) (remaining - 1L) (total + nextTerm / Stdlib.Int64.toFloat64 (index * 2L + 1L))
+        Stdlib.Math.__atanSeries(value, squared, nextTerm, index + 1, remaining - 1, total + nextTerm / Stdlib.Int64.toFloat64(index * 2 + 1))
 
-let __atanPositive (value: Float) : Float =
-    if value > 1.0 then Stdlib.Math.pi / 2.0 - Stdlib.Math.__atanPositive (1.0 / value)
+let __atanPositive(value: Float): Float =
+    if value > 1.0 then Stdlib.Math.pi / 2.0 - Stdlib.Math.__atanPositive(1.0 / value)
     else if value > 0.41421356237309503 then
-        Stdlib.Math.pi / 4.0 + Stdlib.Math.__atanPositive ((value - 1.0) / (value + 1.0))
-    else Stdlib.Math.__atanSeries value (value * value) value 1L 28L value
+        Stdlib.Math.pi / 4.0 + Stdlib.Math.__atanPositive((value - 1.0) / (value + 1.0))
+    else Stdlib.Math.__atanSeries(value, value * value, value, 1, 28, value)
 
-let atan (value: Float) : Float =
-    if Stdlib.Float64.isNaN value then value
+let atan(value: Float): Float =
+    if Stdlib.Float64.isNaN(value) then value
     else if value == 0.0 then value
-    else if Stdlib.Float64.__isInfinite value then
+    else if Stdlib.Float64.__isInfinite(value) then
         if value < 0.0 then 0.0 - Stdlib.Math.pi / 2.0 else Stdlib.Math.pi / 2.0
-    else if value < 0.0 then 0.0 - Stdlib.Math.__atanPositive (0.0 - value)
-    else Stdlib.Math.__atanPositive value
+    else if value < 0.0 then 0.0 - Stdlib.Math.__atanPositive(0.0 - value)
+    else Stdlib.Math.__atanPositive(value)
 
-let atan2 (y: Float) (x: Float) : Float =
-    if Stdlib.Float64.isNaN x || Stdlib.Float64.isNaN y then Stdlib.Float64.__nan ()
-    else if Stdlib.Float64.__isInfinite y && Stdlib.Float64.__isInfinite x then
+let atan2(y: Float, x: Float): Float =
+    if Stdlib.Float64.isNaN(x) || Stdlib.Float64.isNaN(y) then Stdlib.Float64.__nan()
+    else if Stdlib.Float64.__isInfinite(y) && Stdlib.Float64.__isInfinite(x) then
         if y > 0.0 then
             if x > 0.0 then Stdlib.Math.pi / 4.0 else 3.0 * Stdlib.Math.pi / 4.0
         else if x > 0.0 then 0.0 - Stdlib.Math.pi / 4.0
         else 0.0 - 3.0 * Stdlib.Math.pi / 4.0
-    else if Stdlib.Float64.__isInfinite y then
+    else if Stdlib.Float64.__isInfinite(y) then
         if y > 0.0 then Stdlib.Math.pi / 2.0 else 0.0 - Stdlib.Math.pi / 2.0
-    else if Stdlib.Float64.__isInfinite x then
-        if x > 0.0 then if Stdlib.Float64.__isNegative y then -0.0 else 0.0
-        else if Stdlib.Float64.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
-    else if x > 0.0 then Stdlib.Math.atan (y / x)
+    else if Stdlib.Float64.__isInfinite(x) then
+        if x > 0.0 then if Stdlib.Float64.__isNegative(y) then -0.0 else 0.0
+        else if Stdlib.Float64.__isNegative(y) then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
+    else if x > 0.0 then Stdlib.Math.atan(y / x)
     else if x < 0.0 then
-        if Stdlib.Float64.__isNegative y then Stdlib.Math.atan (y / x) - Stdlib.Math.pi
-        else Stdlib.Math.atan (y / x) + Stdlib.Math.pi
+        if Stdlib.Float64.__isNegative(y) then Stdlib.Math.atan(y / x) - Stdlib.Math.pi
+        else Stdlib.Math.atan(y / x) + Stdlib.Math.pi
     else if y > 0.0 then Stdlib.Math.pi / 2.0
     else if y < 0.0 then 0.0 - Stdlib.Math.pi / 2.0
-    else if Stdlib.Float64.__isNegative x then
-        if Stdlib.Float64.__isNegative y then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
+    else if Stdlib.Float64.__isNegative(x) then
+        if Stdlib.Float64.__isNegative(y) then 0.0 - Stdlib.Math.pi else Stdlib.Math.pi
     else y
 
-let asin (value: Float) : Stdlib.Option.Option<Float> =
-    if Stdlib.Float64.isNaN value || value < -1.0 || value > 1.0 then None
-    else if value == 1.0 then Some (Stdlib.Math.pi / 2.0)
-    else if value == -1.0 then Some (0.0 - Stdlib.Math.pi / 2.0)
-    else if value == 0.0 then Some value
-    else Some (Stdlib.Math.atan2 value (Stdlib.Float64.sqrt (1.0 - value * value)))
+let asin(value: Float): Stdlib.Option.Option<Float> =
+    if Stdlib.Float64.isNaN(value) || value < -1.0 || value > 1.0 then None
+    else if value == 1.0 then Some(Stdlib.Math.pi / 2.0)
+    else if value == -1.0 then Some(0.0 - Stdlib.Math.pi / 2.0)
+    else if value == 0.0 then Some(value)
+    else Some(Stdlib.Math.atan2(value, Stdlib.Float64.sqrt(1.0 - value * value)))
 
-let acos (value: Float) : Stdlib.Option.Option<Float> =
-    if Stdlib.Float64.isNaN value || value < -1.0 || value > 1.0 then None
-    else if value == 1.0 then Some 0.0
-    else if value == -1.0 then Some Stdlib.Math.pi
-    else Some (Stdlib.Math.atan2 (Stdlib.Float64.sqrt (1.0 - value * value)) value)
+let acos(value: Float): Stdlib.Option.Option<Float> =
+    if Stdlib.Float64.isNaN(value) || value < -1.0 || value > 1.0 then None
+    else if value == 1.0 then Some(0.0)
+    else if value == -1.0 then Some(Stdlib.Math.pi)
+    else Some(Stdlib.Math.atan2(Stdlib.Float64.sqrt(1.0 - value * value), value))
 
-let cosh (value: Float) : Float =
-    if Stdlib.Float64.isNaN value then value
+let cosh(value: Float): Float =
+    if Stdlib.Float64.isNaN(value) then value
     else
-        let magnitude = Stdlib.Float64.absoluteValue value in
-        let positive = Stdlib.Float64.__exp magnitude in
+        let magnitude = Stdlib.Float64.absoluteValue(value) in
+        let positive = Stdlib.Float64.__exp(magnitude) in
         (positive + 1.0 / positive) / 2.0
 
-let sinh (value: Float) : Float =
-    if value == 0.0 || Stdlib.Float64.isNaN value then value
+let sinh(value: Float): Float =
+    if value == 0.0 || Stdlib.Float64.isNaN(value) then value
     else
-        let magnitude = Stdlib.Float64.absoluteValue value in
-        let positive = Stdlib.Float64.__exp magnitude in
+        let magnitude = Stdlib.Float64.absoluteValue(value) in
+        let positive = Stdlib.Float64.__exp(magnitude) in
         let result = (positive - 1.0 / positive) / 2.0 in
         if value < 0.0 then 0.0 - result else result
 
 // Saturation avoids overflow; the small-input series avoids cancellation.
-let tanh (value: Float) : Float =
-    if value == 0.0 || Stdlib.Float64.isNaN value then value
+let tanh(value: Float): Float =
+    if value == 0.0 || Stdlib.Float64.isNaN(value) then value
     else
-        let magnitude = Stdlib.Float64.absoluteValue value in
+        let magnitude = Stdlib.Float64.absoluteValue(value) in
         let result =
             if magnitude > 20.0 then 1.0
             else if magnitude < 0.00001 then
                 let squared = magnitude * magnitude in
                 magnitude * (1.0 + squared * (-0.3333333333333333 + squared * 0.13333333333333333))
             else
-                let negative = Stdlib.Float64.__exp (0.0 - 2.0 * magnitude) in
+                let negative = Stdlib.Float64.__exp(0.0 - 2.0 * magnitude) in
                 (1.0 - negative) / (1.0 + negative) in
         if value < 0.0 then 0.0 - result else result

@@ -663,7 +663,7 @@ let runTestsWithProgressReporter completedTestReporter args =
     in
     let e2eFiles = getTestFiles "e2e" "e2e" in
     let importedFiles =
-      FileIO.readText (RepositoryTestFiles.scriptPath "upstream/sources.list")
+      FileIO.readText (RepositoryTestFiles.scriptPath "porting/upstream-sources.list")
       |> String.split_on_char '\n'
       |> List.filter (fun line ->
           line <> "" && not (String.starts_with ~prefix:"#" line))
@@ -1486,10 +1486,7 @@ let runTestsWithProgressReporter completedTestReporter args =
           let library =
             if imported then Lazy.force importedStdlib else baseStdlib
           in
-          (* Imported tests are interpreter sources: a bare integer is an
-             Int64. *)
-          Parser.withInterpreterSource imported (fun () ->
-              runE2EFile library suiteName progressLabel tests))
+          runE2EFile library suiteName progressLabel tests)
         (R.sourceFileGroups testsArray)
     in
 

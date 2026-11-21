@@ -14,20 +14,17 @@ module Darklang.LanguageTools.Exec.Policy
 /// F# and never asks. An answer that names no runnable process counts as `None`
 /// for that turn.
 /// What the scheduler does on its own: the process that has waited longest.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Summary'"
 let roundRobin(runnable: List<Summary>): Option<Uuid> =
   Stdlib.List.head(runnable) |> Stdlib.Option.map(fun p -> p.id)
 
 
 /// The process started most recently first: a stack, not a queue. Useful when the
 /// latest request matters most.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Summary'"
 let youngestFirst(runnable: List<Summary>): Option<Uuid> =
   Stdlib.List.last(runnable) |> Stdlib.Option.map(fun p -> p.id)
 
 
 /// Whatever has run the fewest instructions so far: new work before long-running work.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Summary'"
 let leastRunFirst(runnable: List<Summary>): Option<Uuid> =
   runnable
   |> Stdlib.List.sortBy(fun p -> p.instructionsTaken)

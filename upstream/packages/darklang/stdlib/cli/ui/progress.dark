@@ -4,7 +4,6 @@ module Darklang.Stdlib.Cli.UI.Progress
 /// current: current progress value
 /// total: total value
 /// label: text to show after the bar
-// @compiler replace: packages/darklang/stdlib/cli/ui/progress.dark#Darklang.Stdlib.Cli.UI.Progress.bar reason=compiler-implementation
 let bar(current: Int64, total: Int64, label: String): Unit =
   let width = 30
   let filled = Int64.checkedDivide(current * width, total) |> Result.withDefault(0)

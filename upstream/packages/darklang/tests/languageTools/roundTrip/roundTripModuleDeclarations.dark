@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // Parse-then-print round trips: moduleDeclarations. Moved from
 // backend/tests/Tests/LibParser.RoundTrip.Tests.fs; helpers are in roundTrip.dark.
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test moduleDeclarations =
   Stdlib.Test.all(
     [ // Unqualified Result resolves from inside a non-Stdlib module (here

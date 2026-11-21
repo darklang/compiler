@@ -68,7 +68,6 @@ let render(missing: Missing): String =
 
 /// Flatten nested or-patterns at this position into separate alternatives.
 /// Leave patterns inside constructor fields for later checks of those fields.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let alternatives(pattern: ProgramTypes.MatchPattern): List<ProgramTypes.MatchPattern> =
   match pattern with
   | MPOr(_, options) -> Stdlib.List.flatten(Stdlib.List.map(options, alternatives))
@@ -80,7 +79,6 @@ let alternatives(pattern: ProgramTypes.MatchPattern): List<ProgramTypes.MatchPat
 /// variables (including _), tuples and record patterns of catch-alls, or-patterns
 /// containing one, and `p as x` where `p` is one.
 /// Other exhaustive combinations, such as true | false, need constructor checks.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let isIrrefutable(pattern: ProgramTypes.MatchPattern): Bool =
   match pattern with
   | MPVariable(_, _) -> true
@@ -98,7 +96,6 @@ let isIrrefutable(pattern: ProgramTypes.MatchPattern): Bool =
 /// aliases. A list has two constructors even though it has infinitely many values.
 /// Return None when the checker cannot enumerate the constructors, as for Int64 or
 /// a type that is still unknown; coverage then requires catch-all patterns.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let constructors(
   env: Model.Environment,
   subst: Dict<Model.Var, Model.Ty>,
@@ -141,7 +138,6 @@ let constructors(
 /// Keep the alternatives that can match this constructor and return their field
 /// patterns. A wildcard accepts every field; a different constructor produces no
 /// rows. For a matching constructor with no fields, return one empty row.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let specialize(
   constructor: Constructor,
   fieldCount: Int64,
@@ -206,7 +202,6 @@ let specialize(
 
 /// Restrict the rows to one constructor in the first column. Replace that column
 /// with the constructor's field patterns, retaining each row's remaining columns.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let specializeRows(
   constructor: Constructor,
   fieldCount: Int64,
@@ -224,7 +219,6 @@ let specializeRows(
 
 /// Keep rows with a catch-all alternative in the first column, then remove that
 /// column. The remaining patterns determine whether those rows cover the rest.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let catchAllRows(
   rows: List<List<ProgramTypes.MatchPattern>>)
   : List<List<ProgramTypes.MatchPattern>> =
@@ -241,7 +235,6 @@ let catchAllRows(
 
 /// Check whether an alternative explicitly uses this constructor. Variables and
 /// wildcards do not count, even though they can match a value of that constructor.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let namesConstructor(
   constructor: Constructor,
   fieldCount: Int64,
@@ -255,7 +248,6 @@ let namesConstructor(
 
 /// Check whether every possible constructor appears explicitly in the first
 /// column. This checks only outer shapes; their fields may still leave gaps.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let headsCoverAllConstructors(
   cases: List<(Constructor * List<Model.Ty>)>,
   rows: List<List<ProgramTypes.MatchPattern>>)
@@ -271,7 +263,6 @@ let headsCoverAllConstructors(
 /// Determine whether the rows cover every combination of values in types.
 /// Each row must match all its columns; different rows provide alternatives.
 /// First try catch-all rows, then inspect constructor fields if needed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let isExhaustive(
   env: Model.Environment,
   subst: Dict<Model.Var, Model.Ty>,
@@ -294,7 +285,6 @@ let isExhaustive(
 /// Require every constructor to appear explicitly before expanding: a missing
 /// constructor could only be covered by the catch-all rows already checked.
 /// This also prevents endlessly expanding wildcards for recursive types like List.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let isExhaustiveByConstructors(
   env: Model.Environment,
   subst: Dict<Model.Var, Model.Ty>,
@@ -327,7 +317,6 @@ let isExhaustiveByConstructors(
 /// Search for a missing combination of values to explain a coverage failure.
 /// Limit recursive search steps so recursive types cannot keep this search going
 /// forever. None means no example was found within that limit, not proof of coverage.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let findUncovered(
   env: Model.Environment,
   subst: Dict<Model.Var, Model.Ty>,
@@ -378,7 +367,6 @@ let findUncovered(
 
 /// Return None when the unguarded cases cover the matched type. Otherwise return
 /// Some with a missing-value description, using Anything if no example is found.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Environment'"
 let uncovered(
   env: Model.Environment,
   subst: Dict<Model.Var, Model.Ty>,

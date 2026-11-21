@@ -16,7 +16,6 @@ module Darklang.SCM.Conflicts
 
 /// The branch this process is on. Asked of `SCM.Branches`, not of `SCM.PackageOps` (which spells the same
 /// thing `currentBranch`): PackageOps depends on this module, so reaching back would close the loop.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.onBranch: Unknown function or value 'Branches.current'"
 let onBranch(): Uuid =
   Branches.current()
 
@@ -131,7 +130,6 @@ type ConflictRow =
 
 
 /// The recorded conflicts <param filter> selects.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.query: Unknown function or value 'Builtin.scmConflicts'"
 let query(filter: ConflictFilter): List<ConflictRow> =
   Builtin.scmConflicts(filter)
 
@@ -157,7 +155,6 @@ let fqn(owner: String, modules: String, name: String): String =
 /// The fold's own rule (`LibExecution.Lww`), asked rather than restated: later stamp wins, an exact tie
 /// goes to the higher hash, and a side with no stamp never defends itself. Two implementations of one
 /// trait for one type are settled by it too (`SCM.Constraints`).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.beats: Unknown function or value 'SCM.Actions.beats'"
 let beats(aTs: String, aHash: String, bTs: String, bHash: String): Bool =
   Actions.beats(aTs, aHash, bTs, bHash)
 
@@ -168,7 +165,6 @@ let beats(aTs: String, aHash: String, bTs: String, bHash: String): Bool =
 /// tested against the bases they last agreed on: a name conflicts when BOTH sides moved it since its
 /// base, or, with no base, when both created it or both edited one parent. An edit made on top of the
 /// local version never conflicts. Each conflict names the winner the fold will pick.
-// @compiler blocked: compiler-gap diagnostic="Darklang.SCM.Conflicts.detect: Field access requires a record value"
 let detect(
   localLabel: String,
   incomingLabel: String,
@@ -188,7 +184,6 @@ let detect(
 
 /// A removal that arrives for a name you have SINCE edited. A removal of exactly what you hold
 /// records nothing.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.detectRemovals: Unknown function or value 'SCM.Actions.detect'"
 let detectRemovals(
   localLabel: String,
   incomingLabel: String,
@@ -224,7 +219,6 @@ let bindingOf(row: Bindings.BindingRow): Binding =
 
 /// What main currently binds, restricted to <param names> (bare names), so a reconciliation never scans
 /// the whole `locations` projection. The detector matches on the full (owner, modules, name) key anyway.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.localBindingsFor: Unknown function or value 'SCM.Bindings.query'"
 let localBindingsFor(names: List<String>): List<Binding> =
   match names with
   | [] -> []
@@ -237,7 +231,6 @@ let localBindingsFor(names: List<String>): List<Binding> =
 // reading the BASES (the two sources, one shape)
 
 /// The bases a BRANCH recorded when it first touched each name (the parent's hash at the fork point).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.branchBases: Unknown function or value 'SCM.Branches.baseRecords'"
 let branchBases(branchId: Uuid): List<NameBase> =
   Branches.baseRecords(branchId)
 
@@ -272,7 +265,6 @@ let conflictFromRow(row: ConflictRow): Conflict =
 /// the ops that caused the divergence cannot quietly undo it. `previous` names the text being
 /// replaced, so the op reads as an ordinary edit made on top of what this store holds -- which is
 /// exactly what it is, once a person has looked at both.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.settleWording: Unknown function or value 'SCM.Actions.resolve'"
 let settleWording(branchId: Uuid, c: Conflict, text: String): Result<Unit, String> =
   match Actions.resolve(Actions.Resolution.Reword(branchId, c.id, text)) with
   | Ok(_) -> Result.Ok()
@@ -297,7 +289,6 @@ let aboutABinding(kind: String): Bool =
 /// Scoped, because a conflict is a divergence in one line of work: settling main's while standing on a
 /// branch would write the answer into the branch's layers, which main does not see until merge, and settling a
 /// branch's from main would answer for a projection that hasn't happened yet. Each branch sees its own.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.pending: Unknown function or value 'query'"
 let pending(): List<Conflict> =
   let recorded = query(ConflictFilter.Pending(onBranch())) |> Stdlib.List.map(conflictFromRow)
 
@@ -338,7 +329,6 @@ let pending(): List<Conflict> =
 
 /// How many conflicts are waiting -- the number `dark status` and `dark commit` surface. Runs the same
 /// sweep as `pending`, so the count and the list never disagree about a superseded one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.pendingCount: Unknown function or value 'pending'"
 let pendingCount(): Int64 =
   Stdlib.List.length(pending())
 
@@ -348,7 +338,6 @@ let pendingCount(): Int64 =
 ///
 /// Branch-scoped like `pending`, so the ids you can act on are exactly the ids you were just shown -- an
 /// unscoped lookup would let an id pasted from main's list resolve while standing on a branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.getByIdPrefix: Unknown function or value 'query'"
 let getByIdPrefix(rawPrefix: String): Option<Conflict> =
   // `dark conflicts` prints ids as `#509907c8`, so a copy-paste brings the `#` along. Accept what we print.
   let idPrefix =
@@ -366,7 +355,6 @@ let getByIdPrefix(rawPrefix: String): Option<Conflict> =
 
 
 /// Close a conflict as ACKED: the auto-pick stands. An Error says the record is still open.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.ack: Unknown function or value 'SCM.Actions.resolve'"
 let ack(id: String): Result<Unit, String> =
   match Actions.resolve(Actions.Resolution.Ack(id)) with
   | Ok(_) -> Result.Ok()
@@ -375,7 +363,6 @@ let ack(id: String): Result<Unit, String> =
 
 /// Close a conflict as SUPERSEDED: the name has since moved to <param liveHash>, which is neither side.
 /// An Error says the record is still open.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Conflicts.supersede: Unknown function or value 'SCM.Actions.resolve'"
 let supersede(id: String, liveHash: String): Result<Unit, String> =
   match Actions.resolve(Actions.Resolution.Supersede(id, liveHash)) with
   | Ok(_) -> Result.Ok()

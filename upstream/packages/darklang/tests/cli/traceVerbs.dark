@@ -20,7 +20,6 @@ let lines(s: String): List<String> =
 
 
 /// The last line of what a command printed on stdout: the value, after any header.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TraceVerbs.lastLine: Unknown function or value 'Instance.output'"
 let lastLine(i: Instance.T, args: List<String>): String =
   lines(Instance.output(i, args))
   |> Stdlib.List.last
@@ -34,7 +33,6 @@ let words(s: String): List<String> =
 
 
 /// A field of the newest trace in `traces list --json`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TraceVerbs.latestField: Unknown function or value 'Traces.listed'"
 let latestField(i: Instance.T, name: String): Stdlib.AltJson.Json =
   match Stdlib.List.head(Traces.listed(i, 1)) with
   | Some(row) -> JsonShapes.field(row, name)
@@ -49,7 +47,6 @@ let prefix(id: String): String =
 
 /// Author, commit and approve one function, so a run of it records and a view of it
 /// replays.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TraceVerbs.authored: Unknown function or value 'Traces.step'"
 let authored(
   i: Instance.T,
   name: String,
@@ -64,7 +61,6 @@ let authored(
 
 // ─── resume, fork, rerun ────────────────────────────────────────────────────
 
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test resumeReplaysEffectsRatherThanRedoingThem = Traces.withTraces(fun i ->
   let first = lastLine(i, [ "eval", twoUuids ])
   let listed = Instance.said(i, [ "exec" ])
@@ -85,7 +81,6 @@ test resumeReplaysEffectsRatherThanRedoingThem = Traces.withTraces(fun i ->
       |> Stdlib.Test.equal(Stdlib.AltJson.Json.String("done")) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test aForkKeepsTheLogUpToItsPosition = Traces.withTraces(fun i ->
   let first = lastLine(i, [ "eval", twoUuids ])
   let parent = Traces.latestId(i)
@@ -129,7 +124,6 @@ test aForkKeepsTheLogUpToItsPosition = Traces.withTraces(fun i ->
 /// The parent's own effect AFTER the spawn is in here on purpose: serving the spawn
 /// from the log instead of performing it leaves the handle naming a process that no
 /// longer exists, and the next `await` raises.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test aResumedRunSpawnsAgainAndTheChildReplays = Traces.withTraces(fun i ->
   let program =
     "let h = Stdlib.Exec.spawn(fun () -> Stdlib.display(Stdlib.Uuid.generate()))\nlet child = Stdlib.Exec.await(h)\nlet mine = Stdlib.display(Stdlib.Uuid.generate())\nStdlib.printLine($\"{child} {mine}\")"
@@ -152,7 +146,6 @@ test aResumedRunSpawnsAgainAndTheChildReplays = Traces.withTraces(fun i ->
   resumed |> Stdlib.Test.equal(first))
 
 
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test aResumeAfterAnEditRunsTheNewCodeOnTheOldEffects =
   Traces.withTraces(fun i ->
     let v1 =
@@ -219,7 +212,6 @@ test aResumeAfterAnEditRunsTheNewCodeOnTheOldEffects =
 
 /// The other half: a resume against code nobody touched must not warn, or the
 /// warning means nothing on the run that has it.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test aResumeWithoutAnEditSaysNothingAboutEdits = Traces.withTraces(fun i ->
   // A body nothing else has: a hash is structural, so identical bodies share one,
   // and the index would name whichever function the store resolves it to.
@@ -248,7 +240,6 @@ test aResumeWithoutAnEditSaysNothingAboutEdits = Traces.withTraces(fun i ->
 
 
 /// A sandboxed script stays sandboxed when it is taken up again.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test resumeAndRerunKeepTheSandbox = Traces.withTraces(fun i ->
   let path = $"{Instance.home(i)}/sandbox-replay.dark"
   let _ =
@@ -277,7 +268,6 @@ test resumeAndRerunKeepTheSandbox = Traces.withTraces(fun i ->
 
 /// A script's arguments are kept with its run, so the view, resume, fork and rerun
 /// all see them without the file.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test aScriptsArgumentsSurviveViewResumeForkAndRerun = Traces.withTraces(fun i ->
   let defined =
     Traces.step(
@@ -387,7 +377,6 @@ test aScriptsArgumentsSurviveViewResumeForkAndRerun = Traces.withTraces(fun i ->
 /// The call inbox and the preview. The values come from replaying the run with its
 /// effects answered from the log, so the print in the middle of the function must
 /// not print again.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test showReplaysAFunctionWithoutPerforming = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -425,7 +414,6 @@ test showReplaysAFunctionWithoutPerforming = Traces.withTraces(fun i ->
 
 
 /// A stopped replay still shows partial results and exits nonzero.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test showFailsWhenTheLogCannotAnswer = Traces.withTraces(fun i ->
   let defined =
     authored(i, "Tests.Prev.changed", "(): String = \"before\"", "random")
@@ -462,7 +450,6 @@ test showFailsWhenTheLogCannotAnswer = Traces.withTraces(fun i ->
 /// was easiest to get wrong: a preview records nothing, so a spawned child used to
 /// get the tracer that performs effects for real. A uuid is evidence either way:
 /// served from the log it matches the recording, rolled for real it cannot.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test showServesASpawnedChildFromTheLog = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -494,7 +481,6 @@ test showServesASpawnedChildFromTheLog = Traces.withTraces(fun i ->
 
 /// Two identical calls in one run show their own recorded values, not one of them
 /// twice.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test identicalCallsKeepTheirOwnValues = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -536,7 +522,6 @@ test identicalCallsKeepTheirOwnValues = Traces.withTraces(fun i ->
 
 
 /// Replay runs under the approvals the viewer holds.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test showUsesTheViewersApprovals = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -572,7 +557,6 @@ test showUsesTheViewersApprovals = Traces.withTraces(fun i ->
 
 /// Recursion is a loop, and an iteration that never reached a line must not borrow
 /// another iteration's value for it.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test recursionIsALoopAndEmptyIterationsStaySilent = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -635,7 +619,6 @@ test recursionIsALoopAndEmptyIterationsStaySilent = Traces.withTraces(fun i ->
 
 /// The first few iterations and the last few are held; any other is fetched when
 /// asked for, by a person or by `--json`.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test everyIterationOfALoopIsReachable = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -693,7 +676,6 @@ test everyIterationOfALoopIsReachable = Traces.withTraces(fun i ->
 
 /// `traces fns` names the functions recent runs went through, bundled library
 /// hidden.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test fnsNamesWhatRunsWentThrough = Traces.withTraces(fun i ->
   let defined =
     authored(
@@ -732,7 +714,6 @@ test fnsNamesWhatRunsWentThrough = Traces.withTraces(fun i ->
 
 /// `view` and `edit` name `traces show` under a function runs went through, and say
 /// nothing under one no run did.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test viewAndEditPointAtTheRunsThatWentThrough = Traces.withTraces(fun i ->
   let defined =
     Stdlib.Test.all(
@@ -779,7 +760,6 @@ test viewAndEditPointAtTheRunsThatWentThrough = Traces.withTraces(fun i ->
 
 /// Two names for one function find the same runs, because content addressing makes
 /// them one.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test twoNamesForOneFunctionFindTheSameRuns = Traces.withTraces(fun i ->
   let body = "(n: Int64) : Int64 =\n  n * 3"
   let defined =
@@ -817,7 +797,6 @@ test twoNamesForOneFunctionFindTheSameRuns = Traces.withTraces(fun i ->
 
 /// `ps` prints this instance's table first, then the machine's, and refuses an
 /// unknown id.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test psListsThisInstanceThenTheMachine = Instance.withInstance(fun i ->
   // The columns are as wide as their widest cell and the header is bold, so the
   // colour is stripped and the header matched word by word.
@@ -860,7 +839,6 @@ test psListsThisInstanceThenTheMachine = Instance.withInstance(fun i ->
 
 /// `traces calls` says how many times each run called the function and how long it spent in
 /// it. Recursion is counted per call, and its time once, from the outermost call.
-// @compiler xfail compile: "Unknown function or value 'Traces.withTraces'" class=missing-support reason=upstream-dependency
 test callsSaysHowOftenAndHowLongEachRunWasInTheFunction =
   Traces.withTraces(fun i ->
     let defined =

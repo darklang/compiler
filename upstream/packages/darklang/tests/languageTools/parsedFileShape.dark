@@ -12,7 +12,6 @@ module Darklang.LanguageTools.Parser.Parse.Tests
 // post-parse validation decides whether this is Test source — so an ordinary
 // typo like `valoops = 1` (a missing space after `val`) parses as one.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Parse.Tests.shape: Unknown function or value 'Darklang.LanguageTools.Parser.Parse.toWrittenTypes'"
 let shape(source: String): (Int64 * Int64) =
   match LanguageTools.Parser.Parse.toWrittenTypes(source) with
   | Some(SourceFile(file)) ->
@@ -23,7 +22,6 @@ let shape(source: String): (Int64 * Int64) =
 
 
 // The ordinary cases are untouched: one declaration, no trailing expressions.
-// @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
 test realDeclarations =
   Stdlib.Test.all(
     [ shape("val v = 1") |> Stdlib.Test.equal((1, 0))
@@ -32,7 +30,6 @@ test realDeclarations =
       shape("module M =\n  val v = 1") |> Stdlib.Test.equal((1, 0)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
 test notDeclarations =
   Stdlib.Test.all(
     [ // A bare expression belongs in exprsToEval, not declarations.
@@ -55,7 +52,6 @@ test notDeclarations =
 // of every package file on disk, and the serializer for a module's declarations
 // raised on the same cases. The authoring editor strips the module line before
 // parsing, so only the highlighter hits this.
-// @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
 test moduleHeadedFiles =
   Stdlib.Test.all(
     [ shape("module Darklang.Foo\n\nvaloops = 1") |> Stdlib.Test.equal((1, 0))
@@ -70,6 +66,5 @@ test moduleHeadedFiles =
 
 // A real declaration alongside an assignment-shaped line: the declaration
 // survives, the assertion's two sides join exprsToEval.
-// @compiler xfail compile: "Unknown function or value 'shape'" class=missing-support reason=upstream-dependency
 test mixedDeclarationsAndExpressions =
   shape("val v = 1\noops = 2") |> Stdlib.Test.equal((1, 2))

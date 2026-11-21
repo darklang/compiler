@@ -63,7 +63,6 @@ module Input =
         |> Stdlib.Test.equal("main(args)") ])
 
 
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.RuntimeTypes.reflect'" class=missing-support reason=upstream-dependency
   test requestSummary =
     Request { method = "GET", url = "/orders" }
     |> LanguageTools.RuntimeTypes.reflect
@@ -72,7 +71,6 @@ module Input =
     |> Stdlib.Test.equal("GET /orders")
 
 
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.RuntimeTypes.reflect'" class=missing-support reason=upstream-dependency
   test missingRequestFields =
     IncompleteRequest { method = "GET" }
     |> LanguageTools.RuntimeTypes.reflect
@@ -180,7 +178,6 @@ module TheLog =
         ord = seq }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TracesRendering.TheLog.render: Unknown function or value 'Darklang.Cli.Tracing.formatFnCalls'"
   let render(opts: Cli.Tracing.ViewOptions): String =
     Cli.Tracing.formatFnCalls(
       opts,
@@ -189,7 +186,6 @@ module TheLog =
 
 
   // A trace that did nothing outside itself says so, rather than printing an empty block.
-  // @compiler xfail compile: "Unknown function or value 'Cli.Tracing.formatFnCalls'" class=missing-support reason=upstream-dependency
   test noCalls =
     Cli.Tracing.formatFnCalls(
       Cli.Tracing.defaultViewOptions,
@@ -200,7 +196,6 @@ module TheLog =
 
   // The log is a sequence: one line per call, in the order they completed, with the position
   // `fork --at` takes and the time it took.
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test logIsSequence =
     render(Cli.Tracing.defaultViewOptions)
     |> Stdlib.Test.equal(
@@ -208,7 +203,6 @@ module TheLog =
 
 
   // `--filter` and `--exclude` narrow the list by name, case-insensitively.
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test filterAndExclude =
     Stdlib.Test.all(
       [ render(
@@ -223,7 +217,6 @@ module TheLog =
 
 
   // `--slow` is only meaningful because impure calls carry a real duration now.
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test slowCalls =
     render(
       { Cli.Tracing.defaultViewOptions with
@@ -232,7 +225,6 @@ module TheLog =
 
 
   // A filter that matches nothing says THAT, rather than looking like a run that did nothing.
-  // @compiler xfail compile: "Unknown function or value 'render'" class=missing-support reason=upstream-dependency
   test filterMatchesNothing =
     render(
       { Cli.Tracing.defaultViewOptions with
@@ -261,7 +253,6 @@ module TheLogIsCut =
         ord = 0 }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TracesRendering.TheLogIsCut.logOf: Unknown function or value 'Darklang.Cli.Tracing.formatFnCalls'"
   let logOf(count: Int64, opts: Cli.Tracing.ViewOptions): Int64 =
     Stdlib.List.length(
       Stdlib.String.split(
@@ -272,7 +263,6 @@ module TheLogIsCut =
         "\n"))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TracesRendering.TheLogIsCut.textOf: Unknown function or value 'Darklang.Cli.Tracing.formatFnCalls'"
   let textOf(count: Int64, opts: Cli.Tracing.ViewOptions): String =
     Cli.Tracing.formatFnCalls(
       opts,
@@ -281,7 +271,6 @@ module TheLogIsCut =
 
 
   // Forty fit.
-  // @compiler xfail compile: "Unknown function or value 'logOf'" class=missing-support reason=upstream-dependency
   test fortyFit =
     logOf(40, Cli.Tracing.defaultViewOptions) |> Stdlib.Test.equal(40)
 
@@ -290,7 +279,6 @@ module TheLogIsCut =
   // Counted at 100 rather than 41: at 41 the capped form is also 41 lines, so `= 41` there
   // holds whether or not the cap works. At 100 it still prints forty plus one summary line,
   // which is the same 41 and is now a number the uncapped form cannot produce.
-  // @compiler xfail compile: "Unknown function or value 'logOf'" class=missing-support reason=upstream-dependency
   test capAtForty =
     Stdlib.Test.all(
       [ logOf(100, Cli.Tracing.defaultViewOptions) |> Stdlib.Test.equal(41)
@@ -302,7 +290,6 @@ module TheLogIsCut =
 
 
   // And it says what to type for the rest.
-  // @compiler xfail compile: "Unknown function or value 'textOf'" class=missing-support reason=upstream-dependency
   test capSaysHowToSeeRest =
     Stdlib.String.contains(textOf(41, Cli.Tracing.defaultViewOptions), "--all")
     |> Stdlib.Test.equal(true)
@@ -311,7 +298,6 @@ module TheLogIsCut =
   // `--all` prints every one. Counting LINES at 41 proves nothing on its own: the capped
   // form prints forty plus a "... 1 more" line, so it is 41 lines either way. What tells
   // them apart at this size is that the uncapped one has no "more" line at all.
-  // @compiler xfail compile: "Unknown function or value 'textOf'" class=missing-support reason=upstream-dependency
   test allPrintsEvery =
     Stdlib.Test.all(
       [ Stdlib.String.contains(
@@ -412,7 +398,6 @@ module WatchCursor =
 
 
 module ReplayReasons =
-  // @compiler xfail compile: "Unknown function or value 'Tracing.Format.replayStop'" class=missing-support reason=upstream-dependency
   test messages =
     let cases =
       [ (Tracing.ReplayStop.InvalidId, "not an id")

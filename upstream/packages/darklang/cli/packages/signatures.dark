@@ -15,14 +15,12 @@ module Darklang.Cli.Packages.Signatures
 // `Option.Option` regardless of which submodule the listing was scoped to. `shortenName` makes that
 // unnecessary: it drops the longest common prefix with the current module and knows Option and Result
 // resolve bare, so the same listing shortens correctly without anyone naming a namespace.
-// @compiler blocked: upstream-dependency diagnostic="rootContext: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 let rootContext(branchId: Uuid, modulePath: List<String>): PrettyPrinter.ProgramTypes.Context =
   PrettyPrinter.ProgramTypes.Context.forModule(branchId, modulePath)
 
 
 // Renders the signature body only (no name) — e.g.
 // `(list: List<'a>, fn: 'a -> 'b): List<'b>`. Callers prepend the name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let formatFn(
   ctx: PrettyPrinter.ProgramTypes.Context,
   fn: LanguageTools.ProgramTypes.PackageFn.PackageFn)
@@ -50,7 +48,6 @@ let formatFn(
   $"({paramsJoined}): {ret}"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
 let formatType(
   ctx: PrettyPrinter.ProgramTypes.Context,
   name: String,
@@ -138,7 +135,6 @@ let trimRoot(root: String, key: String): String =
     key
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
 let renderModule(
   ctx: PrettyPrinter.ProgramTypes.Context,
   rootName: String,
@@ -179,7 +175,6 @@ let renderModule(
 /// One line per method of each impl, written the way a call is: `a % b  (Modulo)`,
 /// `Stdlib.display(v)  (Display)`. An impl's method fns live at the impl's path, which no call
 /// uses, so they are listed here instead of as a module of their own.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let implLines(
   ctx: PrettyPrinter.ProgramTypes.Context,
   impls:
@@ -209,7 +204,6 @@ let implModuleKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   moduleKey(loc) + "." + loc.name
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Signatures.ParsedArgs: Unknown type 'Cli.Packages.Query.TestModules'"
 type ParsedArgs =
   { root: List<String>
     includeTypes: Bool
@@ -233,7 +227,6 @@ val argSpec =
 
 
 // Every positional is a filter of its own, listed in turn.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let parseArgs(args: List<String>): ParsedArgs =
   let p = FlagParser.parse(argSpec, args)
   let root =
@@ -252,7 +245,6 @@ let parseArgs(args: List<String>): ParsedArgs =
       parseErrors = p.errors }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let executeFiltered(
   state: AppState,
   rootPath: List<String>,
@@ -441,7 +433,6 @@ let executeFiltered(
 /// `Stdlib.Random` holds nothing, but `Int64.random` and `String.random` exist, and
 /// `Stdlib.Cli.Environment` is `Cli.Env`: the modules and functions a dotted filter's last
 /// part names.
-// @compiler blocked: upstream-dependency diagnostic="namedLike: Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let namedLike(
   rootName: String,
   fns: List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>>,
@@ -481,7 +472,6 @@ let namedLike(
   | None -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(args)
 
@@ -529,7 +519,6 @@ let execute(state: AppState, args: List<String>): AppState =
     finalState
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Usage: docs signatures [filter...] [--types] [--module <path>] [--all] [--include-deprecated] [--include-internal] [--include-tests]"
     ""
@@ -561,7 +550,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match Stdlib.List.last(args) with
   | Some(last) ->

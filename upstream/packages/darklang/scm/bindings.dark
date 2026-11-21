@@ -52,6 +52,5 @@ type BindingRow =
 
 
 /// The bindings <param f> asks for.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Bindings.query: Unknown function or value 'Builtin.scmBindings'"
 let query(f: BindingFilter): List<BindingRow> =
   Builtin.scmBindings(f)

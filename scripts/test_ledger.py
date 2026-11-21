@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Regressions for the source-owned ledger and byte-preserving pin verification."""
+"""Regressions for the source-owned ledger and byte-identical pin verification."""
 import importlib.util
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -84,23 +85,38 @@ class SourceLedger(unittest.TestCase):
             reflection=dict(status='excluded', notes='Intentionally excluded.'))))))
         self.assertEqual(ledger.summarize(self.root, [])['parser'], {'excluded': 1})
 
-    def test_only_lexer_identified_annotation_lines_are_removed(self):
-        original = b'module Example\nval text = """\n// @compiler blocked: literal\n"""\n'
+    def test_imported_sources_must_equal_the_pin(self):
+        original = b'module Example\nval text = 1\n'
         path = self.root / 'upstream/packages/example.dark'
         path.parent.mkdir(parents=True)
-        path.write_bytes(b'// @compiler blocked: missing-implementation\n' + original)
-        rows = [{'source': 'upstream/packages/example.dark', 'annotation_lines': [1]}]
+        path.write_bytes(original)
+        rows = [{'source': 'upstream/packages/example.dark'}]
         with patch.object(ledger.sources, 'checked_files', return_value={'packages/example.dark': original}):
             ledger.verify_pin(self.root, self.root, rows)
-            path.write_bytes(path.read_bytes().replace(b'module Example', b'module Altered'))
+            path.write_bytes(b'// @compiler blocked: missing-implementation\n' + original)
             with self.assertRaisesRegex(ValueError, 'differs from the pin'):
                 ledger.verify_pin(self.root, self.root, rows)
+
+    def test_tree_id_matches_git(self):
+        directory = self.root / 'upstream/packages'
+        (directory / 'a').mkdir(parents=True)
+        (directory / 'a/x.dark').write_bytes(b'val x = 1\n')
+        (directory / 'a.dark').write_bytes(b'val a = 1\n')
+        subprocess.run(['git', 'init', '-q', str(directory)], check=True)
+        subprocess.run(['git', '-C', str(directory), 'add', 'a', 'a.dark'], check=True)
+        tree = subprocess.check_output(['git', '-C', str(directory), 'write-tree'], text=True).strip()
+        subprocess.run(['rm', '-rf', str(directory / '.git')], check=True)
+        (self.root / 'porting/sources.yaml').write_text('upstream_packages_tree: ' + tree + '\n')
+        ledger.verify_tree(self.root)
+        (directory / 'a.dark').write_bytes(b'// @compiler blocked: missing-implementation\nval a = 1\n')
+        with self.assertRaisesRegex(ValueError, 'differs from the pinned packages tree'):
+            ledger.verify_tree(self.root)
 
     def test_manifest_cannot_hide_or_duplicate_a_file(self):
         directory = self.root / 'upstream/packages'
         directory.mkdir(parents=True)
         (directory / 'example.dark').write_text('val example = 1')
-        manifest = self.root / 'upstream/sources.list'
+        manifest = self.root / 'porting/upstream-sources.list'
         manifest.write_text('')
         with self.assertRaisesRegex(ValueError, 'complete source tree'):
             ledger.imported_paths(self.root)

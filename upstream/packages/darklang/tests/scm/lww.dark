@@ -10,7 +10,6 @@ module Darklang.SCM.Tests.Lww
 
 module Wins =
   /// Does the INCOMING binding beat the LOCAL one?
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Lww.Wins.incomingWins: Unknown function or value 'Darklang.SCM.Conflicts.beats'"
   let incomingWins(
     incoming: SCM.Conflicts.Binding,
     local: SCM.Conflicts.Binding)
@@ -35,7 +34,6 @@ module Wins =
 
 
   // A later stamp wins, whatever the hashes are.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test laterStampWins =
     Stdlib.Test.all(
       [ Wins.incomingWins(
@@ -50,7 +48,6 @@ module Wins =
 
 
   // An exact tie goes to the HIGHER hash. Portable, so every instance picks the same side.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test tieGoesToHigherHash =
     Stdlib.Test.all(
       [ Wins.incomingWins(
@@ -65,14 +62,12 @@ module Wins =
 
 
   // A live binding with no stamp cannot defend itself.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test unstampedLocalLoses =
     Wins.incomingWins(b("2026-01-01T00:00:00.000Z", "aaaa"), b("", "ffff"))
     |> Stdlib.Test.equal(true)
 
 
   // Stamps are `yyyy-MM-ddTHH:mm:ss.fffZ`, so lexical comparison is already chronological.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test lexicalIsChronological =
     Stdlib.Test.all(
       [ Wins.incomingWins(
@@ -89,7 +84,6 @@ module Wins =
   // An INCOMING binding with no stamp loses to anything that has one: the one asymmetry. Deliberate:
   // an op with no stamp cannot claim recency, and letting it win would let a malformed record beat
   // real history.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test unstampedIncomingLoses =
     Wins.incomingWins(b("", "ffff"), b("2026-01-01T00:00:00.000Z", "aaaa"))
     |> Stdlib.Test.equal(false)
@@ -98,7 +92,6 @@ module Wins =
   // The same binding again, stamped the same: nothing to win, so the incoming side loses. The fold
   // keeps what it has and its earliest stamp, and recording never sees this at all, since equal
   // hashes are not a conflict.
-  // @compiler xfail compile: "Unknown function or value 'Wins.incomingWins'" class=missing-support reason=upstream-dependency
   test sameBindingLoses =
     Wins.incomingWins(
       b("2026-01-01T00:00:00.000Z", "aaaa"),

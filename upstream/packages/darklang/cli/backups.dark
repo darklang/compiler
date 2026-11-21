@@ -8,20 +8,17 @@ module Darklang.Cli.Backups
 
 /// The backups, newest first. The runtime keeps the folder and its names, the upgrade path's
 /// backups among them (`LanguageTools.LocalStore.backups`).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Backups.list: Unknown function or value 'Stdlib.LocalStore.backups'"
 let list(): List<LanguageTools.LocalStore.Backup> =
   match LanguageTools.LocalStore.backups(LanguageTools.LocalStore.BackupAction.List) with
   | Ok(backups) -> backups
   | Error(_) -> []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Backups.names: Unknown function or value 'list'"
 let names(): List<String> =
   list() |> Stdlib.List.map(fun b -> b.name)
 
 
 /// `dark backups`
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeList(state: AppState): AppState =
   match list() with
   | [] ->
@@ -43,7 +40,6 @@ let executeList(state: AppState): AppState =
 
 /// `dark backups now`. Named for the moment rather than the day, so an on-demand copy never collides
 /// with the upgrade path's daily one.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeNow(state: AppState): AppState =
   match LanguageTools.LocalStore.backups(LanguageTools.LocalStore.BackupAction.Create) with
   | Ok(taken) ->
@@ -56,7 +52,6 @@ let executeNow(state: AppState): AppState =
 
 /// `dark backups restore <name> [-y]`. Puts the named backup in place of the store. The store as it is
 /// now is copied aside first (`data.db.pre-restore-<stamp>`), so a restore is itself undoable.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeRestore(state: AppState, name: String, confirm: Confirm): AppState =
   if Stdlib.Bool.not(Stdlib.List.contains(names(), name)) then
     printErr($"no backup named \"{name}\".")
@@ -94,7 +89,6 @@ let executeRestore(state: AppState, name: String, confirm: Confirm): AppState =
 /// `dark backups prune <keep> [-y]`. Deletes the oldest, keeping the newest <keep>. Shows what would go
 /// and takes an explicit yes, like every other verb that destroys something: a backup is the thing you
 /// reach for AFTER a mistake, and the one command that must not make one.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executePrune(state: AppState, keepArg: String, confirm: Confirm): AppState =
   match Stdlib.Int64.parse(keepArg) with
   | Error(_) ->
@@ -145,7 +139,6 @@ let executePrune(state: AppState, keepArg: String, confirm: Confirm): AppState =
           exitWith(state, Stdlib.List.length(deleted) == Stdlib.List.length(doomed))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] -> executeList(state)
@@ -171,7 +164,6 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "  dark backups                      what copies of the store exist"
@@ -186,7 +178,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] -> [ "list", "now", "prune", "restore" ] |> Stdlib.List.map(Completion.simple)

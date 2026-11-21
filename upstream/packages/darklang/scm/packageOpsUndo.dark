@@ -2,7 +2,6 @@ module Darklang.SCM.PackageOps
 
 /// Apply an operation's reference-name changes using the same rules as branch reads.
 /// Keep both changes when separate renames update different calls.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let applyReferenceNames(
   snapshots: List<LanguageTools.ProgramTypes.ReferenceNamesSnapshot>,
   op: LanguageTools.ProgramTypes.PackageOp)
@@ -12,7 +11,6 @@ let applyReferenceNames(
 
 /// Read the reference names from stored declarations.
 /// Apply the branch's later changes to those names separately.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.storedReferenceSnapshots: Unknown function or value 'Builtin.pmStoredReferenceSnapshots'"
 let storedReferenceSnapshots(
   sources:
     List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.Reference)>)
@@ -21,7 +19,6 @@ let storedReferenceSnapshots(
 
 
 /// Does this operation change the declaration or its reference names?
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let revisionTouches(
   location: LanguageTools.ProgramTypes.PackageLocation,
   op: LanguageTools.ProgramTypes.PackageOp)
@@ -48,7 +45,6 @@ type Edits =
 
 
 /// <param scope>'s binding, rename and decision ops, oldest first, with no definitions.
-// @compiler blocked: upstream-dependency diagnostic="historyOps: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let historyOps(
   scope: Uuid,
   edits: Edits,
@@ -60,7 +56,6 @@ let historyOps(
 /// Undo follows this branch's edits, starting from the history it inherited.
 /// Stop a parent's history at the child's first edit: later parent commits are
 /// visible on the branch, but undo should not treat them as the branch's edits.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let readRevisionOps(
   scope: Uuid,
   edits: Edits,
@@ -95,7 +90,6 @@ let readRevisionOps(
 
 
 /// Read the edits undo can follow for this package location on this branch.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let revisionOps(
   branch: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation)
@@ -159,7 +153,6 @@ let recordUndoRevision(
 
 /// Walk this declaration's edit history and remember where each undo landed.
 /// Repeated undo should keep moving back through the earlier edits.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.previousRevision: Unknown function or value 'revisionOps'"
 let previousRevision(
   branch: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation)

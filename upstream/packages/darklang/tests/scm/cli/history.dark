@@ -2,7 +2,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test historyOnMainListsCommitsNewestFirst =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")
@@ -49,7 +48,6 @@ test historyOnMainListsCommitsNewestFirst =
 
 // Odd, but today's behaviour: on a branch, `log` lists the branch's ops (oldest first), not its
 // commits as it does on main.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test onABranchLogListsOpsAndCommitsListsCommits = scenario(fun dark ->
   [ switch(dark, "feat")
     saveNumber(dark, "Tests.App.a", "1")
@@ -88,7 +86,6 @@ test onABranchLogListsOpsAndCommitsListsCommits = scenario(fun dark ->
     same(commits(dark), [], "and main's history has none of it") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test diffShowsTheDraftOrWhatABranchChanges =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.a", "1")

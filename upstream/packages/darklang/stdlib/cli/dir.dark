@@ -1,37 +1,31 @@
 module Darklang.Stdlib.Cli.Dir
 
 /// Create a directory. Returns Error if it already exists.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.create reason=compiler-implementation
 let create(path: String): Result<Unit, Posix.Error> =
   Posix.mkdir(path, Posix.Modes.defaultDir)
 
 
 /// Create a directory and all missing parents (like mkdir -p).
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.createRecursive reason=compiler-implementation
 let createRecursive(path: String): Result<Unit, Posix.Error> =
   Posix.mkdirRecursive(path)
 
 
 /// Get the current working directory.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.current reason=compiler-implementation
 let current(): Result<String, Posix.Error> =
   Posix.getCwd()
 
 
 /// Change the current working directory.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.setCurrent reason=compiler-implementation
 let setCurrent(path: String): Result<Unit, Posix.Error> =
   Posix.chdir(path)
 
 
 /// List entries in a directory (filenames only).
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.list reason=compiler-implementation
 let list(path: String): Result<List<String>, Posix.Error> =
   Posix.listDir(path)
 
 
 /// List entries as full paths.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.listFullPaths reason=compiler-implementation
 let listFullPaths(path: String): Result<List<String>, Posix.Error> =
   let cleanPath = Path.stripTrailing(path)
   Posix.listDir(cleanPath)
@@ -39,13 +33,11 @@ let listFullPaths(path: String): Result<List<String>, Posix.Error> =
 
 
 /// Remove an empty directory.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.delete reason=compiler-implementation
 let delete(path: String): Result<Unit, Posix.Error> =
   Posix.rmdir(path)
 
 
 /// Get the user's home directory, or None if not available.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.home reason=compiler-implementation
 let home(): Option<String> =
   Env.home()
 
@@ -82,7 +74,6 @@ let __entries(path: String): Result<List<(String * Bool)>, Posix.Error> =
 
 /// List all files recursively under a directory (full paths).
 /// Does not follow symlinks — symlinks are included as entries but not recursed into.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.listRecursive reason=compiler-implementation
 let listRecursive(path: String): Result<List<String>, Posix.Error> =
   __entries(path)
   |> Result.map(fun entries ->
@@ -91,7 +82,6 @@ let listRecursive(path: String): Result<List<String>, Posix.Error> =
 
 
 /// Create a temporary directory (like mktemp -d). Returns the path.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.createTemp reason=compiler-implementation
 let createTemp(): Result<String, Posix.Error> =
   let base_ =
     match Env.get("TMPDIR") with
@@ -103,7 +93,6 @@ let createTemp(): Result<String, Posix.Error> =
 
 /// Remove a directory and everything inside it (like rm -rf).
 /// Symlinks are removed (unlinked) without following them.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.deleteRecursive reason=compiler-implementation
 let deleteRecursive(path: String): Result<Unit, Posix.Error> =
   match __entries(path) with
   | Ok(entries) ->
@@ -125,13 +114,11 @@ let deleteRecursive(path: String): Result<Unit, Posix.Error> =
 /// Walk a directory tree, returning all entries (files and directories) as full paths, each
 /// directory before its contents.
 /// Does not follow symlinks — symlinks are included as entries but not recursed into.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.walk reason=compiler-implementation
 let walk(path: String): Result<List<String>, Posix.Error> =
   __entries(path) |> Result.map(fun entries -> List.map(entries, fun((entry, _)) -> entry))
 
 
 /// Get the total size of a directory and its contents in bytes.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.size reason=compiler-implementation
 let size(path: String): Result<Int64, Posix.Error> =
   match listRecursive(path) with
   | Ok(files) ->
@@ -147,7 +134,6 @@ let size(path: String): Result<Int64, Posix.Error> =
 
 
 /// Create a temporary directory, run a function with it, then clean up.
-// @compiler replace: packages/darklang/stdlib/cli/dir.dark#Darklang.Stdlib.Cli.Dir.withTemp reason=compiler-implementation
 let withTemp(fn: String -> 'a): Result<'a, Posix.Error> =
   createTemp()
   |> Result.map(fun tmpDir ->

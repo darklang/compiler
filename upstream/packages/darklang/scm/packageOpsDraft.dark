@@ -11,12 +11,10 @@ module Darklang.SCM.PackageOps
 // Same module as `packageOps.dark`; see the note there.
 
 /// How many ops are in the draft.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpCountFor: Unknown function or value 'countOf'"
 let draftOpCountFor(branchId: Uuid): Int64 =
   countOf(OpFilter.Draft(branchId))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpCount: Unknown function or value 'draftOpCountFor'"
 let draftOpCount(): Int64 =
   draftOpCountFor(currentBranch())
 
@@ -25,7 +23,6 @@ let draftOpCount(): Int64 =
 ///
 /// Sorted rather than in log order: two machines that authored the same ops in a different order committed
 /// the same thing, and an id that says otherwise would be lying about the contents it claims to name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftOpIdsFor: Unknown function or value 'idsOf'"
 let draftOpIdsFor(branchId: Uuid): List<String> =
   idsOf(OpFilter.DraftIds(branchId))
 
@@ -33,7 +30,6 @@ let draftOpIdsFor(branchId: Uuid): List<String> =
 /// What the draft BINDS: one entry per name, latest edit wins. Five edits to one fn collapse to one entry
 /// here, which is why propagation runs at commit time -- the intermediate versions never need to be shown
 /// or propagated to.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftBindingsFor: Unknown function or value 'draftEntriesFromOpRows'"
 let draftBindingsFor(branchId: Uuid): List<Conflicts.Binding> =
   draftEntriesFromOpRows(draftOpRowsFor(branchId))
   |> Stdlib.List.filterMap(fun word -> word.binding)
@@ -41,12 +37,10 @@ let draftBindingsFor(branchId: Uuid): List<Conflicts.Binding> =
 
 /// The draft's op rows for <param branchId>, oldest first -- the one query behind
 /// <fn draftBindingsFor>, <fn draftRemovalsFor> and <fn draftEntriesFor>.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let draftOpRowsFor(branchId: Uuid): List<OpRow> =
   rowsOf(OpFilter.Draft(branchId))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftBindings: Unknown function or value 'draftBindingsFor'"
 let draftBindings(): List<Conflicts.Binding> =
   draftBindingsFor(currentBranch())
 
@@ -54,7 +48,6 @@ let draftBindings(): List<Conflicts.Binding> =
 /// The names the draft REMOVES, fully qualified: an `Unbind` with no later binding of the same name.
 /// Not a binding, so `draftBindingsFor` cannot carry it, and a status that counted bindings alone would
 /// read "clean" over a draft whose one op deletes something.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftRemovalsFor: Unknown function or value 'bindingEntriesFromOpRows'"
 let draftRemovalsFor(branchId: Uuid): List<String> =
   bindingEntriesFromOpRows(draftOpRowsFor(branchId))
   |> Stdlib.List.filterMap(fun w ->
@@ -63,7 +56,6 @@ let draftRemovalsFor(branchId: Uuid): List<String> =
     | None -> Option.Some(Conflicts.fqn(w.owner, w.modules, w.name)))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.draftRemovals: Unknown function or value 'draftRemovalsFor'"
 let draftRemovals(): List<String> =
   draftRemovalsFor(currentBranch())
 
@@ -73,7 +65,6 @@ let draftRemovals(): List<String> =
 /// An unresolved reference is fine while you work -- you can write a caller before the callee exists, and
 /// `WipRefresh` re-resolves once it does. It stops being fine at commit, where a draft becomes history
 /// other machines rely on. What to DO about the answer is decided in `Cli.Commit`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.unresolvedInDraft: Unknown function or value 'draftEntriesFor'"
 let unresolvedInDraft(branchId: Uuid): List<(String * List<String>)> =
   let ops = draftEntriesFor(branchId) |> Stdlib.List.map(fun e -> e.op)
   let bindings = draftBindingsFor(branchId)
@@ -104,7 +95,6 @@ let unresolvedInDraft(branchId: Uuid): List<(String * List<String>)> =
 /// `locations.source` is the only place this is knowable: a repoint changes an item's resolved references
 /// and nothing else, so its binding is shape-identical to one you typed. Returned fully-qualified so a
 /// caller can intersect with what it is about to display rather than asking per item.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.propagatedNames: Unknown function or value 'SCM.Bindings.query'"
 let propagatedNames(): List<String> =
   Bindings.query(Bindings.BindingFilter.Propagated(currentBranch()))
   |> Stdlib.List.map(fun b -> Conflicts.fqn(b.owner, b.modules, b.name))
@@ -112,13 +102,11 @@ let propagatedNames(): List<String> =
 
 /// The draft, decoded, oldest first. Same predicate as `draftWhere`, so this and the counts can't disagree
 /// about what the draft is.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'DraftEntry'"
 let draftEntriesFor(branchId: Uuid): List<DraftEntry> =
   decodeOpRowEntries(draftOpRowsFor(branchId))
   |> Stdlib.List.map(fun((id, ts, op)) -> DraftEntry { id = id, ts = ts, op = op })
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'DraftEntry'"
 let draftEntries(): List<DraftEntry> =
   draftEntriesFor(currentBranch())
 
@@ -141,7 +129,6 @@ let decisionKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
 /// Guarded on the `conflicts` projection first, which is small and usually empty of overrides, so the
 /// op-log decode below costs nothing on the common path.
 /// A failed read of the op log is reported rather than mistaken for no findings.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.supersededOverrides: Unknown function or value 'SCM.Conflicts.query'"
 let supersededOverrides()
   : Result<List<(LanguageTools.ProgramTypes.PackageLocation * String * String)>, String> =
   match Conflicts.query(Conflicts.ConflictFilter.AnyOverridden) with
@@ -181,7 +168,6 @@ let supersededOverrides()
 /// Split out so `merge` can ask the same question of a branch's COMMITTED frontier that
 /// `commit` asks of a draft. One implementation, so the two gates cannot disagree about what
 /// "definite type error" means.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let typeCheckOps(
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : LanguageTools.AtRestTypeChecker.Report =
@@ -280,7 +266,6 @@ let typeCheckOps(
 /// target. A superseded version's `Add` stays in the draft by design (its naming collapses, the
 /// content ships as history), and must not be checked, or a broken-then-fixed edit would refuse every
 /// commit. Unreachable history is not what the gate protects; what other machines will RESOLVE is.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 let typeCheckDraft(branchId: Uuid): LanguageTools.AtRestTypeChecker.Report =
   typeCheckOps(draftEntriesFor(branchId) |> Stdlib.List.map(fun e -> e.op))
 
@@ -291,7 +276,6 @@ let typeCheckDraft(branchId: Uuid): LanguageTools.AtRestTypeChecker.Report =
 
 /// A draft op, with the two things a selection needs that a decoded op alone doesn't carry: which row it is,
 /// and when it was authored.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.DraftEntry: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 type DraftEntry =
   { id: String
     ts: String
@@ -299,7 +283,6 @@ type DraftEntry =
 
 
 /// Drop <param what> from <param branchId>'s draft. Returns how many ops went.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardOn: Unknown function or value 'SCM.Actions.discard'"
 let discardOn(branchId: Uuid, what: Actions.DiscardWhat): Result<Int64, String> =
   match Actions.discard(branchId, what) with
   | Ok(n) -> Result.Ok(n)
@@ -317,7 +300,6 @@ let discardOn(branchId: Uuid, what: Actions.DiscardWhat): Result<Int64, String> 
 ///
 /// Only the NAME's bindings go -- `SetName`s, and the overrides an `undo` writes. That reverts the name to
 /// its last committed binding, or to not existing at all if it never had one. Its content stays.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardDraftName: Unknown function or value 'discardOn'"
 let discardDraftName(owner: String, modules: List<String>, name: String): Result<Int64, String> =
   discardOn(
     currentBranch(),
@@ -326,7 +308,6 @@ let discardDraftName(owner: String, modules: List<String>, name: String): Result
 
 
 /// Drop these ops from <param branchId>'s draft. Returns how many went.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.dropBranchOps: Unknown function or value 'discardOn'"
 let dropBranchOps(branchId: Uuid, ids: List<String>): Result<Int64, String> =
   match ids with
   | [] -> Result.Ok(0)
@@ -334,6 +315,5 @@ let dropBranchOps(branchId: Uuid, ids: List<String>): Result<Int64, String> =
 
 
 /// Drop the current scope's draft, whichever it is.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.discardDraft: Unknown function or value 'discardOn'"
 let discardDraft(): Result<Int64, String> =
   discardOn(currentBranch(), Actions.DiscardWhat.All)

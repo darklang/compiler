@@ -6,14 +6,12 @@ module Darklang.LanguageTools.Exec
 /// Every process is a wrapped VM the scheduler steps; the table's rows are copies taken on
 /// the scheduler thread, never references into a running VM.
 /// What a process was started on.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 type Entry =
   | Function(RuntimeTypes.FQFnName.FQFnName)
   | Expr
 
 
 /// What a parked process is waiting for.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 type ParkedOn =
   /// A host operation being performed for a builtin: a file read, an HTTP request, a process
   /// run. The text names the operation and its resource (`file-read /some/path`).
@@ -32,7 +30,6 @@ type ParkedOn =
   | Process(Uuid)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Exec.Status: Unknown type 'ParkedOn'"
 type Status =
   | Runnable
   | Parked(ParkedOn)
@@ -40,7 +37,6 @@ type Status =
   | Failed(RuntimeTypes.RuntimeError.Error)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Exec.Summary: Unknown type 'Entry'"
 type Summary =
   { id: Uuid
     entry: Entry
@@ -60,7 +56,6 @@ type Summary =
 type ExecutionPoint = RuntimeTypes.ExecutionPoint
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Summary'"
 type Detail =
   { summary: Summary
     /// The call stack at the moment of the snapshot, outermost first.
@@ -68,7 +63,6 @@ type Detail =
 
 
 /// Every process this instance's scheduler knows, finished ones included.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Exec.list: Unknown function or value 'Builtin.execList'"
 let list(): List<Summary> =
   Builtin.execList()
 
@@ -85,19 +79,16 @@ type MachineProcess =
 
 
 /// Every Dark process on this machine still running, oldest first.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Exec.machineList: Unknown function or value 'Builtin.execMachineList'"
 let machineList(): List<MachineProcess> =
   Builtin.execMachineList()
 
 
 /// One process in detail, or `None` for an id nobody has.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Exec.inspect: Unknown function or value 'Builtin.execInspect'"
 let inspect(id: Uuid): Option<Detail> =
   Builtin.execInspect(id)
 
 
 /// How many processes run at once: one per core this process may use. More than this many
 /// spawned at once take turns rather than running faster.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Exec.workers: Unknown function or value 'Builtin.execWorkerCount'"
 let workers(): Int64 =
   Builtin.execWorkerCount()

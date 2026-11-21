@@ -22,4 +22,7 @@ type source = { tree : WrittenTypes.sourceFile; entries : entry list }
 val kindName : kind -> string
 val isTest : kind -> bool
 val parse :
-  ?interpreterSource:bool -> reasons:string list -> string -> (source, string) result
+  ?annotations:(string * string) list ->
+  reasons:string list ->
+  string ->
+  (source, string) result

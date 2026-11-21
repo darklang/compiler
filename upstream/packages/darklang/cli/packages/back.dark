@@ -1,7 +1,6 @@
 // Navigate 'back' to wherever you were last in the package tree
 module Darklang.Cli.Packages.Back
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match Stdlib.List.last(state.packageData.locationHistory) with
   | Some(previousLocation) ->
@@ -18,12 +17,10 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: back"
     "Navigate back to the previous location in navigation history."

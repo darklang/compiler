@@ -5,7 +5,6 @@ module Darklang.SCM.PackageOps
 // Same module as `packageOps.dark`; see the note there.
 
 /// Get recent package ops (fully decoded), newest first.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let getRecent(limit: Int64): List<LanguageTools.ProgramTypes.PackageOp> =
   let n = limit
   decodeOpRows((query(OpFilter.Recent, n)).ops)
@@ -13,12 +12,10 @@ let getRecent(limit: Int64): List<LanguageTools.ProgramTypes.PackageOp> =
 
 /// Ops whose id starts with <param prefix>, fully decoded -- for inspecting op CONTENT. Newest 20: a
 /// prefix short enough to match more than a handful is a typo, not a listing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let getByIdPrefix(prefix: String): List<LanguageTools.ProgramTypes.PackageOp> =
   decodeOpRows((query(OpFilter.IdPrefix(prefix), 20)).ops)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let opsInCommitLimited(
   commitHash: String,
   limit: Int64)
@@ -27,13 +24,11 @@ let opsInCommitLimited(
 
 
 /// How many ops a commit committed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.opCountIn: Unknown function or value 'countOf'"
 let opCountIn(commitHash: String): Int64 =
   countOf(OpFilter.InCommit(commitHash))
 
 
 /// How many ops are in the log.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.count: Unknown function or value 'countOf'"
 let count(): Int64 =
   countOf(OpFilter.Recent)
 
@@ -41,7 +36,6 @@ let count(): Int64 =
 /// How many ops this branch can see: main's log, plus that branch's chain's own delta ops. Another
 /// branch's ops are in the same table but invisible from here -- that isolation is the point of the
 /// overlay.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.countFor: Unknown function or value 'countOf'"
 let countFor(branchId: Uuid): Int64 =
   countOf(OpFilter.Visible(branchId))
 
@@ -49,13 +43,11 @@ let countFor(branchId: Uuid): Int64 =
 /// An op row as `dark ops` lists it. The op is None for one this build cannot read: a synced store's
 /// log holds ops this build cannot read, and a listing that raised on one would be a listing you
 /// cannot run.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let summaryOf(row: OpRow): OpSummary =
   OpSummary { id = row.id, sizeBytes = row.sizeBytes, ts = row.ts, op = row.op }
 
 
 /// The <param limit> most recent op summaries this branch can see, newest first by insertion order.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpSummary'"
 let summariesFor(branchId: Uuid, limit: Int64): List<OpSummary> =
   (query(OpFilter.Visible(branchId), limit)).ops |> Stdlib.List.map(summaryOf)
 
@@ -80,13 +72,11 @@ let summariesFor(branchId: Uuid, limit: Int64): List<OpSummary> =
 /// resolves to the previous hash. A host that took the op then would check the old version, keep it,
 /// and never look again. Reporting an op only once it is applied means a host that looks mid-fold sees
 /// nothing new, and the poll after the fold sees the op.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.landedSince: Unknown function or value 'rowsOf'"
 let landedSince(branchId: Uuid, since: String): List<(String * String)> =
   rowsOf(OpFilter.LandedSince(branchId, since)) |> Stdlib.List.map(fun r -> (r.id, r.ts))
 
 
 /// The summaries for <param ids>, in the order given. An id the log does not hold is skipped.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpSummary'"
 let summariesByIds(ids: List<String>): List<OpSummary> =
   if Stdlib.List.isEmpty(ids) then
     []
@@ -98,7 +88,6 @@ let summariesByIds(ids: List<String>): List<OpSummary> =
 /// The newest instant an APPLIED op landed here (`created_at`), on any branch, and the ids that
 /// landed at it; ("", []) for an empty log. Where a watcher starts from. Applied only, as
 /// `landedSince`: an op inserted and not yet folded must not advance a watcher past itself.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.landedLast: Unknown function or value 'rowsOf'"
 let landedLast(): (String * List<String>) =
   let rows = rowsOf(OpFilter.LandedLast)
   match Stdlib.List.head(rows) with
@@ -110,7 +99,6 @@ let landedLast(): (String * List<String>) =
 ///
 /// The same predicate `commitsOnBranch` selects with, counted in SQLite, so nothing is decoded to
 /// print one number.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.commitCountOnBranch: Unknown function or value 'Commits.query'"
 let commitCountOnBranch(branchId: Uuid): Int64 =
   (Commits.query(Commits.CommitFilter.OnBranch(branchId), 0)).total
 
@@ -120,6 +108,5 @@ let commitCountOnBranch(branchId: Uuid): Int64 =
 /// A commit belongs to `commits.branch_id`, and a merge moves it to the parent. That is what a branch
 /// OWNS, a different question from what it can SEE: "owns" answers "what did I do that the parent has
 /// not" -- the number Home means when it says a branch is N ahead.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.commitsOnBranch: Unknown function or value 'Commits.query'"
 let commitsOnBranch(branchId: Uuid, limit: Int64): List<Commits.Commit> =
   (Commits.query(Commits.CommitFilter.OnBranch(branchId), limit)).commits

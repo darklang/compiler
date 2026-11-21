@@ -2,7 +2,6 @@ module Darklang.Cli.Tests.Listing
 
 module GroupedByModule =
   // Modules sorted, leaves in the order they came.
-  // @compiler blocked: compiler-leak diagnostic="Native execution returns true but reports leaks: 5; the runner rejects leaked allocations."
   test groupedByModule =
     Stdlib.Test.all(
       [ Cli.Listing.groupedByModule([ "B.y.f", "A.g", "B.y.e", "A.h", "top" ])

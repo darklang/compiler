@@ -4,7 +4,6 @@
 module Darklang.Cli.Workbench
 
 /// All package values for Tree's flat values-only lens.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadThingItems: Unknown function or value 'Packages.Query.withoutInternal'"
 let loadThingItems(branchId: Uuid): List<BodyItem> =
   let q =
     LanguageTools.ProgramTypes.Search.SearchQuery
@@ -25,7 +24,6 @@ let loadThingItems(branchId: Uuid): List<BodyItem> =
 
 
 /// The source of the selected Thing (value), for the preview - looked up by its full path.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let thingDetail(state: State): String =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> "(nothing selected)"
@@ -49,7 +47,6 @@ let thingDetail(state: State): String =
 /// branch marked ●, merged ones noted, and each described the way Home describes it -- current,
 /// draft, how far ahead, when it last committed -- so the list answers "which one" without
 /// opening each.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadBranchItems: Unknown function or value 'SCM.PackageOps.commitsOnBranch'"
 let loadBranchItems(currentBranchId: Uuid): List<BodyItem> =
   let describe(id: Uuid, ahead: Int64): String =
     let last =
@@ -89,7 +86,6 @@ let loadBranchItems(currentBranchId: Uuid): List<BodyItem> =
 
 
 /// The branch list as reader text.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.branchListText: Unknown function or value 'loadBranchItems'"
 let branchListText(currentBranchId: Uuid): String =
   let rows =
     loadBranchItems(currentBranchId)
@@ -113,7 +109,6 @@ let isMainRow(item: BodyItem): Bool =
 
 
 /// Is the cursor on a branch row for main (Home's)?
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let cursorOnMainRow(state: State): Bool =
   match Stdlib.List.getAt(state.items, state.selected) with
   | Some(item) -> (item.kind == "branch" || item.kind == "home-branch") && isMainRow(item)
@@ -122,7 +117,6 @@ let cursorOnMainRow(state: State): Bool =
 
 /// Where ⏎ on the branch row under the cursor would take you: id and name.
 /// Main comes from its constants, everything else through `selectedBranch`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let branchRowTarget(state: State): Option<(Uuid * String)> =
   if cursorOnMainRow(state) then
     Option.Some((SCM.Branch.mainBranchId, SCM.Branch.mainBranchName))
@@ -138,7 +132,6 @@ let branchRowTarget(state: State): Option<(Uuid * String)> =
 /// `SCM.Branch.list ()` would target whatever branch sits at that position in the FULL list, so with the
 /// list filtered to one entry `x` could offer to delete `main`. Every branch action and the preview go
 /// through here.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let selectedBranch(state: State): Option<SCM.Branch.Branch> =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> Option.None
@@ -160,7 +153,6 @@ let selectedBranch(state: State): Option<SCM.Branch.Branch> =
 /// row is one of Home's branch rows, else the branch you're on. Home
 /// advertises `m`/`r` on *other* branches, so acting on `state.branchId`
 /// there would mutate the wrong one.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let branchForAction(state: State): Option<SCM.Branch.Branch> =
   let onBranchRow =
     match Stdlib.List.getAt(state.items, state.selected) with
@@ -171,7 +163,6 @@ let branchForAction(state: State): Option<SCM.Branch.Branch> =
 
 
 /// The conflict the cursor is on, by location. Same filtered-cursor reasoning as `selectedBranch`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let selectedConflict(state: State): Option<SCM.Conflicts.Conflict> =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> Option.None
@@ -186,7 +177,6 @@ let selectedConflict(state: State): Option<SCM.Conflicts.Conflict> =
 
 
 /// In-CLI documentation topics (for the Docs view).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadDocBodyItems: Unknown function or value 'Docs.Command.Topics.allTopics'"
 let loadDocBodyItems(): List<BodyItem> =
   Docs.Command.Topics.allTopics()
   |> Stdlib.List.map(fun t ->
@@ -195,7 +185,6 @@ let loadDocBodyItems(): List<BodyItem> =
 
 /// The Errors view - the high-importance issues an operator running software on Dark cares about. Real
 /// conflicts (genuine) first, then a mock set of the other error kinds until those signals are wired.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadErrorItems: Unknown function or value 'SCM.Conflicts.pending'"
 let loadErrorItems(): List<BodyItem> =
   let conflicts =
     SCM.Conflicts.pending()
@@ -210,7 +199,6 @@ let loadErrorItems(): List<BodyItem> =
   conflicts
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let errorDetail(state: State): String =
   match Stdlib.List.getAt(state.items, state.selected) with
   | Some(item) ->
@@ -226,7 +214,6 @@ let errorDetail(state: State): String =
 /// same order; the id is the item name, so the detail pane can resolve it back with
 /// `Cli.TraceVerbs.find`. No sample rows: an empty list means nothing has run, and inventing runs
 /// to make the pane look full makes every other row in it suspect.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.loadTraceBodyItems: Unknown function or value 'Darklang.Tracing.Store.list'"
 let loadTraceBodyItems(): List<BodyItem> =
   let runs = Tracing.Store.list(30)
   // The shortest prefix that tells THESE runs apart, as the CLI table does it: the detail pane
@@ -252,7 +239,6 @@ let loadTraceBodyItems(): List<BodyItem> =
 /// `loadHomeItems`); Matter the packages (with a Values lens); Changes this
 /// branch's uncommitted work; Traces and Docs their own; Scratch renders its
 /// own body (no list). The lens comes from the view state.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let itemsForView(
   view: Int64,
   branchId: Uuid,
@@ -308,7 +294,6 @@ let applyFilter(items: List<BodyItem>, filter: String): List<BodyItem> =
 ///
 /// Switching to a DIFFERENT list is the other case, and those sites clear `filter` instead: a filter you
 /// typed for Changes has no business narrowing History.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let reloadItems(state: State): List<BodyItem> =
   itemsForView(state.activeView, state.branchId, state.location, state.matter.lens)
   |> applyFilter(state.filter)

@@ -153,40 +153,33 @@ type DetectRequest =
 
 
 /// Commit what <param request> names.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.commit: Unknown function or value 'Builtin.scmCommit'"
 let commit(request: CommitRequest): Result<Committed, Failure> =
   Builtin.scmCommit(request)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.branch: Unknown function or value 'Builtin.scmBranch'"
 let branch(action: BranchAction): Result<BranchDone, Failure> =
   Builtin.scmBranch(action)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.merge: Unknown function or value 'Builtin.scmMerge'"
 let merge(action: MergeAction): Result<Reconciled, Failure> =
   Builtin.scmMerge(action)
 
 
 /// Drop part of <param branchId>'s draft. Ok is how many ops went.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.discard: Unknown function or value 'Builtin.scmDiscard'"
 let discard(branchId: Uuid, what: DiscardWhat): Result<Int64, Failure> =
   Builtin.scmDiscard(branchId, what)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.resolve: Unknown function or value 'Builtin.scmResolve'"
 let resolve(resolution: Resolution): Result<Unit, Failure> =
   Builtin.scmResolve(resolution)
 
 
 /// The conflicts between two sides, each naming the winner the fold picks.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.detect: Unknown function or value 'Builtin.scmDetect'"
 let detect(request: DetectRequest): List<Conflicts.Conflict> =
   Builtin.scmDetect(request)
 
 
 /// Does the side stamped <param aTs> / hashed <param aHash> beat the other under last-writer-wins?
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Actions.beats: Unknown function or value 'Builtin.scmLwwBeats'"
 let beats(aTs: String, aHash: String, bTs: String, bHash: String): Bool =
   Builtin.scmLwwBeats(aTs, aHash, bTs, bHash)
 

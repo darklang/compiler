@@ -43,7 +43,6 @@ let floatParts<'a: Stdlib.Display + Stdlib.Compare + Stdlib.Negate + Stdlib.Zero
 /// enums have to carry theirs across. Always `Ok`-resolved: the value came from a real runtime type, so the
 /// name is by construction resolvable. The location is looked up because without it the pretty-printer has
 /// nothing to print but the hash.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.RuntimeTypesToProgramTypes.typeNameToPT: Unknown function or value 'PackageManager.Type.getWithLocation'"
 let typeNameToPT(
   branchId: Uuid,
   typeName: RuntimeTypes.FQTypeName.FQTypeName)
@@ -63,7 +62,6 @@ let typeNameToPT(
               { name = ProgramTypes.FQTypeName.FQTypeName.Package(ptHash), location = location }) }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'ProgramTypes.Expr'"
 let dvalToExpr(branchId: Uuid, dval: RuntimeTypes.Dval): Result<ProgramTypes.Expr, String> =
   match dval with
   | DUnit -> Result.Ok(ProgramTypes.Expr.EUnit(gid()))

@@ -7,7 +7,6 @@ module Documentation =
   // shipping empty (the actual count is well over 100; the threshold
   // is intentionally loose so adding/removing one fn doesn't churn this
   // test).
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.allBuiltinFns'" class=missing-support reason=upstream-dependency
   test registryIsNotEmpty =
     (LanguageTools.allBuiltinFns() |> Stdlib.List.length) > 100
     |> Stdlib.Test.equal(true)
@@ -15,7 +14,6 @@ module Documentation =
 
   // Builtin metadata round-trips: the registry exposes `int64ToFloat64` with
   // the parameter shape the type-checker uses at call sites.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.allBuiltinFns'" class=missing-support reason=upstream-dependency
   test int64ToFloatParameters =
     (LanguageTools.allBuiltinFns()
      |> Stdlib.List.findFirst(fun f -> f.name.name == "int64ToFloat64")
@@ -29,7 +27,6 @@ module Documentation =
 
 module Lookup =
   // Named lookups preserve the metadata exposed by the full registry.
-  // @compiler xfail compile: "Unknown function or value 'LanguageTools.findBuiltinFn'" class=missing-support reason=upstream-dependency
   test namedLookups =
     Stdlib.Test.all(
       [ LanguageTools.findBuiltinFn("listMap", 0s32)
@@ -54,7 +51,6 @@ module Lookup =
 
 
 module Resolution =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Tests.BuiltinIntrospection.Resolution.resolves: Unknown function or value 'LanguageTools.NameResolver.FnName.tryResolve'"
   let resolves(name: String, version: Int32): Bool =
     LanguageTools.NameResolver.FnName.tryResolve(
       LanguageTools.PackageManager.pm(),
@@ -66,7 +62,6 @@ module Resolution =
     |> Stdlib.Result.isOk
 
   // A builtin resolves by its name and version, not by its name alone.
-  // @compiler xfail compile: "Unknown function or value 'resolves'" class=missing-support reason=upstream-dependency
   test builtinResolvesOnlyAtItsVersion =
     Stdlib.Test.all(
       [ resolves("int64ToFloat64", 0s32) |> Stdlib.Test.equal(true)

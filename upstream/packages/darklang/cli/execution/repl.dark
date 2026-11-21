@@ -226,7 +226,6 @@ let upsert(bindings: List<Binding>, b: Binding): List<Binding> =
 /// miss.
 ///
 /// `branchId` is the branch to resolve type names against.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Repl.captureValue: Unknown function or value 'LanguageTools.RuntimeTypesToProgramTypes.dvalToExpr'"
 let captureValue(branchId: Uuid, v: 'a): String =
   match LanguageTools.RuntimeTypesToProgramTypes.dvalToExpr(
           branchId,

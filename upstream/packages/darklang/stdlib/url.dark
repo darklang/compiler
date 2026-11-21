@@ -473,7 +473,6 @@ let __resolveRaw(base: Url, ref: Url): Url =
 /// each field at its first {{=}}, reads {{+}} as a space (as an HTML form sends
 /// it), and skips empty fields, so {{?a=1&&b}} is {{[("a", "1"), ("b", "")]}}.
 /// <fn withQueryParams> goes the other way.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.queryParams: Unknown function or value 'formDecode'"
 let queryParams(url: Url): List<(String * String)> =
   match url.query with
   | None -> []
@@ -495,7 +494,6 @@ let queryParams(url: Url): List<(String * String)> =
 /// Decoding is <fn percentDecode>, so a {{+}} stays a {{+}}. Use it for routing,
 /// and the raw {{path}} when an escaped {{/}} ({{%2F}}) must not split.
 /// <fn withPathSegments> goes the other way.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.pathSegments: Unknown function or value 'percentDecode'"
 let pathSegments(url: Url): List<String> =
   let segments =
     match String.split(url.path, "/") with
@@ -512,7 +510,6 @@ let pathSegments(url: Url): List<String> =
 
 /// The other way from <fn queryParams>: {{[("q", "a b"), ("n", "1")]}} is
 /// {{q=a%20b&n=1}}, ready to go after a {{?}}.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.encodeQuery: Unknown function or value 'percentEncode'"
 let encodeQuery(params: List<(String * String)>): String =
   params
   |> List.map(fun pair ->
@@ -535,7 +532,6 @@ let encodeQuery(params: List<(String * String)>): String =
 /// segment of {{""}} gives a trailing {{/}}, which <fn pathSegments> drops; and
 /// with no host, a first segment of {{""}} gets a dot segment in front
 /// ({{/.//x}} or {{.//x}}), so the path reads back as neither a host nor absolute.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.withPathSegments: Unknown function or value 'percentEncode'"
 let withPathSegments(url: Url, segments: List<String>): Url =
   let joined =
     segments
@@ -561,7 +557,6 @@ let withPathSegments(url: Url, segments: List<String>): Url =
 /// by <fn encodeQuery>, so {{[("q", "a&b")]}} is {{?q=a%26b}}, and
 /// {{queryParams(withQueryParams(u, ps)) == ps}}. No params is no query at all,
 /// rather than a bare {{?}}.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.withQueryParams: Unknown function or value 'encodeQuery'"
 let withQueryParams(url: Url, params: List<(String * String)>): Url =
   { url with query = if params == [] then Option.None else Option.Some(encodeQuery(params)) }
 
@@ -572,7 +567,6 @@ let withQueryParams(url: Url, params: List<(String * String)>): Url =
 ///
 /// A {{%}} that does not start two hex digits is kept as itself rather than
 /// dropped, and bytes that are not valid UTF-8 become U+FFFD.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.percentDecode: Unknown function or value 'Stdlib.Bytes.concatAll'"
 let percentDecode(s: String): String =
   match String.split(s, "%") with
   | [] -> ""
@@ -597,7 +591,6 @@ let percentDecode(s: String): String =
 /// Decodes one field of a query string or HTML form: <fn percentDecode>, with
 /// {{+}} read as a space first, as a form sends it. A literal {{+}} travels as
 /// {{%2B}} and survives: {{C%2B%2B+map}} is {{C++ map}}.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.formDecode: Unknown function or value 'percentDecode'"
 let formDecode(s: String): String =
   percentDecode(String.replaceAll(s, "+", " "))
 
@@ -606,7 +599,6 @@ let formDecode(s: String): String =
 /// ({{A-Z a-z 0-9 - . _ ~}}), as UTF-8 bytes in uppercase hex: {{a b/é}} is
 /// {{a%20b%2F%C3%A9}}. Safe for any one part of a URL, a path segment or a query
 /// key or value; it escapes {{/}}, so encode segments, not a whole path.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.percentEncode: Unknown function or value 'Stdlib.Bytes.toList'"
 let percentEncode(s: String): String =
   s
   |> Utf8.encode

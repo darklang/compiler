@@ -15,7 +15,6 @@ type SubAppAction =
   | LaunchCommand(String)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.Live.Change'"
 type SubApp =
   { onKey: (Stdlib.Cli.Stdin.Key.Key, Stdlib.Cli.Stdin.Modifiers.Modifiers, Option<String>) ->
     (SubAppAction * SubApp)
@@ -39,7 +38,6 @@ type SubApp =
     onStoreChanged: LanguageTools.Live.Change -> SubApp }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Page: Unknown type 'Packages.NavInteractive.Session'"
 type Page =
   | MainPrompt
   | InteractiveNav(Packages.NavInteractive.Session)
@@ -47,7 +45,6 @@ type Page =
   | SubApp(SubApp)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.AppState: Unknown type 'Packages.State'"
 type AppState =
   { isExiting: Bool
     prompt: Prompt.State
@@ -98,7 +95,6 @@ type AppState =
 ///
 /// Only when you're on a branch. Everyone is on main almost all the time, and a prompt that says so every
 /// line is noise you learn to stop reading.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let locationStr(state: AppState): String =
   let where = Packages.formatLocation(state.packageData.currentLocation)
   match state.currentBranchId with
@@ -136,7 +132,6 @@ let printHint(msg: String): Unit =
 
 
 /// Print <param json> on stdout, or say on stderr why the value has no JSON form. Whether it printed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.printJson: No implementation of trait 'Darklang.Stdlib.Display'"
 let printJson(json: Result<String, Stdlib.Json.SerializeError.SerializeError>): Bool =
   match json with
   | Ok(text) ->
@@ -184,14 +179,12 @@ module Confirm =
 ///
 /// An empty ANSWER is not a refusal: a command asked a question and told the truth about it
 /// succeeded, however little there was to say.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let exitWith(state: AppState, ok: Bool): AppState =
   if ok then state else failed(state)
 
 
 /// The state a command hands back when it could not do what it was asked, and has printed why:
 /// exit code 1. <fn exitWith> is for when that is worked out at run time.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let failed(state: AppState): AppState =
   { state with exitCode = 1 }
 
@@ -218,7 +211,6 @@ let jsonStr(s: String): String =
 /// Takes the command list rather than calling `Registry.allCommands ()` itself: `initState` needs both the
 /// list and the options, and building the list twice per process start would be duplicate work on every
 /// invocation, including `dark version`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Registry.CommandHandler'"
 let commandOptions(commands: List<Registry.CommandHandler>): List<String> =
   let allNames = Stdlib.List.map(commands, fun cmd -> cmd.name)
   let allAliases =
@@ -239,12 +231,10 @@ let commandOptions(commands: List<Registry.CommandHandler>): List<String> =
 /// `SCM.PackageOps.currentBranch ()` is the process's, and it is what the verbs that MUTATE the store use
 /// -- `branch`, `merge`, `discard`, `push` -- because the ops they author route by the process's branch,
 /// and a state that had drifted from it would report one branch while writing to another.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.resolveStartingBranch: Unknown function or value 'SCM.PackageOps.currentBranch'"
 let resolveStartingBranch(): Uuid =
   SCM.PackageOps.currentBranch()
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let initState(): AppState =
   // No accounts: approval scoping is the only thing that still takes one, and it takes None.
   let accountID = Option.None
@@ -305,7 +295,6 @@ module ExecutionError =
 
   /// Boundary type for CLI command failures. Each variant carries its own
   /// structured payload — no flattening to strings at the boundary.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.ExecutionError: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
   type ExecutionError =
     | Parse(LanguageTools.Parser.CliScript.ParseError)
     /// A definite type error found before anything ran, and where each node the report
@@ -328,7 +317,6 @@ module ExecutionError =
   /// `. Did you mean `X`?` for a name that did not resolve, when the standard library has it
   /// somewhere else or a name near it exists; the same hint `dark fn` gives
   /// (<fn Packages.Errors.didYouMean>).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.nameSuggestion: Unknown function or value 'Packages.Errors.didYouMean'"
   let nameSuggestion(branchId: Uuid, rte: LanguageTools.RuntimeTypes.RuntimeError.Error): String =
     match rte with
     | ParseTimeNameResolution(originalName, NotFound) ->
@@ -340,7 +328,6 @@ module ExecutionError =
 
   /// Why <param name> was denied <param resource>, and how to allow <param rule>, or, for a
   /// process, <param anyArgsRule>: the program with any arguments.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.entryDenial: Unknown function or value 'Permissions.Command.approvedVersionOf'"
   let entryDenial(
     accountID: Option<Uuid>,
     branchId: Uuid,
@@ -370,7 +357,6 @@ module ExecutionError =
     $"permission denied:\n  {resource} is not allowed.\n\n{why}\n\nFor one run:\n  dark run --allow {Stdlib.Cli.Process.shellQuote(rule)} …{anyArgs}"
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError'"
   let toString(accountID: Option<Uuid>, branchId: Uuid, err: ExecutionError): String =
     match err with
     | Parse(pe) -> LanguageTools.Parser.CliScript.ParseError.toString(pe)
@@ -400,7 +386,6 @@ module ExecutionError =
 
 
   /// Format an error for the terminal, with colors for permission errors.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ExecutionError.formatForTerminal: Unknown type 'ExecutionError'"
   let formatForTerminal(accountID: Option<Uuid>, branchId: Uuid, err: ExecutionError): String =
     let message = toString(accountID, branchId, err)
     match err with
@@ -419,7 +404,6 @@ module ExecutionError =
   /// Permission denials already explain the resource and how to allow access.
   /// Keep their frames in the structured error for diagnostics, without printing
   /// an internal stack.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'ExecutionError'"
   let printCallStack(branchId: Uuid, what: String, error: ExecutionError): Unit =
     match error with
     | Runtime(_, frames, lambdaLines) when hasReadableFrames(frames) ->

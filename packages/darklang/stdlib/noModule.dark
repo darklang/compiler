@@ -3,9 +3,9 @@
 module Darklang.Stdlib
 
 /// Returns true when both values are structurally equal.
-let equals<'a> (left: a) (right: a) : Bool =
+let equals<'a>(left: a, right: a): Bool =
     left == right
 
 /// Returns true when both values are not structurally equal.
-let notEquals<'a> (left: a) (right: a) : Bool =
-    Stdlib.Bool.not (Stdlib.equals<'a> left right)
+let notEquals<'a>(left: a, right: a): Bool =
+    Stdlib.Bool.not(Stdlib.equals<'a>(left, right))

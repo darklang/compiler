@@ -7,5 +7,5 @@ module ParseError =
 
     type JsonPath = List<Part.Part>
 
-    let toString (path: JsonPath) : String =
-      path |> List.reverse |> List.map Part.toString |> String.join ""
+    let toString(path: JsonPath): String =
+      path |> List.reverse |> List.map(Part.toString) |> String.join("")

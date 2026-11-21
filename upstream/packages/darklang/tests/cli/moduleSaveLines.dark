@@ -1,7 +1,6 @@
 /// A module save names the line and column of each type error, so a long module is not a hunt.
 module Darklang.Cli.Tests.ModuleSaveLines
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test eachOccurrenceHasItsLine = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/lines.dark"
   let source =
@@ -26,7 +25,6 @@ test eachOccurrenceHasItsLine = Instance.withInstance(fun i ->
 
 
 /// A value that doesn't match its declared type is a type error at the value.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test annotatedValueHasItsLine = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/annotated.dark"
   let source = "val ok: String = \"a\"\nval limit: Int64 = \"six\""
@@ -38,7 +36,6 @@ test annotatedValueHasItsLine = Instance.withInstance(fun i ->
 
 
 /// A value called as a function names the value and the source location.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test calledValueHasNameAndLine = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/called-value.dark"
   let source = "let f(): Bytes = Stdlib.Bytes.empty()"
@@ -56,7 +53,6 @@ test calledValueHasNameAndLine = Instance.withInstance(fun i ->
 
 
 /// A `val` of a type declared in the same save is fully checked, here and from another module.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test valOfSiblingTypeIsChecked = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/store.dark"
   let source =
@@ -78,7 +74,6 @@ test valOfSiblingTypeIsChecked = Instance.withInstance(fun i ->
 
 
 /// A `val`'s declared type is something it uses, so the type has a live dependent.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test valTypeIsADependency = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/names.dark"
   let source = "type Names = List<String>\nval none: Names = []\n"

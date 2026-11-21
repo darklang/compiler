@@ -45,7 +45,6 @@ let fqnOf(location: LanguageTools.ProgramTypes.PackageLocation): String =
 
 /// List draft bindings and reference-name changes in order, with their operation IDs.
 /// Keep repeated edits to a name so a commit can include the earlier revisions it needs.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let namingsFrom(entries: List<PackageOps.DraftEntry>): List<Selected> =
   entries
   |> Stdlib.List.map(fun e ->
@@ -73,7 +72,6 @@ let namingsFrom(entries: List<PackageOps.DraftEntry>): List<Selected> =
 
 /// List the content hashes added by the draft.
 /// Dependency selection also needs new names for content that is already committed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let draftAddedHashes(entries: List<PackageOps.DraftEntry>): List<String> =
   entries
   |> Stdlib.List.filterMap(fun e ->
@@ -90,7 +88,6 @@ let draftAddedHashes(entries: List<PackageOps.DraftEntry>): List<String> =
 /// Find dependencies of these hashes that still have draft content or names.
 /// The dependency index records the hashes referenced by each stored body.
 /// Reuse the pending hashes from closeOverDeps so each step does not read the draft again.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PartialCommit.draftDepsOf: Unknown function or value 'SCM.Deps.query'"
 let draftDepsOf(pending: List<String>, hashes: List<String>): List<String> =
   if Stdlib.List.isEmpty(hashes) then
     []
@@ -101,7 +98,6 @@ let draftDepsOf(pending: List<String>, hashes: List<String>): List<String> =
 
 
 /// Add draft dependencies that are not yet selected.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PartialCommit.closeStep: Unknown function or value 'draftDepsOf'"
 let closeStep(pending: List<String>, acc: List<String>): List<String> =
   let next =
     draftDepsOf(pending, acc)
@@ -112,7 +108,6 @@ let closeStep(pending: List<String>, acc: List<String>): List<String> =
 
 /// Include draft dependencies until no new content is found.
 /// Each round adds only unseen hashes, so cycles terminate too.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let closeOverDeps(
   entries: List<PackageOps.DraftEntry>,
   namings: List<Selected>,
@@ -133,7 +128,6 @@ let closeOverDeps(
 
 
 /// Return this operation's ID if it adds content for a wanted hash.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let contentIdIfWanted(wantedHashes: List<String>, e: PackageOps.DraftEntry): Option<String> =
   let hashOf(h: LanguageTools.ProgramTypes.Hash): String =
     LanguageTools.ProgramTypes.hashToString(h)
@@ -155,7 +149,6 @@ let contentIdIfWanted(wantedHashes: List<String>, e: PackageOps.DraftEntry): Opt
 
 /// Return this operation's ID if it updates documentation or deprecation for a selected name.
 /// Both belong to the name, so select these edits by name.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let docIdIfWanted(wantedFqns: List<String>, e: PackageOps.DraftEntry): Option<String> =
   let location =
     match e.op with
@@ -174,7 +167,6 @@ let docIdIfWanted(wantedFqns: List<String>, e: PackageOps.DraftEntry): Option<St
 
 
 /// Which names `--include=` asked for that the draft doesn't hold.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PartialCommit.unknownNames: Unknown function or value 'namingsFrom'"
 let unknownNames(names: List<String>): List<String> =
   let held =
     namingsFrom(PackageOps.draftEntries())
@@ -186,7 +178,6 @@ let unknownNames(names: List<String>): List<String> =
 
 /// Include the versions needed by the selected changes.
 /// For a rename, keep later edits to its callers in the draft.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'SCM.PackageOps.DraftEntry'"
 let closeOverNamings(
   entries: List<PackageOps.DraftEntry>,
   namings: List<Selected>,
@@ -291,7 +282,6 @@ let closeOverNamings(
 
 /// Choose the operations needed to commit these names, and list any extra names they require.
 /// Return an error if a requested name has no draft changes.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PartialCommit.plan: Unknown function or value 'SCM.PackageOps.draftEntries'"
 let plan(names: List<String>): Result<(List<String> * List<String>), String> =
   let entries = PackageOps.draftEntries()
   let namings = namingsFrom(entries)

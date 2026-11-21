@@ -11,7 +11,6 @@ let describeSelf(branchId: Uuid, self: LanguageTools.RuntimeTypes.TypeReference)
   PrettyPrinter.RuntimeTypes.typeReference(branchId, self)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let traitHashAt(
   branchId: Uuid,
   currentLocation: PackageLocation,
@@ -28,7 +27,6 @@ let traitHashAt(
 
 /// The trait as written, then under `Stdlib.` (the operator traits are what
 /// most people ask about, and `impls Add` should just work).
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let resolveTrait(
   state: AppState,
   traitPath: String)
@@ -64,7 +62,6 @@ let resolveTrait(
 /// `impl Display for Int64` gives `[Stdlib.display]`, which is what someone looking for
 /// `Stdlib.Int64.toString` wanted; otherwise it is the trait's own, `Stdlib.Add.add`.
 /// Empty when the trait is unresolved.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let methodCalls(branchId: Uuid, i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl): List<String> =
   match traitLocation(i) with
   | Some(loc) ->
@@ -73,7 +70,6 @@ let methodCalls(branchId: Uuid, i: LanguageTools.ProgramTypes.TraitImpl.TraitImp
 
 
 /// Where the trait of <param i> lives, when it resolved.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let traitLocation(
   i: LanguageTools.ProgramTypes.TraitImpl.TraitImpl)
   : Option<LanguageTools.ProgramTypes.PackageLocation> =
@@ -85,7 +81,6 @@ let traitLocation(
 /// The name a call to <param method> of the trait at <param loc> uses: the fn beside the trait
 /// named for the method when there is one (`Stdlib.display`), else the trait's own
 /// (`Stdlib.Add.add`). Written as a person writes it: `Stdlib`, not `Darklang.Stdlib`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.methodCallName: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
 let methodCallName(
   branchId: Uuid,
   loc: LanguageTools.ProgramTypes.PackageLocation,
@@ -139,7 +134,6 @@ let operatorSyntax(
 /// `Stdlib.Zero.zero<Int64>()` for a method that takes nothing and so reads its type from a type
 /// argument. Arguments use the trait method's own parameter names. Empty when the trait is
 /// unresolved.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.TraitImpl.TraitImpl'"
 let callExamples(
   branchId: Uuid,
   ctx: PrettyPrinter.ProgramTypes.Context,
@@ -182,7 +176,6 @@ let callExamples(
 
 
 /// The name of the implementation, or its short hash when nothing binds it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.sourceNameOf: Unknown function or value 'LanguageTools.PackageManager.TraitImpl.locations'"
 let sourceNameOf(branchId: Uuid, source: LanguageTools.ProgramTypes.Hash): String =
   match LanguageTools.PackageManager.TraitImpl.locations(branchId, source) with
   | [loc, ...] -> PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(loc)
@@ -192,7 +185,6 @@ let sourceNameOf(branchId: Uuid, source: LanguageTools.ProgramTypes.Hash): Strin
 /// Which of `active`, `shadowed` and `unordered` this implementation is, against the others for
 /// the same type. `shadowed` means a newer implementation for that type runs instead;
 /// `unordered` means neither came from an op, so nothing says which is newer and a call errors.
-// @compiler blocked: compiler-gap diagnostic="Darklang.Cli.Packages.Impls.statusOf: Expected TSum (\"Darklang.LanguageTools.ProgramTypes.Hash\", []), got TSum (\"Darklang.LanguageTools.RuntimeTypes.Hash\", [])"
 let statusOf(
   branchId: Uuid,
   candidates: List<LanguageTools.RuntimeTypes.ImplCandidate>,
@@ -225,7 +217,6 @@ let statusOf(
 /// `--json`: the same listing, for something parsing it rather than reading it. One object,
 /// `implementations` in the order the human listing prints them, each with the status a call
 /// would see. An error leaves stdout empty, says why on stderr, and exits 1, as every --json does.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Impls.printJson: Unknown function or value 'sourceNameOf'"
 let printJson(
   branchId: Uuid,
   traitName: String,
@@ -259,7 +250,6 @@ let printJson(
     $"{{\"trait\":{jsonStr(traitName)},\"methods\":[{methodsJson}],\"implementations\":[{implsJson}]}}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let json = Stdlib.List.contains(args, "--json")
   let positional =
@@ -342,7 +332,6 @@ let execute(state: AppState, args: List<String>): AppState =
     { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "List the implementations of a trait that are bound on the current branch."
     ""
@@ -365,7 +354,6 @@ let help(_state: AppState): String =
 
 
 /// The traits in the current module, then the stdlib's, which is where a bare name resolves.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] | [_] ->

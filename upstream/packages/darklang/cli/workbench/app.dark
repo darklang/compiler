@@ -33,7 +33,6 @@ module Darklang.Cli.Workbench
 /// sound, so the badge and peek caches are refreshed here rather than read
 /// while drawing. A sectioned list's cursor is kept off its headers here too,
 /// since any transition can reload the list under it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let refresh(previous: State, next: State): State =
   // SCM status FIRST: the tree's wip badges read it rather than doing their own draft query, so
   // refreshing them against last frame's status would draw a dot one keypress behind the truth.
@@ -43,7 +42,6 @@ let refresh(previous: State, next: State): State =
       refreshLiveValues(refreshPeek(refreshBadges(previous, refreshScmStatus(previous, next))))))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let onKey(
   state: State,
   key: Stdlib.Cli.Stdin.Key.Key,
@@ -68,7 +66,6 @@ let onKey(
 /// The name caches were dropped by the poll that reported the change either way, so the reads
 /// see the store as it is. Your own saves take the authoring path (`authoring.dark`), which
 /// reloads on its own.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let onStoreChanged(state: State, change: LanguageTools.Live.Change): State =
   // The item page is a read of the store, so it goes either way; the next frame rebuilds it.
   let state = { state with previews = [], liveRuns = [] }
@@ -94,7 +91,6 @@ let onStoreChanged(state: State, change: LanguageTools.Live.Change): State =
 /// A FUNCTION, not a `val`: a component holds lambdas, and a lambda cannot be stored. Its
 /// instructions live in the execution that created it, so a stored one is a dangling reference that
 /// dies when applied in a later process. Rebuilt per call instead.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.Workbench.State'"
 let component(): Component.Component<State> =
   Component.Component
     { view = viewAtSize
@@ -110,7 +106,6 @@ let component(): Component.Component<State> =
 ///
 /// Separate from `execute` so a state can be constructed without taking over the terminal, which is what
 /// lets the render smoke test exist at all.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let initialState(
   branchId: Uuid,
   accountId: Option<Uuid>,
@@ -122,7 +117,6 @@ let initialState(
 
 /// `initialState` over a draft already read. `execute` reads the draft once and hands the same
 /// picture to Home and to the SCM status row; reading it per consumer ran constraint detection twice.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let initialStateFrom(
   branchId: Uuid,
   accountId: Option<Uuid>,
@@ -169,7 +163,6 @@ let initialStateFrom(
       branchId = branchId }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.AppState'"
 let execute(cliState: AppState, args: List<String>): AppState =
   match Stdlib.Cli.Tui.TerminalSupport.current() with
   | Unavailable(reason) ->
@@ -220,7 +213,6 @@ let execute(cliState: AppState, args: List<String>): AppState =
     Component.launchOrExit(cliState, component(), state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.AppState'"
 let help(_state: AppState): String =
   [ "Usage: workbench [--live]"
     "Open the workbench - a framed, navigable view of your package tree."
@@ -233,6 +225,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

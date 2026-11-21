@@ -3,7 +3,6 @@ module Darklang.Cli.Packages
 // CLEANUP should largely defer to a Darklang.Packages or Darklang.Matter namespace
 // (less of this in CLI world)
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 2033: Darklang.Cli.Packages.PackageLocation.Function, Darklang.Stdlib.__Http3Stream.Event.End"
 type PackageLocation =
   | Module(path: List<String>)
   | Type(location: LanguageTools.ProgramTypes.PackageLocation)
@@ -15,7 +14,6 @@ type PackageLocation =
 
 
 /// The module path a location sits in: the module itself, or the module an item lives in.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let modulePathOf(location: PackageLocation): List<String> =
   match location with
   | Module(path) -> path
@@ -27,7 +25,6 @@ let modulePathOf(location: PackageLocation): List<String> =
   | Test(t) -> Stdlib.List.prepend(t.modules, t.owner)
 
 
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 3357: Darklang.Cli.Packages.EntityType.Type, Darklang.LanguageTools.RuntimeTypes.RuntimeError.Error.Trait"
 type EntityType =
   | Module
   | Type
@@ -38,18 +35,15 @@ type EntityType =
   | Test
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.State: Unknown type 'PackageLocation'"
 type State =
   { currentLocation: PackageLocation
     locationHistory: List<PackageLocation> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let initState(): State =
   State { currentLocation = PackageLocation.Module([]), locationHistory = [] }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageLocation'"
 let formatLocation(location: PackageLocation): String =
   match location with
   | Module(path) ->
@@ -113,7 +107,6 @@ let codeAfterComments(definition: String): String =
 ///
 /// Both sides of the comparison are built by this, so "what did the author write" and "what does
 /// this name say now" are the same question asked of two declarations.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let docsOfFn(
   fn: LanguageTools.ProgramTypes.PackageFn.PackageFn)
   : List<(LanguageTools.ProgramTypes.DocPart * String)> =
@@ -127,7 +120,6 @@ let docsOfFn(
   Stdlib.List.prepend(params, (LanguageTools.ProgramTypes.DocPart.WholeItem, fn.description))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageType.PackageType'"
 let docsOfType(
   t: LanguageTools.ProgramTypes.PackageType.PackageType)
   : List<(LanguageTools.ProgramTypes.DocPart * String)> =
@@ -147,7 +139,6 @@ let docsOfType(
 
 
 /// Every doc these authored ops carry, for the item they declare.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let authoredDocs(
   ops: List<LanguageTools.ProgramTypes.PackageOp>)
   : List<(LanguageTools.ProgramTypes.DocPart * String)> =
@@ -174,7 +165,6 @@ let authoredDocs(
 
 /// What <param location> says NOW at each part: its own words where it has said any, and its
 /// declaration's where it has not.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.currentDocs: Unknown function or value 'LanguageTools.PackageManager.Function.get'"
 let currentDocs(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -241,7 +231,6 @@ let docAt(
 ///
 /// One op per changed PART, each naming the text it replaces. Naming it is what lets the far side
 /// tell an edit made on top of its own words from one made without ever seeing them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let updateDocsThatChanged(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -292,7 +281,6 @@ let updateDocsThatChanged(
 /// (`saveAuthored`), and so does the workbench's editor, so the two cannot drift apart on what a
 /// save means. They did once: the workbench kept its own copy of this, and the copy never
 /// propagated.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Committed: Unknown type 'LanguageTools.AtRestTypeChecker.Report'"
 type Committed =
   { isUpdate: Bool
     /// Anything happened at all: a new item, a new version, a doc change, or a revert.
@@ -315,7 +303,6 @@ type Committed =
 
 /// Save <param ops>, which bind <param location> (a <param kind>) at the placeholder <param hash>,
 /// repoint what depended on the version it replaces, and say what happened. Prints nothing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let commitAuthored(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -462,7 +449,6 @@ let commitAuthored(
 /// A syntax error, or anything after the declaration, is reported and nothing is saved: the parser
 /// may recover a tree after errors. <param save> answers None for a declaration of another kind,
 /// and then, as when nothing parsed at all, <param hint> is printed.
-// @compiler blocked: upstream-dependency diagnostic="authorInline: Unknown type 'AppState'"
 let authorInline(
   state: AppState,
   locationStr: String,
@@ -504,7 +490,6 @@ let authorInline(
 /// declaration, check unresolved names, take the previous hashes, save, report, and repoint
 /// dependents. `kindWord` fills the output lines ("function" | "type" | "value"). `convert`
 /// answers None to refuse, having said why; nothing is written, and the command fails.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let saveAuthored(
   state: AppState,
   location: LanguageTools.ProgramTypes.PackageLocation,

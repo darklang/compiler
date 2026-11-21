@@ -8,7 +8,6 @@ module Darklang.Cli.Tests.SearchRanking
 module Rank =
   /// The names in the order search shows them, from a fixed set of candidates, so the answer does
   /// not depend on what the store happens to hold.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.SearchRanking.Rank.order: Unknown function or value 'Darklang.Cli.Packages.Search.sortKey'"
   let order(query: String, candidates: List<(String * String)>): List<String> =
     candidates
     |> Stdlib.List.sortBy(fun pair ->
@@ -35,7 +34,6 @@ module Rank =
 
 
 // Plain words find the camelCase name they spell.
-// @compiler xfail compile: "Unknown function or value 'Rank.order'" class=missing-support reason=upstream-dependency
 test plainWordsFindCamelCase =
   Stdlib.Test.all(
     [ Rank.order("read file", Rank.fileFns())
@@ -51,7 +49,6 @@ test plainWordsFindCamelCase =
 
 // A section's best rank decides where it prints: a function spelled by the words beats a type that
 // only starts with them.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test bestRankDecidesSection =
   Stdlib.Test.all(
     [ Cli.Packages.Search.nameRank("read file", "readFile")
@@ -62,7 +59,6 @@ test bestRankDecidesSection =
 
 
 // Verb then noun, where the name is the verb: `parse json` names `parse` outright.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test verbThenNoun =
   Stdlib.Test.all(
     [ Cli.Packages.Search.nameRank("parse json", "parse")
@@ -73,7 +69,6 @@ test verbThenNoun =
 
 
 // Already right, and unchanged: the item token still decides a one-word or dotted query.
-// @compiler xfail compile: "Unknown function or value 'Rank.order'" class=missing-support reason=upstream-dependency
 test itemTokenDecides =
   Stdlib.Test.all(
     [ Rank.order(
@@ -94,7 +89,6 @@ test itemTokenDecides =
 
 
 // A one-word query joins to itself, so nameRank is matchRank there.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.nameRank'" class=missing-support reason=upstream-dependency
 test oneWordQuery =
   Stdlib.Test.all(
     [ Cli.Packages.Search.nameRank("map", "map")
@@ -106,7 +100,6 @@ test oneWordQuery =
 
 // Any word can be the name, and a word naming the module picks among equal names:
 // `parse int` is `Int64.parse`, not whichever `parse` sorts first.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.sortKey'" class=missing-support reason=upstream-dependency
 test wordNamesModule =
   Stdlib.Test.all(
     [ [ ("Stdlib.AltJson", "parse")
@@ -137,7 +130,6 @@ test wordNamesModule =
 
 // On an equal match Stdlib comes first, then other packages, then Darklang's own
 // tools; within each, the most called first.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.rankKey'" class=missing-support reason=upstream-dependency
 test tiersThenCallers =
   let uses =
     Stdlib.Dict.fromList(
@@ -174,7 +166,6 @@ test tiersThenCallers =
 
 // A word Stdlib spells another way is searched that way too, and ranks by the name it
 // stands for: `size of string` is `String.length`, `replace` is `String.replaceAll`.
-// @compiler xfail compile: "Unknown function or value 'Cli.Packages.Search.rankKey'" class=missing-support reason=upstream-dependency
 test synonyms =
   let order = fun(query, uses, candidates) ->
     let targets =
@@ -278,7 +269,6 @@ test typeQueries =
 
 // A function answers a by-type query when it returns the type, bare or wrapped:
 // `Int64.parse` returns `Result<Int64, _>`. One named for converting ranks first.
-// @compiler xfail compile: "Unknown type 'LanguageTools.ProgramTypes.TypeReference'" class=missing-support reason=upstream-dependency
 test byTypeMatches =
   let wrapped =
     LanguageTools.ProgramTypes.TypeReference.TCustomType(
@@ -326,7 +316,6 @@ test nearNamesForTypos =
 
 // Plain words find what they describe: a plural matches the singular inside a camelCase name,
 // and a doc that says "Unix timestamp" answers that query.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test plainWordsFindTheObviousFn = Instance.withInstance(fun i ->
   let first = fun query ->
     let (_, out) = Instance.ran(i, [ "search", query, "--fn", "--batch" ])
@@ -346,7 +335,6 @@ test plainWordsFindTheObviousFn = Instance.withInstance(fun i ->
 
 // A module named by the query is asking for what is in it: `table` reaches `Table.print`
 // before names that only spell "table" inside a longer word.
-// @compiler blocked: upstream-dependency diagnostic="moduleNamedByTheQuery: Unknown type 'Model.Environment'"
 test moduleNamedByTheQuery =
   Stdlib.Test.all(
     [ Rank.order(
@@ -368,7 +356,6 @@ test moduleNamedByTheQuery =
 
 
 // What already ranked well stays put: a name the query spells beats the module rule.
-// @compiler xfail compile: "Unknown function or value 'Rank.order'" class=missing-support reason=upstream-dependency
 test moduleRuleKeepsNamedHitsFirst =
   Stdlib.Test.all(
     [ Rank.order(
@@ -392,7 +379,6 @@ test moduleRuleKeepsNamedHitsFirst =
 
 
 // When no name matches, every hit came from a doc comment, and search says so.
-// @compiler blocked: upstream-dependency diagnostic="docOnlyMatchesAreFlagged: Unknown type 'Packages.PackageLocation'"
 test docOnlyMatchesAreFlagged =
   let loc = fun(modules, name) ->
     LanguageTools.ProgramTypes.PackageLocation

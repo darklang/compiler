@@ -6,5 +6,5 @@ module Darklang.Cli.Terminal
 /// `NO_COLOR` is the informal standard and people expect it to work; a redirected stdout is what makes
 /// `dark eval ... > file` produce text rather than escape sequences. Both are facts about the process,
 /// which is why the host answers rather than the printer.
-let colorEnabled () : Bool =
-  Builtin.cliTerminalColorEnabled ()
+let colorEnabled(): Bool =
+  Builtin.cliTerminalColorEnabled()

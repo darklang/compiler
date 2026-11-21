@@ -70,7 +70,6 @@ let runWithStdin(
   | Error(message) -> (-1, message)
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test stdinAndPatchRoundTrip = Instance.withInstance(fun instance ->
   let name = "Me.AgentEdit.greeting"
   let before = "let greeting(name: String): String =\n  \"Hello, \" + name\n"
@@ -125,7 +124,6 @@ test stdinAndPatchRoundTrip = Instance.withInstance(fun instance ->
         "interactive path remains") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test failedPatchesLeaveRawSourceUnchanged =
   Instance.withInstance(fun instance ->
     let name = "Me.AgentFailure.f"
@@ -166,7 +164,6 @@ test failedPatchesLeaveRawSourceUnchanged =
 
 
 /// Ambiguous patches leave the declaration unchanged and return its raw source.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test ambiguousPatchDoesNotSave = Instance.withInstance(fun instance ->
   let name = "Me.AgentAmbiguous.f"
   let _ =
@@ -194,7 +191,6 @@ test ambiguousPatchDoesNotSave = Instance.withInstance(fun instance ->
 
 
 /// Matched patches save type errors as drafts, just like full-declaration edits.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test matchedPatchesFollowNormalEditRules = Instance.withInstance(fun instance ->
   let source = "let f(): String =\n  \"kept\"\n"
   let _ = runWithStdin(instance, [ "module", "/Me.PatchRules", "-" ], source)
@@ -251,7 +247,6 @@ test matchedPatchesFollowNormalEditRules = Instance.withInstance(fun instance ->
 
 
 /// Read the saved code before patching it, since printed names can change.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test patchRetryUsesStoredSource = Instance.withInstance(fun instance ->
   let name = "Me.PatchNormalization.f"
   let (createExitCode, _) =
@@ -317,7 +312,6 @@ test patchRetryUsesStoredSource = Instance.withInstance(fun instance ->
 
 
 /// A module saved again without some of its names says which are still there.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test moduleSaveNamesWhatItLeftBehind = Instance.withInstance(fun instance ->
   let _ =
     runWithStdin(
@@ -334,7 +328,6 @@ test moduleSaveNamesWhatItLeftBehind = Instance.withInstance(fun instance ->
 
 
 /// Editing one declaration does not list the module's other names as left behind.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test editDoesNotListSiblingsAsLeftBehind = Instance.withInstance(fun instance ->
   let _ =
     runWithStdin(

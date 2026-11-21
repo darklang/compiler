@@ -2,7 +2,6 @@
 module Darklang.Cli.Workbench
 
 /// Main and every open branch; this list is deliberately not Home's capped summary.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.branchChoices: Unknown function or value 'SCM.Branch.list'"
 let branchChoices(current: Uuid): List<BranchChoice> =
   let choice(id: Uuid, name: String): BranchChoice =
     BranchChoice { id = id, name = name, detail = if id == current then "current" else "" }
@@ -22,7 +21,6 @@ let matchingBranches(picker: BranchPicker): List<BranchChoice> =
   |> Stdlib.List.filter(fun b -> Stdlib.String.contains(Stdlib.String.toLowercase(b.name), query))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let openBranchPicker(state: State): Step =
   let choices = branchChoices(state.branchId)
   let selected =
@@ -42,7 +40,6 @@ let openBranchPicker(state: State): Step =
 
 /// Switch the process overlay before reading anything for the destination.
 /// Stay in the same view; Home keeps the switched branch selected.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let switchWorkbenchBranch(state: State, id: Uuid, name: String): State =
   let moved = onBranch({ state with overlay = Overlay.NoOverlay, input = Option.None }, id)
   let moved = { moved with filter = "", detailScroll = 0 }
@@ -72,7 +69,6 @@ let switchWorkbenchBranch(state: State, id: Uuid, name: String): State =
             message = "switched to " + name })))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let handleBranchPickerKey(
   state: State,
   picker: BranchPicker,
@@ -118,7 +114,6 @@ let handleBranchPickerKey(
     | None -> keep(picker)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderBranchPicker(
   state: State,
   picker: BranchPicker,

@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Cli.Process
 
 /// Process handle for interacting with spawned processes
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.ProcessHandle reason=compiler-implementation
 type ProcessHandle = BigInt
 
 
@@ -14,7 +13,6 @@ type Stdio =
 
 
 /// Start <param program> with <param args>, its standard streams wired as <param stdio> says.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Process.__childStart: Expected TSum (\"Darklang.Stdlib.Result.Result\", [TInt; TInt64]), got TSum (\"Darklang.Stdlib.Result.Result\", [TInt; TInt])"
 let __childStart(program: String, args: List<String>, stdio: Stdio): Result<BigInt, Int64> =
   let inheritTerminal =
     match stdio with
@@ -25,12 +23,10 @@ let __childStart(program: String, args: List<String>, stdio: Stdio): Result<BigI
 
 
 /// Spawn a new process and return a handle for interaction
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.spawn reason=compiler-implementation
 let spawn(command: String): ProcessHandle =
   __childStart("/bin/sh", [ "-c", command ], Stdio.Capture) |> Builtin.unwrap
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Process.__executionBytes: Unknown function or value 'Stdlib.Bytes.empty'"
 let __executionBytes(result: Result<(Int64 * Bytes * Bytes), Int64>): ExecutionBytes =
   match result with
   | Error(e) ->
@@ -39,20 +35,17 @@ let __executionBytes(result: Result<(Int64 * Bytes * Bytes), Int64>): ExecutionB
   | Ok((code, output, error)) -> ExecutionBytes { exitCode = code, stdout = output, stderr = error }
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64> -> Darklang.Stdlib.Cli.ExecutionOutcome, replacement Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int> -> Darklang.Stdlib.Cli.ExecutionOutcome"
 let __executionOutcome(result: Result<(Int64 * Bytes * Bytes), Int64>): ExecutionOutcome =
   executionText(__executionBytes(result))
 
 
 /// Send input to a process and read any available output (non-blocking)
 /// Use empty string for input to just read output without sending anything
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.communicate reason=compiler-implementation
 let communicate(handle: ProcessHandle, input: String): ExecutionOutcome =
   __executionOutcome(__childCommunicate(handle, input))
 
 
 /// Terminate a process and get final output
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.terminate reason=compiler-implementation
 let terminate(handle: ProcessHandle): ExecutionOutcome =
   __executionOutcome(__childTerminate(handle))
 
@@ -60,7 +53,6 @@ let terminate(handle: ProcessHandle): ExecutionOutcome =
 // ─── Posix-based process execution (no bash, no shell) ───
 
 /// Result of running a process
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.Output reason=compiler-implementation
 type Output =
   { exitCode: Int64
     stdout: String
@@ -75,7 +67,6 @@ type BytesOutput =
 
 
 /// Decode both streams of <param output> as UTF-8, replacing invalid sequences
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Process.outputText: Expected TInt, got TInt64"
 let outputText(output: BytesOutput): Output =
   Output
     { exitCode = output.exitCode
@@ -85,7 +76,6 @@ let outputText(output: BytesOutput): Output =
 
 /// Escape a string for safe use inside single quotes in a shell command.
 /// Replaces ' with '\'' (end quote, escaped quote, start quote).
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.shellQuote reason=compiler-implementation
 let shellQuote(s: String): String =
   let escaped = String.replaceAll(s, "'", "'\\''")
   $"'{escaped}'"
@@ -94,7 +84,6 @@ let shellQuote(s: String): String =
 /// Spawn <param program> directly (no shell), wait for it, and return
 /// (exitCode, stdout, stderr) as bytes. With a timeout the child is killed when
 /// it elapses and the call fails with ETIMEDOUT.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Process.spawnAndWaitBytes: Expected TSum (\"Darklang.Stdlib.Option.Option\", [TInt]), got TSum (\"Darklang.Stdlib.Option.Option\", [TInt64])"
 let spawnAndWaitBytes(
   program: String,
   args: List<String>,
@@ -109,7 +98,6 @@ let spawnAndWaitBytes(
 
 
 /// Same as `spawnAndWaitBytes`, with stdout and stderr decoded as UTF-8.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.spawnAndWait reason=compiler-implementation
 let spawnAndWait(
   program: String,
   args: List<String>,
@@ -123,7 +111,6 @@ let spawnAndWait(
 
 /// Run a program with arguments and capture its output as bytes, for output
 /// that isn't UTF-8 text. No bash, no shell. `outputText` decodes it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Process.runBytes: Unknown function or value 'spawnAndWaitBytes'"
 let runBytes(program: String, args: List<String>): Result<BytesOutput, Posix.Error> =
   spawnAndWaitBytes(program, args, Option.None)
   |> Result.map(fun result ->
@@ -133,7 +120,6 @@ let runBytes(program: String, args: List<String>): Result<BytesOutput, Posix.Err
 
 /// Run a program with arguments and capture its output.
 /// No bash, no shell — spawns the process directly.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.run reason=compiler-implementation
 let run(program: String, args: List<String>): Result<Output, Posix.Error> =
   runBytes(program, args) |> Result.map(fun output -> outputText(output))
 
@@ -144,14 +130,12 @@ let run(program: String, args: List<String>): Result<Output, Posix.Error> =
 /// anything that DRAWS needs: an editor with a redirected stdout paints into a pipe
 /// and reads keys from nowhere. Use `run` when you want the output, this when you
 /// want the program to be usable.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runInteractive reason=compiler-implementation
 let runInteractive(program: String, args: List<String>): Result<Int64, Posix.Error> =
   __childInteractive(program, args) |> Result.mapError(Posix.__fromErrno)
 
 
 /// Run a program and return stdout as text, or stderr as error.
 /// Returns String errors because it mixes spawn failures with command failures.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.exec reason=compiler-implementation
 let exec(program: String, args: List<String>): Result<String, String> =
   run(program, args)
   |> Result.mapError(fun e -> e.message)
@@ -167,13 +151,11 @@ let exec(program: String, args: List<String>): Result<String, String> =
 
 
 /// Kill a process by PID.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.kill reason=compiler-implementation
 let kill(pid: Posix.Pid): Result<Unit, Posix.Error> =
   Posix.kill(pid, Posix.Signal.SIGTERM)
 
 
 /// Force-kill a process by PID.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.forceKill reason=compiler-implementation
 let forceKill(pid: Posix.Pid): Result<Unit, Posix.Error> =
   Posix.kill(pid, Posix.Signal.SIGKILL)
 
@@ -182,7 +164,6 @@ let forceKill(pid: Posix.Pid): Result<Unit, Posix.Error> =
 // Ideally this would pass cwd directly to the child process (like Python's
 // subprocess.run(cwd=...)) without involving a shell.
 /// Run a program in a specific directory.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runIn reason=compiler-implementation
 let runIn(directory: String, program: String, args: List<String>): Result<Output, Posix.Error> =
   let quotedArgs =
     args
@@ -193,7 +174,6 @@ let runIn(directory: String, program: String, args: List<String>): Result<Output
 
 
 /// Run a program silently, discarding output. Returns exit code only.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runSilent reason=compiler-implementation
 let runSilent(program: String, args: List<String>): Result<Int64, Posix.Error> =
   run(program, args) |> Result.map(fun output -> output.exitCode)
 
@@ -202,7 +182,6 @@ let runSilent(program: String, args: List<String>): Result<Int64, Posix.Error> =
 /// Uses /usr/bin/env to avoid shell interpretation.
 /// Env var names must not contain '=' or spaces.
 /// Returns String errors because it mixes spawn failures with validation errors.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runWithEnv reason=compiler-implementation
 let runWithEnv(
   program: String,
   args: List<String>,
@@ -235,7 +214,6 @@ let runWithEnv(
 /// Run a program with a timeout in milliseconds.
 /// Returns Error if the command times out.
 /// Returns String errors because it mixes spawn failures with validation/timeout errors.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.runWithTimeout reason=compiler-implementation
 let runWithTimeout(timeoutMs: Int64, program: String, args: List<String>): Result<Output, String> =
   if timeoutMs <= 0 then
     Result.Error("timeoutMs must be positive")
@@ -250,7 +228,6 @@ let runWithTimeout(timeoutMs: Int64, program: String, args: List<String>): Resul
 
 
 /// Pipe the output of one command into another via shell.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.pipe reason=compiler-implementation
 let pipe(
   program1: String,
   args1: List<String>,
@@ -275,20 +252,17 @@ let pipe(
 /// Run a pipeline of raw shell commands connected by pipes.
 /// UNSAFE: commands are passed directly to the shell with NO escaping.
 /// Caller is responsible for sanitizing all inputs.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.shellPipeline reason=compiler-implementation
 let shellPipeline(commands: List<String>): Result<Output, Posix.Error> =
   let cmd = String.join(commands, " | ")
   run("/bin/sh", [ "-c", cmd ])
 
 
 /// Check if a process is running.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.isRunning reason=compiler-implementation
 let isRunning(pid: Posix.Pid): Bool =
   Posix.isProcessRunning(pid)
 
 
 /// Wait for a process to finish by polling.
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.waitFor reason=compiler-implementation
 let waitFor(pid: Posix.Pid): Unit =
   if Posix.isProcessRunning(pid) then
     let _ = Posix.sleep(100.0)
@@ -299,18 +273,15 @@ let waitFor(pid: Posix.Pid): Unit =
 
 /// Shared child IO, output limits, retries and deadlines. Runtime leaves only
 /// launch/supervise owned children; descriptor leaves only attempt one syscall.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch"
 type __ChildBuffer =
   { chunks: List<Bytes>
     size: Int64 }
 
 
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.__childEmpty reason=compiler-implementation
 let __childEmpty(): __ChildBuffer =
   __ChildBuffer { chunks = [], size = 0 }
 
 
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.__childAppend reason=compiler-implementation
 let __childAppend(buffer: __ChildBuffer, bytes: Bytes): __ChildBuffer =
   let remaining = 67108864 - buffer.size
   let length = Bytes.length(bytes)
@@ -322,40 +293,34 @@ let __childAppend(buffer: __ChildBuffer, bytes: Bytes): __ChildBuffer =
     __ChildBuffer { chunks = List.prepend(buffer.chunks, kept), size = buffer.size + keep }
 
 
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.__childBytes reason=compiler-implementation
 let __childBytes(buffer: __ChildBuffer): Bytes =
   Bytes.concatAll(List.reverse(buffer.chunks))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<Darklang.Stdlib.Option.Option<Int64>, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Darklang.Stdlib.Option.Option<Int>, Int>"
 let __childPollChild(child: BigInt): Result<Option<Int64>, Int64> =
   match Builtin.runtimeChildPoll(child) with
   | Error(4) -> __childPollChild(child)
   | result -> result
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<Int64, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Int, Int>"
 let __childWaitChild(child: BigInt): Result<Int64, Int64> =
   match Builtin.runtimeChildWait(child) with
   | Error(4) -> __childWaitChild(child)
   | result -> result
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Unit, Int>"
 let __childKillChild(child: BigInt): Result<Unit, Int64> =
   match Builtin.runtimeChildKill(child) with
   | Error(4) -> __childKillChild(child)
   | result -> result
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<Unit, Int>"
 let __childCloseChild(child: BigInt): Result<Unit, Int64> =
   match Builtin.runtimeChildClose(child) with
   | Error(4) -> __childCloseChild(child)
   | result -> result
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<#0, Int64> -> Darklang.Stdlib.Result.Result<#0, Int64>, replacement Int -> Darklang.Stdlib.Result.Result<#0, Int> -> Darklang.Stdlib.Result.Result<#0, Int>"
 let __childFinish(child: BigInt, result: Result<'a, Int64>): Result<'a, Int64> =
   let closed = __childCloseChild(child)
   match result with
@@ -363,7 +328,6 @@ let __childFinish(child: BigInt, result: Result<'a, Int64>): Result<'a, Int64> =
   | Ok(value) -> closed |> Result.map(fun _ -> value)
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Bool -> Darklang.Stdlib.Result.Result<(Blob, Bool), Int64>, replacement Int -> Bool -> Darklang.Stdlib.Result.Result<(Blob, Bool), Int>"
 let __childRead(fd: BigInt, eof: Bool): Result<(Bytes * Bool), Int64> =
   if eof then
     Result.Ok((Bytes.empty, true))
@@ -376,7 +340,6 @@ let __childRead(fd: BigInt, eof: Bool): Result<(Bytes * Bool), Int64> =
 
 /// One write per turn, interleaved with both readers, so a child producing
 /// output while accepting a large input cannot deadlock on a full pipe.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Blob -> Darklang.Stdlib.Result.Result<Blob, Int64>, replacement Int -> Blob -> Darklang.Stdlib.Result.Result<Blob, Int>"
 let __childWrite(fd: BigInt, pending: Bytes): Result<Bytes, Int64> =
   let length = Bytes.length(pending)
   if length == 0 then
@@ -394,7 +357,6 @@ let __childWrite(fd: BigInt, pending: Bytes): Result<Bytes, Int64> =
         Result.Ok(Bytes.drop(pending, written))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream List<(Int, Int64)> -> Int64 -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement List<(Int, Int)> -> Int -> Darklang.Stdlib.Result.Result<Unit, Int>"
 let __childPoll(fds: List<(BigInt * Int64)>, milliseconds: Int64): Result<Unit, Int64> =
   let result =
     if Posix.__abiMac() then
@@ -408,7 +370,6 @@ let __childPoll(fds: List<(BigInt * Int64)>, milliseconds: Int64): Result<Unit, 
   | Ok(_) -> Result.Ok()
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Int -> Int -> Blob -> Bool -> Bool -> List<(Int, Int64)>, replacement Int -> Int -> Int -> Blob -> Bool -> Bool -> List<(Int, Int)>"
 let __childDescriptors(
   stdin: BigInt,
   stdout: BigInt,
@@ -423,7 +384,6 @@ let __childDescriptors(
   List.concat(input, List.concat(output, error))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Int -> Int -> Darklang.Stdlib.Option.Option<Int64> -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Bool -> Bool -> Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64>, replacement Int -> Int -> Int -> Darklang.Stdlib.Option.Option<Int> -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Bool -> Bool -> Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int>"
 let __childCapture(
   child: BigInt,
   stdout: BigInt,
@@ -471,7 +431,6 @@ let __childCapture(
               __childCapture(child, stdout, stderr, deadline, output, error, outEOF, errEOF)))))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream String -> List<String> -> Darklang.Stdlib.Option.Option<Int64> -> Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64>, replacement String -> List<String> -> Darklang.Stdlib.Option.Option<Int> -> Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int>"
 let __childRun(
   program: String,
   args: List<String>,
@@ -510,13 +469,11 @@ let __childRun(
     __childFinish(child, result))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream String -> List<String> -> Darklang.Stdlib.Result.Result<Int64, Int64>, replacement String -> List<String> -> Darklang.Stdlib.Result.Result<Int, Int>"
 let __childInteractive(program: String, args: List<String>): Result<Int64, Int64> =
   __childStart(program, args, Stdio.Inherit)
   |> Result.andThen(fun child -> __childFinish(child, __childWaitChild(child)))
 
 
-// @compiler replace: packages/darklang/stdlib/cli/process.dark#Darklang.Stdlib.Cli.Process.__childNewline reason=compiler-implementation
 let __childNewline(bytes: Bytes): Bool =
   // An empty Bytes asks for index -1, which is None.
   Bytes.getAt(bytes, Bytes.length(bytes) - 1) == Option.Some(10u8)
@@ -525,7 +482,6 @@ let __childNewline(bytes: Bytes): Bool =
 /// Empty-input communication is immediately nonblocking. Input-driven calls
 /// wait in at most 100 polling turns; complete newline responses can finish
 /// earlier. Each turn drains both streams and advances a partial input write.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> (Int, Int, Int) -> Blob -> Int64 -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> (Bool, Bool) -> Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64>, replacement Int -> (Int, Int, Int) -> Blob -> Int -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> (Bool, Bool) -> Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int>"
 let __childCommunicateLoop(
   child: BigInt,
   ports: (BigInt * BigInt * BigInt),
@@ -572,7 +528,6 @@ let __childCommunicateLoop(
                 (outEOF, errEOF)))))))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Int64 -> Blob -> Darklang.Stdlib.Result.Result<Unit, Int64>, replacement Int -> Int -> Blob -> Darklang.Stdlib.Result.Result<Unit, Int>"
 let __childSaveHistory(child: BigInt, index: Int64, chunk: Bytes): Result<Unit, Int64> =
   Builtin.runtimeChildBufferGet(child, index)
   |> Result.andThen(fun previous ->
@@ -580,7 +535,6 @@ let __childSaveHistory(child: BigInt, index: Int64, chunk: Bytes): Result<Unit, 
     Builtin.runtimeChildBufferSet(child, index, __childBytes(next)))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> String -> Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64>, replacement Int -> String -> Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int>"
 let __childCommunicate(child: BigInt, input: String): Result<(Int64 * Bytes * Bytes), Int64> =
   Builtin.runtimeChildDescriptors(child)
   |> Result.andThen(fun ports ->
@@ -607,7 +561,6 @@ let __childCommunicate(child: BigInt, input: String): Result<(Int64 * Bytes * By
 /// After terminating the owned child, drain currently available bytes, not
 /// future output from an unowned grandchild retaining a pipe. Bound draining
 /// turns as well as stored bytes so such a grandchild cannot keep cleanup busy.
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Int -> Int64 -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Result.Result<(Blob, Blob), Int64>, replacement Int -> Int -> Int -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Cli.Process.__ChildBuffer -> Darklang.Stdlib.Result.Result<(Blob, Blob), Int>"
 let __childDrain(
   stdout: BigInt,
   stderr: BigInt,
@@ -632,7 +585,6 @@ let __childDrain(
           __childDrain(stdout, stderr, turns - 1, output, error)))
 
 
-// @compiler blocked: compiler-contract diagnostic="Replacement contract mismatch: upstream Int -> Darklang.Stdlib.Result.Result<(Int64, Blob, Blob), Int64>, replacement Int -> Darklang.Stdlib.Result.Result<(Int, Blob, Blob), Int>"
 let __childTerminate(child: BigInt): Result<(Int64 * Bytes * Bytes), Int64> =
   let result =
     __childKillChild(child)

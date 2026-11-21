@@ -11,19 +11,16 @@
 module Darklang.Stdlib.Cli.Tui.Text
 
 /// Terminal columns occupied by a row that may carry SGR styling.
-// @compiler replace: packages/darklang/stdlib/cli/tui/text.dark#Darklang.Stdlib.Cli.Tui.Text.styledWidth reason=compiler-implementation
 let styledWidth(text: String): Int64 =
   Builtin.cliTerminalStyledWidth(text)
 
 
 /// Drop SGR styling, other escapes and control characters, leaving the visible text.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Tui.Text.stripSgr: Unknown function or value 'Builtin.cliTerminalStripSgr'"
 let stripSgr(text: String): String =
   Builtin.cliTerminalStripSgr(text)
 
 
 /// Clip a row to a column width, keeping SGR and dropping every other escape and control character.
-// @compiler replace: packages/darklang/stdlib/cli/tui/text.dark#Darklang.Stdlib.Cli.Tui.Text.clipToWidth reason=compiler-implementation
 let clipToWidth(text: String, maxWidth: Int64): String =
   Builtin.cliTerminalClipToWidth(text, maxWidth)
 
@@ -35,7 +32,6 @@ let clipToWidth(text: String, maxWidth: Int64): String =
 /// character of ellipsis is the difference between "there is more" and "that is all".
 ///
 /// Below two columns there is no room to say anything, so it degrades to a plain clip.
-// @compiler replace: packages/darklang/stdlib/cli/tui/text.dark#Darklang.Stdlib.Cli.Tui.Text.clipMarked reason=compiler-implementation
 let clipMarked(text: String, maxWidth: Int64): String =
   if styledWidth(text) <= maxWidth then
     text
@@ -47,7 +43,6 @@ let clipMarked(text: String, maxWidth: Int64): String =
 
 /// Break a row at the column, restating styling that spans the wrap. To break at spaces where it
 /// can, use `wrapAtWords`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Tui.Text.wrapAtColumn: Unknown function or value 'Builtin.cliTerminalWrapAtColumn'"
 let wrapAtColumn(text: String, maxWidth: Int64): List<String> =
   Builtin.cliTerminalWrapAtColumn(text, maxWidth)
 
@@ -55,7 +50,6 @@ let wrapAtColumn(text: String, maxWidth: Int64): List<String> =
 /// `wrapAtColumn` over `before + after`, with the zero-based row and column of the cursor between
 /// them. Both come from the one wrap, so the cursor stays on the text when a word moves down. Exactly
 /// past a full last row reads as column zero of the next row, matching what the terminal does.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Tui.Text.wrapWithCursor: Unknown function or value 'Builtin.cliTerminalWrapWithCursor'"
 let wrapWithCursor(before: String, after: String, maxWidth: Int64): (List<String> * Int64 * Int64) =
   Builtin.cliTerminalWrapWithCursor(before, after, maxWidth)
 

@@ -45,7 +45,6 @@ let noCounters(): Counters =
 
 
 /// The interpreter's counters as they stand now.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Perf.counters: Unknown function or value 'InterpreterStats.get'"
 let counters(): Counters =
   match Stdlib.Json.parse<Counters>(InterpreterStats.get()) with
   | Ok(c) -> c
@@ -56,7 +55,6 @@ let counters(): Counters =
 ///
 /// Includes this function's own cost, which is not small: see <fn floor>, and take it off with
 /// <fn minus>. The reset is process-wide, so measurements cannot nest.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Perf.measure: Unknown function or value 'InterpreterStats.reset'"
 let measure(f: Unit -> 'a): (Measurement * 'a) =
   let _reset = InterpreterStats.reset()
   let allocBefore = InterpreterStats.allocatedBytes()
@@ -85,7 +83,6 @@ let measure(f: Unit -> 'a): (Measurement * 'a) =
 /// Measured on a debug build: 1,400 instructions, 239 builtin calls, 89 frame pushes and about
 /// 76 KB, the counters exactly constant run to run. The first measurement in a process allocates
 /// about four times that, which is why this warms up before the reading it returns.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Perf.floor: Unknown function or value 'measure'"
 let floor(): Measurement =
   let (_warm, _) = measure(fun () -> ())
   let (f, _) = measure(fun () -> ())
@@ -127,7 +124,6 @@ let best(readings: List<Measurement>): Option<Measurement> =
 /// <param a> against <param b>, alternated for <param rounds> rounds so that drift over the run
 /// lands on both sides rather than on whichever went second. Each reading has the harness taken
 /// off (<fn floor>), and each side reports its <fn best>. Fewer than one round counts as one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Perf.ab: Unknown function or value 'floor'"
 let ab(a: Unit -> 'a, b: Unit -> 'b, rounds: Int64): (Measurement * Measurement) =
   let harness = floor()
   let n = if rounds < 1 then 1 else rounds

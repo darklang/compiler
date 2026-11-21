@@ -21,12 +21,10 @@ module Darklang.SCM.Branch
 /// Well-known rather than minted, because main is the one branch that exists before anything creates it,
 /// and it has no `branches` row to mint an id into. Comes from the same F# constant the runtime compares
 /// against (`ProgramTypes.BranchId.Main`), so the two cannot disagree.
-// @compiler blocked: compiler-contract diagnostic="Already selected from packages/darklang/scm/branch.dark; importing another declaration of Darklang.SCM.Branch.mainBranchId requires an explicit replacement contract"
 val mainBranchId = Builtin.scmMainBranchId
 
 
 /// Main's branch NAME: what a person types and reads; resolved to an id at the edge.
-// @compiler replace: packages/darklang/scm/branch.dark#Darklang.SCM.Branch.mainBranchName reason=compiler-implementation
 val mainBranchName = "main"
 
 
@@ -73,13 +71,11 @@ let toBranch(row: Branches.BranchRow): Branch =
 
 /// Every branch a view should offer, oldest first. Excludes archived ones, includes merged: a merged branch
 /// is still readable, which is the whole point of keeping it listed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.list: Unknown function or value 'SCM.Branches.list'"
 let list(): List<Branch> =
   Branches.list() |> Stdlib.List.map(toBranch)
 
 
 /// One branch by id. None for main, and for an id nothing is registered under.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.get: Unknown function or value 'list'"
 let get(branchId: Uuid): Option<Branch> =
   if isMain(branchId) then
     Option.None
@@ -89,7 +85,6 @@ let get(branchId: Uuid): Option<Branch> =
 
 /// One branch by the name a person typed. Live branches only -- the same rule `switch` follows, since this
 /// is what a view's "go to branch" affordance lands on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.getByName: Unknown function or value 'SCM.PackageOps.branchIdForName'"
 let getByName(name: String): Option<Branch> =
   match PackageOps.branchIdForName(name) with
   | Some(id) -> get(id)
@@ -98,7 +93,6 @@ let getByName(name: String): Option<Branch> =
 
 /// Start a branch off <param parentId> and return it. Idempotent on the name: asking twice gets
 /// you the branch you already have, which is what `switch` does too.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.create: Unknown function or value 'SCM.PackageOps.ensureBranch'"
 let create(name: String, parentId: Uuid): Option<Branch> =
   match PackageOps.ensureBranch(name, parentId) with
   | Ok((id, _created)) -> get(id)
@@ -110,7 +104,6 @@ let create(name: String, parentId: Uuid): Option<Branch> =
 ///
 /// Refuses to take a name a LIVE branch already holds, so `switch <name>` stays unambiguous. Merged and
 /// archived branches don't block: their names are free again by design.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.rename: Unknown function or value 'SCM.Actions.branch'"
 let rename(branchId: Uuid, newName: String): Result<Branch, String> =
   let trimmed = Stdlib.String.trim(newName)
   if trimmed == "" then
@@ -131,7 +124,6 @@ let rename(branchId: Uuid, newName: String): Result<Branch, String> =
 
 /// Archive a branch: its unmerged ops are discarded and it leaves the listings. Nothing that reached its
 /// parent is touched.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Branch.delete: Unknown function or value 'get'"
 let delete(branchId: Uuid): Result<Unit, String> =
   match get(branchId) with
   | None -> Result.Error("no such branch")

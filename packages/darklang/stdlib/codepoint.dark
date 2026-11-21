@@ -2,13 +2,13 @@
 
 module Darklang.Stdlib.Codepoint
 
-let isLetter (codepoint: UInt32) : Bool =
-    Stdlib.String.__Unicode.isLetter (Stdlib.Int64.fromUInt32 codepoint)
+let isLetter(codepoint: UInt32): Bool =
+    Stdlib.String.__Unicode.isLetter(Stdlib.Int64.fromUInt32(codepoint))
 
-let isWhitespace (codepoint: UInt32) : Bool =
-    Stdlib.String.__Unicode.isWhitespace (Stdlib.Int64.fromUInt32 codepoint)
+let isWhitespace(codepoint: UInt32): Bool =
+    Stdlib.String.__Unicode.isWhitespace(Stdlib.Int64.fromUInt32(codepoint))
 
-let isAlphanumeric (codepoint: UInt32) : Bool =
-    let value = Stdlib.Int64.fromUInt32 codepoint in
-    Stdlib.String.__Unicode.isLetter value
-    || Stdlib.String.__Unicode.generalCategory value == Stdlib.String.__Unicode.__Data.GeneralCategory.Nd
+let isAlphanumeric(codepoint: UInt32): Bool =
+    let value = Stdlib.Int64.fromUInt32(codepoint) in
+    Stdlib.String.__Unicode.isLetter(value)
+    || Stdlib.String.__Unicode.generalCategory(value) == Stdlib.String.__Unicode.__Data.GeneralCategory.Nd

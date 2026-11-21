@@ -5,7 +5,6 @@ module Darklang.LanguageTools.Parser.Tests.Diagnostics
 // severity stay in backend/tests/Tests/LibParser.Tests.fs, because only the
 // message crosses into Dark.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.messagesIn: Unknown function or value 'Darklang.LanguageTools.Parser.Parse.parse'"
 let messagesIn(
   kind: LanguageTools.Parser.FileKind,
   source: String)
@@ -15,7 +14,6 @@ let messagesIn(
   |> Stdlib.List.map(fun((_, message)) -> message)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.messages: Unknown function or value 'messagesIn'"
 let messages(source: String): List<String> =
   messagesIn(LanguageTools.Parser.FileKind.Script, source)
 
@@ -25,7 +23,6 @@ let shown(source: String): String =
 
 
 /// Exactly these messages, in order, so a new cascade or a reworded message fails.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.golden: Unknown function or value 'messages'"
 let golden(source: String, expected: List<String>): Stdlib.Test.Result =
   let actual = messages(source)
   Stdlib.Test.expect(
@@ -33,7 +30,6 @@ let golden(source: String, expected: List<String>): Stdlib.Test.Result =
     $"{shown(source)}: got {Stdlib.inspect(actual)}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejectsIn: Unknown function or value 'messagesIn'"
 let rejectsIn(
   kind: LanguageTools.Parser.FileKind,
   source: String)
@@ -43,7 +39,6 @@ let rejectsIn(
     $"{shown(source)}: expected a diagnostic, got none")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.cleanIn: Unknown function or value 'messagesIn'"
 let cleanIn(
   kind: LanguageTools.Parser.FileKind,
   source: String)
@@ -54,28 +49,23 @@ let cleanIn(
     $"{shown(source)}: {Stdlib.inspect(actual)}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejects: Unknown function or value 'rejectsIn'"
 let rejects(source: String): Stdlib.Test.Result =
   rejectsIn(LanguageTools.Parser.FileKind.Script, source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.clean: Unknown function or value 'cleanIn'"
 let clean(source: String): Stdlib.Test.Result =
   cleanIn(LanguageTools.Parser.FileKind.Script, source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.rejectsPackage: Unknown function or value 'rejectsIn'"
 let rejectsPackage(source: String): Stdlib.Test.Result =
   rejectsIn(LanguageTools.Parser.FileKind.Package, source)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.cleanPackage: Unknown function or value 'cleanIn'"
 let cleanPackage(source: String): Stdlib.Test.Result =
   cleanIn(LanguageTools.Parser.FileKind.Package, source)
 
 
 /// Some message contains <param fragment>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.Tests.Diagnostics.says: Unknown function or value 'messages'"
 let says(source: String, fragment: String): Stdlib.Test.Result =
   let actual = messages(source)
   Stdlib.Test.expect(
@@ -83,7 +73,6 @@ let says(source: String, fragment: String): Stdlib.Test.Result =
     $"{shown(source)} should say {fragment}, got {Stdlib.inspect(actual)}")
 
 
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test goldenMessages =
   Stdlib.Test.all(
     [ golden(
@@ -232,7 +221,6 @@ test goldenMessages =
 
 
 // A malformed lexeme gets a diagnostic, never a silent success and never a throw.
-// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
 test lexicalFailures =
   Stdlib.Test.all(
     [ rejects("let x = §")
@@ -262,7 +250,6 @@ test lexicalFailures =
       clean("$\"a{ 1 }b\"") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test charLiteralsHoldOneCharacter =
   Stdlib.Test.all(
     [ clean("'q́'")
@@ -272,7 +259,6 @@ test charLiteralsHoldOneCharacter =
       says("'\\u0061\\u0062'", "exactly one grapheme") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'says'" class=missing-support reason=upstream-dependency
 test operatorsDarkLacksSayWhatToWrite =
   Stdlib.Test.all(
     [ says("match xs with | h :: t -> h", "a list is `[head, ...tail]`")
@@ -289,7 +275,6 @@ test operatorsDarkLacksSayWhatToWrite =
 
 
 // `rec` is reported once, and the function after it parses as written.
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test letRecSaysRecursionNeedsNoKeyword =
   Stdlib.Test.all(
     [ golden(
@@ -303,7 +288,6 @@ test letRecSaysRecursionNeedsNoKeyword =
       clean("let rec = 1\nrec") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test builtinTypeNamesAreRefused =
   Stdlib.Test.all(
     [ golden(
@@ -316,7 +300,6 @@ test builtinTypeNamesAreRefused =
 
 
 // The refused operator is the only mistake reported: the parse reads on past it.
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test operatorsDarkLacksDoNotCascade =
   Stdlib.Test.all(
     [ golden(
@@ -333,7 +316,6 @@ test operatorsDarkLacksDoNotCascade =
         [ "'@' is not Dark; join lists with `[...a, ...b]`" ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
 test sameLineItemsNeedSeparators =
   Stdlib.Test.all(
     [ rejects("[1 2]")
@@ -356,7 +338,6 @@ test sameLineItemsNeedSeparators =
       clean("let f(): Unit =\n  print(1)\n  print(2)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test identifiersAndModifiers =
   Stdlib.Test.all(
     [ clean("def")
@@ -396,7 +377,6 @@ test identifiersAndModifiers =
       clean("__make(buffer.size)") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'rejects'" class=missing-support reason=upstream-dependency
 test emptyAndMalformedForms =
   Stdlib.Test.all(
     [ // recovery still reports what it recovered from
@@ -435,7 +415,6 @@ test emptyAndMalformedForms =
       clean("match x with | Ok(5s8) -> 1 | Ok(-4s8) -> 2 | _ -> 3") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'messages'" class=missing-support reason=upstream-dependency
 test recoveryStopsAtEndOfFile =
   let found = messages("let x =")
   Stdlib.Test.all(
@@ -452,7 +431,6 @@ test recoveryStopsAtEndOfFile =
       clean("type Y = List<Int64>") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test genericSyntaxIsExplicit =
   Stdlib.Test.all(
     [ clean("type Pair<'a, 'b> = 'a * 'b")
@@ -468,7 +446,6 @@ test genericSyntaxIsExplicit =
       rejects("type Box = Stdlib.Option.Option < Int64 >") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test callSyntax =
   Stdlib.Test.all(
     [ clean("f (1, 2)")
@@ -500,7 +477,6 @@ test callSyntax =
       rejects("let f(g: (Int64, Int64)): Int64 = 1") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test unwrapSpelling =
   Stdlib.Test.all(
     [ clean("fun x -> f(x)?")
@@ -518,14 +494,12 @@ test unwrapSpelling =
       says("fun x ->\n  let n = x ?\n  n", "directly after its operand") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'rejectsPackage'" class=missing-support reason=upstream-dependency
 test effectRows =
   Stdlib.Test.all(
     [ rejectsPackage("module M =\n  let f(x: Int64):{Http, Clock} Int64 = x")
       rejectsPackage("module M =\n  let f(x: Int64):{} Int64 = x") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test traitDeclarations =
   Stdlib.Test.all(
     [ // a method may declare its own type params
@@ -539,7 +513,6 @@ test traitDeclarations =
 
 // Named tests are package declarations. These use the Package kind, since a
 // Script adds its own diagnostic for any test and would hide a missing one.
-// @compiler xfail compile: "Unknown function or value 'cleanPackage'" class=missing-support reason=upstream-dependency
 test namedTests =
   Stdlib.Test.all(
     [ cleanPackage("module M =\n  test doubles = Stdlib.Test.equal(8, 8)")
@@ -575,7 +548,6 @@ test namedTests =
 
 // At a package root, a `let` value gets one focused diagnostic rather than an
 // end-of-file cascade.
-// @compiler xfail compile: "Unknown function or value 'messagesIn'" class=missing-support reason=upstream-dependency
 test packageRootLetValue =
   messagesIn(
     LanguageTools.Parser.FileKind.Package,
@@ -586,7 +558,6 @@ test packageRootLetValue =
 
 // A keyword where a name goes says how to escape it, and is then read as that name,
 // so the rest parses and it is the only error.
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test keywordAsName =
   let escape = fun word ->
     $"{word} is a keyword, so to use it as a name write `{word}`"
@@ -633,7 +604,6 @@ test keywordAsName =
 
 
 // Where only a name can go, a keyword is a name without backticks.
-// @compiler xfail compile: "Unknown function or value 'clean'" class=missing-support reason=upstream-dependency
 test keywordWhereOnlyANameGoes =
   Stdlib.Test.all(
     [ clean("r.type")
@@ -646,7 +616,6 @@ test keywordWhereOnlyANameGoes =
 
 
 // A name in backticks can't hold spaces, wherever it is.
-// @compiler xfail compile: "Unknown function or value 'golden'" class=missing-support reason=upstream-dependency
 test spacedName =
   let spaced = "a name can't hold spaces; use hello_world or helloWorld"
   Stdlib.Test.all(

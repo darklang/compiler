@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Cli.Path
 
 /// Strip trailing slashes from a path (preserving root "/").
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.stripTrailing reason=compiler-implementation
 let stripTrailing(path: String): String =
   if String.length(path) > 1 && String.endsWith(path, "/") then
     stripTrailing(String.dropLast(path, 1))
@@ -12,7 +11,6 @@ let stripTrailing(path: String): String =
 /// Join path segments with "/".
 /// If a segment is absolute, all previous segments are discarded
 /// (matches Python's os.path.join and bash behavior).
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.join reason=compiler-implementation
 let join(parts: List<String>): String =
   parts
   |> List.fold("", fun(acc, part) ->
@@ -32,7 +30,6 @@ let join(parts: List<String>): String =
 /// "a/b/c" -> "a/b"
 /// "file.txt" -> "."
 /// "/" -> "/"
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.parent reason=compiler-implementation
 let parent(path: String): String =
   let p = stripTrailing(path)
   match String.lastIndexOf(p, "/") with
@@ -45,7 +42,6 @@ let parent(path: String): String =
 /// "/home/user/file.txt" -> "file.txt"
 /// "a/b/c" -> "c"
 /// "a/b/" -> "b"
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.basename reason=compiler-implementation
 let basename(path: String): String =
   let p = stripTrailing(path)
   match String.lastIndexOf(p, "/") with
@@ -58,7 +54,6 @@ let basename(path: String): String =
 /// "archive.tar.gz" -> Some ".gz"
 /// ".bashrc" -> None
 /// "Makefile" -> None
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.extension reason=compiler-implementation
 let extension(path: String): Option<String> =
   let name = basename(path)
   match String.lastIndexOf(name, ".") with
@@ -69,7 +64,6 @@ let extension(path: String): Option<String> =
 
 /// Replace the extension of a path. The dot is optional:
 /// `withExtension("file.txt", ".md")` and `withExtension("file.txt", "md")` are both "file.md".
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.withExtension reason=compiler-implementation
 let withExtension(path: String, ext: String): String =
   let dir = parent(path)
   let name = basename(path)
@@ -85,7 +79,6 @@ let withExtension(path: String, ext: String): String =
 
 
 /// Check if a path is absolute (starts with /).
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.isAbsolute reason=compiler-implementation
 let isAbsolute(path: String): Bool =
   String.startsWith(path, "/")
 
@@ -93,7 +86,6 @@ let isAbsolute(path: String): Bool =
 /// Normalize a path by resolving "." and ".." components.
 /// "/home/../lib/./foo" -> "/lib/foo"
 /// "" -> "."
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.normalize reason=compiler-implementation
 let normalize(path: String): String =
   let isAbs = isAbsolute(path)
   let parts = String.split(path, "/")
@@ -118,7 +110,6 @@ let normalize(path: String): String =
 
 
 /// Resolve a relative path to an absolute path using the current directory.
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.resolve reason=compiler-implementation
 let resolve(path: String): Result<String, Posix.Error> =
   if isAbsolute(path) then
     Result.Ok(normalize(path))
@@ -127,7 +118,6 @@ let resolve(path: String): Result<String, Posix.Error> =
 
 
 /// Resolve a potentially relative path to an absolute normalized path.
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.resolveToAbsolute reason=compiler-implementation
 let resolveToAbsolute(p: String): Result<String, Posix.Error> =
   resolve(p)
 
@@ -136,7 +126,6 @@ let resolveToAbsolute(p: String): Result<String, Posix.Error> =
 /// Relative paths are resolved against cwd first (like Python's os.path.relpath).
 /// (relativeTo "/home/user" "/home/lib") -> Ok "../lib"
 /// (relativeTo "/home" "/home") -> Ok "."
-// @compiler replace: packages/darklang/stdlib/cli/path.dark#Darklang.Stdlib.Cli.Path.relativeTo reason=compiler-implementation
 let relativeTo(fromPath: String, toPath: String): Result<String, Posix.Error> =
   resolveToAbsolute(fromPath)
   |> Result.andThen(fun absFrom ->

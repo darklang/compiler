@@ -12,7 +12,6 @@ module TextField =
 
   // A paste arrives as one chunk. Moving the cursor by one per keypress is what made typing `abcdef` and
   // then `X` produce `aXbcdef`.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.insert'" class=missing-support reason=upstream-dependency
   test pasteIsOneChunk =
     Stdlib.Test.all(
       [ (let field =
@@ -31,7 +30,6 @@ module TextField =
 
 
   // Backspace at the start does nothing, rather than going negative.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.backspace'" class=missing-support reason=upstream-dependency
   test backspaceAtStart =
     Stdlib.Test.all(
       [ (Stdlib.Cli.UI.TextField.backspace(
@@ -49,7 +47,6 @@ module TextField =
 
 
   // The window follows the cursor, so a line longer than the box doesn't take the cursor off-screen.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.windowFor'" class=missing-support reason=upstream-dependency
   test windowFollowsCursor =
     Stdlib.Test.all(
       [ Stdlib.Cli.UI.TextField.windowFor(
@@ -64,7 +61,6 @@ module TextField =
 
 
   // Tab is passed up rather than typed into the line, so the widget that owns the field can use it.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.onKey'" class=missing-support reason=upstream-dependency
   test tabPassedUp =
     (match Stdlib.Cli.UI.TextField.onKey(
              Stdlib.Cli.UI.TextField.empty,
@@ -79,7 +75,6 @@ module TextField =
 
 
   // Enter hands the text to the parent.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.onKey'" class=missing-support reason=upstream-dependency
   test enterHandsTextUp =
     (match Stdlib.Cli.UI.TextField.onKey(
              Stdlib.Cli.UI.TextField.fromText("done"),
@@ -161,7 +156,6 @@ module Picker =
 
 
   // A focused text field draws its cursor; an unfocused empty one shows the placeholder.
-  // @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.UI.TextField.renderMaybeFocused'" class=missing-support reason=upstream-dependency
   test textFieldFocus =
     let empty = Stdlib.Cli.UI.TextField.empty
     Stdlib.Test.all(

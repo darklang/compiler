@@ -9,7 +9,6 @@ module Darklang.SCM.Docs
 
 /// Every doc <param location> has of its own, by part. Empty for a name nobody has edited, which is
 /// most of them.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Docs.at: Unknown function or value 'Builtin.pmDocsAt'"
 let at(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation)
@@ -35,7 +34,6 @@ let find(
 ///
 /// The read every located surface wants: `view`, a listing, hover. A lookup BY HASH has no name to
 /// ask about and keeps the declaration's words, which is the honest answer for it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Docs.overlay: Unknown function or value 'Docs.at'"
 let overlay(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,

@@ -10,24 +10,20 @@ module Darklang.Cli.Tests.CommandCompletions
 module CompletionSweep =
   // forcing the length is what makes the lazy list actually run
 
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.Cli.Registry.CommandHandler'"
   let forced(c: Cli.Registry.CommandHandler, args: List<String>): Bool =
     let state = Cli.initState()
     (c.complete(state, args) |> Stdlib.List.length) >= 0
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandCompletions.CompletionSweep.sweep: Unknown function or value 'Darklang.Cli.Registry.allCommands'"
   let sweep(args: List<String>): Bool =
     Cli.Registry.allCommands() |> Stdlib.List.all(fun c -> forced(c, args))
 
 
 // no argument yet: the command was typed, then Tab
-// @compiler xfail compile: "Unknown function or value 'CompletionSweep.sweep'" class=missing-support reason=upstream-dependency
 test noArgument = CompletionSweep.sweep([]) |> Stdlib.Test.equal(true)
 
 
 // a partial first argument
-// @compiler xfail compile: "Unknown function or value 'CompletionSweep.sweep'" class=missing-support reason=upstream-dependency
 test partialFirstArgument =
   Stdlib.Test.all(
     [ CompletionSweep.sweep([ "" ]) |> Stdlib.Test.equal(true)
@@ -35,7 +31,6 @@ test partialFirstArgument =
 
 
 // a subcommand, then Tab for its argument -- the arm that reads the store
-// @compiler xfail compile: "Unknown function or value 'CompletionSweep.sweep'" class=missing-support reason=upstream-dependency
 test subcommandArgument =
   Stdlib.Test.all(
     [ CompletionSweep.sweep([ "show", "" ]) |> Stdlib.Test.equal(true)
@@ -43,7 +38,6 @@ test subcommandArgument =
 
 
 // more arguments than any command takes; nothing should throw reaching for a word that isn't there
-// @compiler xfail compile: "Unknown function or value 'CompletionSweep.sweep'" class=missing-support reason=upstream-dependency
 test tooManyArguments =
   CompletionSweep.sweep([ "a", "b", "c", "d" ]) |> Stdlib.Test.equal(true)
 
@@ -51,14 +45,12 @@ test tooManyArguments =
 // --- the SCM commands specifically offer branch names, since those are the ones typed daily ---
 
 module BranchCompletion =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandCompletions.BranchCompletion.values: Unknown function or value 'Darklang.Cli.initState'"
   let values(args: List<String>): List<String> =
     let state = Cli.initState()
     Cli.Branch.complete(state, args) |> Stdlib.List.map(fun i -> i.value)
 
 
 // a name that exists in no store: the filter runs and matches nothing, rather than the whole list coming back
-// @compiler xfail compile: "Unknown function or value 'BranchCompletion.values'" class=missing-support reason=upstream-dependency
 test unknownBranchMatchesNothing =
   Stdlib.Test.all(
     [ BranchCompletion.values([ "zzz-no-such-branch" ]) |> Stdlib.Test.equal([])
@@ -68,26 +60,22 @@ test unknownBranchMatchesNothing =
 
 
 // `main` is always a legitimate target for the branch-taking subcommands
-// @compiler xfail compile: "Unknown function or value 'BranchCompletion.values'" class=missing-support reason=upstream-dependency
 test mainIsAlwaysOffered =
   (BranchCompletion.values([ "switch", "mai" ]) |> Stdlib.List.contains("main"))
   |> Stdlib.Test.equal(true)
 
 
 // a subcommand that takes no branch gets no branch names
-// @compiler xfail compile: "Unknown function or value 'BranchCompletion.values'" class=missing-support reason=upstream-dependency
 test nonBranchSubcommand =
   BranchCompletion.values([ "list", "" ]) |> Stdlib.Test.equal([])
 
 
 module PermissionProfiles =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandCompletions.PermissionProfiles.values: Unknown function or value 'Darklang.Cli.Permissions.Command.complete'"
   let values(args: List<String>): List<String> =
     Cli.Permissions.Command.complete(Cli.initState(), args)
     |> Stdlib.List.map(fun item -> item.value)
 
 
-// @compiler xfail compile: "Unknown function or value 'PermissionProfiles.values'" class=missing-support reason=upstream-dependency
 test profileNames =
   Stdlib.Test.all(
     [ PermissionProfiles.values([ "profile", "default" ])
@@ -114,7 +102,6 @@ module CommonPrefix =
     Cli.Completion.extendToCommonPrefix(input, items(values))
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandCompletions.CommonPrefix.pressTab: Unknown function or value 'Darklang.Cli.initState'"
   let pressTab(text: String): String =
     let state = Cli.initState()
     let state =
@@ -156,6 +143,5 @@ test commonPrefixNotAPrefixMatch =
 
 
 // through the key handler: `commi` matches `commit` and `commits`
-// @compiler xfail compile: "Unknown function or value 'CommonPrefix.pressTab'" class=missing-support reason=upstream-dependency
 test tabCompletesCommandToCommonPrefix =
   CommonPrefix.pressTab("commi") |> Stdlib.Test.equal("commit")

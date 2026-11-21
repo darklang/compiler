@@ -31,13 +31,11 @@ test general =
       |> Stdlib.Test.equal(10) ])
 
 // A pipe gives a lambda one argument, so a two-parameter lambda stops short.
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test pipeIntoTwoParameterLambdaRaises =
   (let x = fun(a, b) -> a + 1 in (7 |> x))
   => raises "Lambda expects 2 arguments, but got 1 argument"
 
 // only lambda might be placed into the variable used in the middle of the pipe
-// @compiler xfail compile: "Expression is not callable" class=aot-rejection reason=aot-type-error
 test nonFunctionStageRaises =
   (let x = 1 in (5 |> x |> (fun v -> v + 3)))
   => raises

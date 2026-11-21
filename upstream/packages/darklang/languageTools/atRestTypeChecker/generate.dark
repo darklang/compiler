@@ -10,7 +10,6 @@ module Darklang.LanguageTools.AtRestTypeChecker.Generate
 
 /// Names and types available while inspecting an expression. locals maps variable
 /// names to either a shared type or a reusable scheme identified by its binding node.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.AtRestTypeChecker.Generate.Scope: Unknown type 'Model.Ty'"
 type Scope =
   { locals: Dict<String, Model.Binder>
     /// Package function parameter types, indexed by zero-based EArg positions.
@@ -27,7 +26,6 @@ type Scope =
 
 /// Start a scope for an expression outside any function, with no local bindings,
 /// declared type parameters, positional arguments, or return type for ?.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let emptyScope(): Scope =
   Scope
     { locals = Dict {}
@@ -43,31 +41,26 @@ let emptyScope(): Scope =
 
 /// Identify an unknown type by its syntax node and role. Reusing the same pair
 /// connects requirements for the same type without allocating a new solver variable.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let var(id: Int64, role: Model.Role): Model.Ty =
   Model.Ty.TVar(Model.Var.Of(id, role))
 
 
 /// The unknown type of the value produced or matched by this syntax node.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let resultOf(id: Int64): Model.Ty =
   var(id, Model.Role.Result)
 
 
 /// An unknown for one component of a node, such as an argument or field, indexed from zero.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let part(id: Int64, index: Int64): Model.Ty =
   var(id, Model.Role.Part(index))
 
 
 /// An empty requirement group for syntax that adds no checks of its own.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Constraint'"
 let nothing(): Model.Constraint =
   Model.Constraint.All([])
 
 
 /// Group requirements in the order the solver should process them.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Constraint'"
 let all(constraints: List<Model.Constraint>): Model.Constraint =
   Model.Constraint.All(constraints)
 
@@ -83,19 +76,16 @@ let decided(choice: ProgramTypes.FQFnName.ImplChoice): Bool =
 
 
 /// Include a problem already found from syntax in the solver's findings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Finding'"
 let report(finding: Model.Finding): Model.Constraint =
   Model.Constraint.Report(finding)
 
 
 /// Include several existing findings as an ordered group of requirements.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Finding'"
 let reports(findings: List<Model.Finding>): Model.Constraint =
   all(Stdlib.List.map(findings, fun f -> report(f)))
 
 
 /// Require compatible types and record the node and context to report on mismatch.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let equal(id: Int64, site: Site, expected: Model.Ty, actual: Model.Ty): Model.Constraint =
   Model.Constraint.Equal(id, site, expected, actual)
 
@@ -106,7 +96,6 @@ let at(id: Int64): Option<Int64> =
 
 
 /// Omit an expected or actual type when a finding does not describe a type mismatch.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let noType(): Option<Model.Ty> =
   Option.None
 
@@ -124,7 +113,6 @@ let duplicates(names: List<String>): List<String> =
 
 /// Report names bound more than once by a pattern or parameter list.
 /// Ignore _, since repeated wildcards do not introduce variable bindings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let duplicateBindings(
   reportAt: Option<Int64>,
   bindings: List<(String * Model.Ty * Int64)>)
@@ -149,7 +137,6 @@ let duplicateBindings(
 /// Add pattern variables to the local scope, with one shared type per binding.
 /// New bindings may shadow outer names; duplicates within the supplied bindings
 /// are errors. Ignore wildcards and return the new scope with any duplicate findings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let bind(
   scope: Scope,
   reportAt: Option<Int64>,
@@ -167,7 +154,6 @@ let bind(
 /// Add local names whose reusable type schemes will be saved by Generalize
 /// requirements. Use each binding's pattern-node ID to find its scheme later.
 /// Ignore wildcards and report duplicate names within these bindings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let bindGeneralized(
   scope: Scope,
   reportAt: Option<Int64>,
@@ -187,7 +173,6 @@ let bindGeneralized(
 // --------------------
 
 /// Read an already resolved function name. Return None when name resolution failed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
 let resolvedFn(
   name: ProgramTypes.NameResolution<ProgramTypes.FQFnName.FQFnName>)
   : Option<ProgramTypes.FQFnName.FQFnName> =
@@ -198,7 +183,6 @@ let resolvedFn(
 
 /// Return a version-0 builtin's name for special-rule lookup. Return an empty
 /// string for package functions or other versions, so they do not match these rules.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
 let builtinName(fn: ProgramTypes.FQFnName.FQFnName): String =
   match fn with
   | Builtin(b) -> if b.version == 0s32 then b.name else ""
@@ -236,7 +220,6 @@ let operatorOf(name: String): Option<ProgramTypes.InfixFnName> =
 
 /// Identify operator builtins that need special operand checks. When used as
 /// function values, their generic signatures cannot express those restrictions.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQFnName.FQFnName'"
 let isOperatorLike(fn: ProgramTypes.FQFnName.FQFnName): Bool =
   let name = builtinName(fn)
   name == "negate" || name == "bitwiseNot" || Stdlib.Option.isSome(operatorOf(name))
@@ -271,7 +254,6 @@ let isComparison(operation: ProgramTypes.InfixFnName): Bool =
 /// Accept literals, references, lambdas, and containers whose contents also qualify.
 /// Calls and other computations keep one type shared across uses. This conservative
 /// rule is the value restriction; it does not execute the expression to inspect effects.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let isNonExpansive(expr: ProgramTypes.Expr): Bool =
   match expr with
   | EUnit(_) -> true
@@ -329,14 +311,12 @@ let isNonExpansive(expr: ProgramTypes.Expr): Bool =
 
 /// Give each lambda parameter its own unknown, identified by the lambda node
 /// and parameter position. Destructuring patterns add their own component unknowns.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let lambdaParameters(id: Int64, patterns: List<ProgramTypes.LetPattern>): List<Model.Ty> =
   Stdlib.List.indexedMap(patterns, fun(i, _) -> part(id, i))
 
 
 /// Match a let or lambda parameter pattern against expected. Return bindings as
 /// (name, type, pattern-node ID) and requirements for unit or tuple destructuring.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let letPattern(
   expected: Model.Ty,
   pattern: ProgramTypes.LetPattern)
@@ -355,7 +335,6 @@ let letPattern(
 
 /// Check paired parameter types and let-patterns, combining their bindings and
 /// requirements. Callers supply one type per pattern; this helper does not check counts.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let letPatterns(
   types: List<Model.Ty>,
   patterns: List<ProgramTypes.LetPattern>)
@@ -371,7 +350,6 @@ let letPatterns(
 /// Check a match pattern against the matched value's type. Return its variable
 /// bindings and requirements for literals, containers, enum cases, or alternatives.
 /// Enum names and payload types are resolved later from expected by the solver.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let matchPattern(
   expected: Model.Ty,
   pattern: ProgramTypes.MatchPattern)
@@ -443,7 +421,6 @@ let matchPattern(
 
 /// Check each pattern against its corresponding component type and combine the
 /// results. Callers supply matching list lengths; constructor checks validate arity.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let matchPatterns(
   types: List<Model.Ty>,
   patterns: List<ProgramTypes.MatchPattern>)
@@ -457,7 +434,6 @@ let matchPatterns(
 
 
 /// Check every pattern against one shared type, as needed for elements of a list pattern.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let matchPatternsAgainst(
   expected: Model.Ty,
   patterns: List<ProgramTypes.MatchPattern>)
@@ -468,7 +444,6 @@ let matchPatternsAgainst(
 /// Require all or-pattern alternatives to bind the same names with compatible
 /// types. Use the first alternative's bindings in the case body, and connect the
 /// other alternatives to those types through equality requirements.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let orPattern(
   id: Int64,
   expected: Model.Ty,
@@ -538,7 +513,6 @@ let orPattern(
 
 /// Collect this pattern's node ID and all nested pattern IDs. Coverage checking
 /// uses them to skip matches whose patterns already have findings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.MatchPattern'"
 let patternIds(pattern: ProgramTypes.MatchPattern): List<Int64> =
   match pattern with
   | MPUnit(id) -> [ id ]
@@ -586,7 +560,6 @@ let patternIds(pattern: ProgramTypes.MatchPattern): List<Int64> =
 /// Generate requirements for expr to match expected, using site for diagnostics.
 /// For lambdas, relate the parameter and return types to expected before checking
 /// the body. For other expressions, infer their type and then require it to match.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let check(scope: Scope, expected: Model.Ty, site: Site, expr: ProgramTypes.Expr): Model.Constraint =
   match expr with
   | ELambda(id, patterns, body) ->
@@ -610,7 +583,6 @@ let check(scope: Scope, expected: Model.Ty, site: Site, expr: ProgramTypes.Expr)
 ///
 /// Keep commonly encountered constructs near the start because match arms are
 /// tried in order. Rules requiring more work live in the helpers below.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let infer(scope: Scope, expr: ProgramTypes.Expr): (Model.Ty * Model.Constraint) =
   match expr with
   | EVariable(id, name) -> inferVariable(scope, id, name)
@@ -657,7 +629,6 @@ let infer(scope: Scope, expr: ProgramTypes.Expr): (Model.Ty * Model.Constraint) 
 
 /// Look up a local variable. Shared bindings reuse their type; generic bindings
 /// request a fresh use of the saved scheme. Report an error if the name is absent.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferVariable(scope: Scope, id: Int64, name: String): (Model.Ty * Model.Constraint) =
   match Stdlib.Dict.get(scope.locals, name) with
   | Some(binder) ->
@@ -678,7 +649,6 @@ let inferVariable(scope: Scope, id: Int64, name: String): (Model.Ty * Model.Cons
 
 /// Read a package function parameter by its zero-based position. Report an invalid
 /// index when the position is out of range or the current scope has no argument slots.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferArg(scope: Scope, id: Int64, index: Int64): (Model.Ty * Model.Constraint) =
   match Stdlib.List.getAt(scope.arguments, index) with
   | Some(t) -> (t, nothing())
@@ -697,7 +667,6 @@ let inferArg(scope: Scope, id: Int64, index: Int64): (Model.Ty * Model.Constrain
 /// Generate checks for a function call, using special builtin rules when applicable.
 /// Explicit type arguments are supported only on named functions. Check the callee
 /// before its arguments so its signature can supply their expected types.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferApply(
   scope: Scope,
   id: Int64,
@@ -740,7 +709,6 @@ let inferApply(
 
 /// A string expression has type String. Require each interpolated expression
 /// to be String too; plain text adds no typing requirements.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferString(
   scope: Scope,
   segments: List<ProgramTypes.StringSegment>)
@@ -756,7 +724,6 @@ let inferString(
 /// Infer the bound value, check its pattern, and then infer the body with the new names.
 /// When isNonExpansive permits a generic binding, save a scheme for each name before
 /// checking its uses. Other bindings keep one type shared across all uses.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferLet(
   scope: Scope,
   id: Int64,
@@ -794,7 +761,6 @@ let inferLet(
 
 /// Infer the pipeline's initial expression, then pass each step's output type to
 /// the next step. Preserve that order in the generated requirements.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferPipe(
   scope: Scope,
   lhs: ProgramTypes.Expr,
@@ -813,7 +779,6 @@ let inferPipe(
 
 /// Infer the receiver's type and defer field lookup until the solver knows it.
 /// GetField handles both named record fields and tuple-element access.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferFieldAccess(
   scope: Scope,
   id: Int64,
@@ -829,7 +794,6 @@ let inferFieldAccess(
 /// Check every case against the same input type and require all case bodies to
 /// share one result type. Pattern variables are local to each case and its Bool
 /// guard. Save a coverage requirement for checking after type inference.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferMatch(
   scope: Scope,
   id: Int64,
@@ -860,7 +824,6 @@ let inferMatch(
 
 /// Give all list elements one shared type. An empty list leaves that type unknown
 /// so later context or generalization can determine how it is used.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferList(
   scope: Scope,
   id: Int64,
@@ -875,7 +838,6 @@ let inferList(
 /// Require a Bool condition and compatible branch types. Infer the then branch
 /// first and check the else branch against it. Without else, the then branch
 /// must return Unit, which is also the type of the whole expression.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferIf(
   scope: Scope,
   id: Int64,
@@ -905,7 +867,6 @@ let inferIf(
 /// Generate an enum-construction check that supplies expected payload types before
 /// checking the field expressions. If the type name is unresolved, still inspect
 /// the fields so independent problems in their expressions can be reported.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferEnum(
   scope: Scope,
   id: Int64,
@@ -934,7 +895,6 @@ let inferEnum(
 /// Generate a record-construction check that supplies expected field types before
 /// checking their expressions. The solver checks field names and completeness;
 /// unresolved type names still allow independent findings from field expressions.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferRecord(
   scope: Scope,
   id: Int64,
@@ -960,7 +920,6 @@ let inferRecord(
 
 
 /// Report the original spelling of a type name that failed to resolve.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Constraint'"
 let unresolvedType(
   id: Int64,
   typeName: ProgramTypes.NameResolution<ProgramTypes.FQTypeName.FQTypeName>)
@@ -972,7 +931,6 @@ let unresolvedType(
 /// Infer a lambda from unknown parameter types and the type of its body. Give its
 /// ? expressions a separate return-type unknown, then connect that unknown to the
 /// body's result so early returns and the normal return must agree.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferLambda(
   scope: Scope,
   id: Int64,
@@ -991,7 +949,6 @@ let inferLambda(
 /// Make ? refer to this lambda's return type and clear positional argument slots
 /// inherited from the outer function. Captured parameters are accessed by name;
 /// an EArg node inside the lambda must not read an outer function's slot.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let withLambdaReturn(scope: Scope, id: Int64): Scope =
   { scope with arguments = [], returns = Option.Some(var(id, Model.Role.Return)) }
 
@@ -999,7 +956,6 @@ let withLambdaReturn(scope: Scope, id: Int64): Scope =
 /// Require the lambda's return-type unknown to match its body's inferred result.
 /// Process this after the body so the result can resolve ? checks waiting for
 /// an Option or Result return type.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Model.Ty'"
 let constrainLambdaReturn(id: Int64, bodyType: Model.Ty): Model.Constraint =
   equal(id, Site.LambdaReturnValue, var(id, Model.Role.Return), bodyType)
 
@@ -1007,7 +963,6 @@ let constrainLambdaReturn(id: Int64, bodyType: Model.Ty): Model.Constraint =
 /// Generate a check for postfix ?: it extracts a Some or Ok payload, or returns
 /// None or Error from the nearest function or lambda. Relate its operand to that
 /// return type, and report an error when there is no enclosing function.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferUnwrap(
   scope: Scope,
   id: Int64,
@@ -1035,7 +990,6 @@ let inferUnwrap(
 
 
 /// Infer each tuple element independently and retain its position in the result type.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferTuple(
   scope: Scope,
   first: ProgramTypes.Expr,
@@ -1055,7 +1009,6 @@ let inferTuple(
 
 /// Require the first expression in a sequence to return Unit. The next expression
 /// supplies the sequence's result type and may itself contain further statements.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferStatement(
   scope: Scope,
   first: ProgramTypes.Expr,
@@ -1068,7 +1021,6 @@ let inferStatement(
 
 /// Ask the solver for a resolved package or builtin value's type. If name resolution
 /// failed, report a warning and use TError to suppress errors that depend on its type.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.FQValueName.FQValueName'"
 let inferValue(
   id: Int64,
   name: ProgramTypes.NameResolution<ProgramTypes.FQValueName.FQValueName>)
@@ -1088,7 +1040,6 @@ let inferValue(
 /// Keep the original record's type and require each updated field to accept its
 /// new value. Report repeated field names, and establish declared field types
 /// before checking the replacement expressions.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferRecordUpdate(
   scope: Scope,
   id: Int64,
@@ -1134,7 +1085,6 @@ let inferRecordUpdate(
 ///
 /// This copies the runtime's key equality, so a change to that (NaN keys, say)
 /// must be made here too.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let constantDictKey(expr: ProgramTypes.Expr): Option<String> =
   let quote(q: String, text: String): String =
     let escaped =
@@ -1208,7 +1158,6 @@ let constantDictKey(expr: ProgramTypes.Expr): Option<String> =
 /// Give all entries one shared key type and one shared value type. After checking
 /// the entries, require the key type to support dictionary keys; the solver can
 /// defer this requirement if the key type remains unknown.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferDict(
   scope: Scope,
   id: Int64,
@@ -1243,7 +1192,6 @@ let inferDict(
 
 /// Use the enclosing package function's type for an ESelf reference, or report
 /// an error when there is no function signature in scope.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferSelf(scope: Scope, id: Int64): (Model.Ty * Model.Constraint) =
   match scope.self with
   | Some(t) -> (t, nothing())
@@ -1263,7 +1211,6 @@ let inferSelf(scope: Scope, id: Int64): (Model.Ty * Model.Constraint) =
 /// Put its parameter and return types in scope before checking its body, with one
 /// shared type for recursive calls. If the name already exists, the initializer
 /// sees that outer binding instead; no recursive binding is introduced here.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferLetValue(
   scope: Scope,
   pattern: ProgramTypes.LetPattern,
@@ -1291,7 +1238,6 @@ let inferLetValue(
 /// the required arguments and no explicit type arguments. Generate rules for
 /// their supported runtime behavior instead of relying on overly broad signatures.
 /// Return None for other call shapes so inferApply uses the regular call path.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let specialApplication(
   scope: Scope,
   id: Int64,
@@ -1346,7 +1292,6 @@ let specialApplication(
 /// Generate a requirement that target match a named function's signature with
 /// the supplied type arguments. Report unresolved names or unsupported operator
 /// references as warnings; signature lookup and instantiation happen in the solver.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let useFunction(
   scope: Scope,
   id: Int64,
@@ -1386,7 +1331,6 @@ let useFunction(
 /// Give new arguments separate unknowns, then let Apply establish their expected
 /// types before checking their expressions. <param calleeName> is the function's name as
 /// written, when the call is to a name, so a wrong argument can say which call it is in.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let apply(
   scope: Scope,
   id: Int64,
@@ -1411,7 +1355,6 @@ let apply(
 /// argument order. One pass rather than an indexed map for the slots, a zip of the slots with
 /// the arguments and a map for the checks, each a list and a lambda per call for a call's two or
 /// three arguments.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let argumentSlots(
   scope: Scope,
   id: Int64,
@@ -1439,7 +1382,6 @@ let argumentSlots(
 /// Generate operand checks for an infix operation. Boolean and string operations
 /// require their fixed types; equality requires matching operand types. Other
 /// operators also need an Operand check for the types that operation supports.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferInfix(
   scope: Scope,
   id: Int64,
@@ -1496,7 +1438,6 @@ let inferInfix(
 /// Infer one pipeline step from the type produced by the previous step. Treat
 /// input as the first function argument, operator operand, or enum payload field,
 /// and retain pipeline-specific diagnostic contexts for mismatches involving it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Scope'"
 let inferPipePart(
   scope: Scope,
   input: Model.Ty,

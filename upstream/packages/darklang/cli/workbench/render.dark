@@ -9,7 +9,6 @@ module Darklang.Cli.Workbench
 ///
 /// Continuation rows are indented two columns, so a wrapped line reads as one thing rather than as two
 /// unrelated rows; the wrap width is reduced to match, which keeps every row inside the pane.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.wrapRow: Unknown function or value 'Stdlib.Cli.Tui.Text.wrapAtColumn'"
 let wrapRow(maxFit: Int64, line: String): List<String> =
   let room = Stdlib.max(1, maxFit - 2)
   match Stdlib.Cli.Tui.Text.wrapAtColumn(line, room) with
@@ -26,7 +25,6 @@ let wrapRow(maxFit: Int64, line: String): List<String> =
 /// Wrap, never clip: clipping loses everything past the pane's edge with no mark (a
 /// record literal printed on one line loses most of its fields). Wrapping is a floor
 /// under that, not a substitute for the printer laying out to the width.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.renderScrollableLines: Unknown function or value 'wrapRow'"
 let renderScrollableLines(
   region: Stdlib.Cli.UI.Layout.Region,
   colOffset: Int64,
@@ -66,7 +64,6 @@ let renderScrollableLines(
 /// Sized to the longest name plus its cursor, glyph, badges and inset, then held between a floor and
 /// a ceiling. The tree is a column of short names; the Inspect pane is where the text that needs room
 /// actually goes, so any column the tree doesn't need belongs to it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let matterSplitFor(state: State): Int64 =
   let (w, _h) = Terminal.getSize()
   let w = if w < 24 then 80 else w
@@ -98,7 +95,6 @@ let matterSplitFor(state: State): Int64 =
 /// sizes the pretty-printer and the diff wash, so an estimate won't do: an
 /// older one used Matter's ceiling split for every view, which over-padded
 /// diff lines until each wrapped in two. Home has no preview.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let previewInnerWidth(state: State): Int64 =
   let (w, _h) = Terminal.getSize()
   let w = if w < 24 then 80 else w
@@ -112,7 +108,6 @@ let previewInnerWidth(state: State): Int64 =
 
 
 /// How many screen rows `previewLines` occupies once wrapped: what scrolling is bounded by.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let previewRowCount(state: State): Int64 =
   let maxFit = previewInnerWidth(state)
   previewLines(state)
@@ -120,7 +115,6 @@ let previewRowCount(state: State): Int64 =
   |> Stdlib.List.fold(0, fun(acc, n) -> acc + n)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderPreview(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region)
@@ -176,7 +170,6 @@ let selectionBar(name: String, rest: String, focus: Stdlib.Cli.UI.Focus): String
 
 
 /// A full-body scrollable reader (Docs topic content, etc.).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.renderReading: Unknown function or value 'SyntaxHighlighting.highlightCode'"
 let renderReading(
   content: String,
   isCode: Bool,
@@ -416,7 +409,6 @@ let paneSplit(
 
 /// A list and its scrollable preview, titles already styled. With nothing
 /// listed, the list column alone with `emptyMsg` where its rows would be.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let splitListPreviewTitled(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region,
@@ -445,7 +437,6 @@ let splitListPreviewTitled(
 
 /// The list's trailer: its count with its noun (`7 apps`), and the filter
 /// narrowing it, so a narrowed list never looks like the whole set.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let listTrailer(state: State, noun: String): List<String> =
   [ plural(Stdlib.List.length(state.items), noun)
     if state.filter == "" then "" else "filter: " + state.filter ]
@@ -453,7 +444,6 @@ let listTrailer(state: State, noun: String): List<String> =
 
 /// A list and its scrollable preview, from plain names. `leftTitle` may be
 /// "" when the nav already names the view; `noun` is what the rows are.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let splitListPreview(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region,

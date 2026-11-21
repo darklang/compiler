@@ -10,7 +10,6 @@ module Darklang.SCM.PackageOps
 ///
 /// What an unreadable op MEANS belongs to `SCM.StoreHealth`, which counts them. Not to whichever
 /// reader touches one first.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let decodeOpRowEntries(
   rows: List<OpRow>)
   : List<(String * String * LanguageTools.ProgramTypes.PackageOp)> =
@@ -19,7 +18,6 @@ let decodeOpRowEntries(
 
 
 /// The ops of these rows, skipping any this build could not read.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let decodeOpRows(rows: List<OpRow>): List<LanguageTools.ProgramTypes.PackageOp> =
   rows |> Stdlib.List.filterMap(fun row -> row.op)
 
@@ -29,7 +27,6 @@ let decodeOpRows(rows: List<OpRow>): List<LanguageTools.ProgramTypes.PackageOp> 
 /// Read the binding from a SetName or an Override decision, with its timestamp.
 /// Callers first split renames and restores into binding changes.
 /// Include overrides so Dark reports the same binding that F# uses when running the code.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let bindingFromOp(
   op: LanguageTools.ProgramTypes.PackageOp,
   ts: String)
@@ -90,7 +87,6 @@ let bindingSortKey(ts: String, hash: Option<String>): String =
 /// Read the operations and keep the latest change for each name.
 /// Sort by <fn bindingSortKey> so the result does not depend on the order rows arrived in.
 /// An Unbind removes the binding until a later operation gives the name a binding again.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let nameEntriesFromOpRows(
   expand: LanguageTools.ProgramTypes.PackageOp -> List<LanguageTools.ProgramTypes.PackageOp>,
   rows: List<OpRow>)
@@ -137,26 +133,22 @@ let nameEntriesFromOpRows(
 
 
 /// Read changes to what each name points to. Edits to reference names alone do not change bindings.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let bindingEntriesFromOpRows(rows: List<OpRow>): List<NameWord> =
   nameEntriesFromOpRows(LanguageTools.ProgramTypes.PackageOp.bindingOps, rows)
 
 
 /// Include edits to reference names when listing or selecting draft changes.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let draftEntriesFromOpRows(rows: List<OpRow>): List<NameWord> =
   nameEntriesFromOpRows(LanguageTools.ProgramTypes.PackageOp.draftOps, rows)
 
 
 /// <fn bindingEntriesFromOpRows>, keeping only the names that end up bound.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'OpRow'"
 let bindingsFromOpRows(rows: List<OpRow>): List<Conflicts.Binding> =
   bindingEntriesFromOpRows(rows) |> Stdlib.List.filterMap(fun w -> w.binding)
 
 
 /// What <param branchId> has COMMITTED at each of <param locations>: its own committed work over its
 /// ancestors', main's included. Its draft is left out.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.committedBindingsOn: Unknown function or value 'SCM.Bindings.query'"
 let committedBindingsOn(
   branchId: Uuid,
   locations: List<(String * String * String)>)
@@ -178,14 +170,12 @@ let sourceOfBinding(binding: Conflicts.Binding): ReferenceSource =
 
 
 /// List the declarations visible on this branch, including its own draft.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.liveReferenceSources: Unknown function or value 'Builtin.pmLiveReferenceSources'"
 let liveReferenceSources(branchId: Uuid): List<ReferenceSource> =
   Builtin.pmLiveReferenceSources(branchId)
 
 
 /// What <param loc> resolves to on <param branchId>: the branch's own work over what its ancestors
 /// committed, main's included. THE branch-aware read of a live binding.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.liveBindingFor: Unknown function or value 'SCM.Bindings.query'"
 let liveBindingFor(
   branchId: Uuid,
   loc: LanguageTools.ProgramTypes.PackageLocation)
@@ -200,7 +190,6 @@ let liveBindingFor(
 
 /// <fn liveBindingFor> for many names at once, keyed by `Conflicts.bindingKey`; a name that resolves
 /// to nothing is absent.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.liveBindingsFor: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let liveBindingsFor(
   branchId: Uuid,
   locs: List<LanguageTools.ProgramTypes.PackageLocation>)
@@ -220,6 +209,5 @@ let liveBindingsFor(
 
 
 /// <fn liveBindingFor> on the branch this process stands on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.PackageOps.liveBindingAt: Unknown function or value 'liveBindingFor'"
 let liveBindingAt(loc: LanguageTools.ProgramTypes.PackageLocation): Option<Conflicts.Binding> =
   liveBindingFor(currentBranch(), loc)

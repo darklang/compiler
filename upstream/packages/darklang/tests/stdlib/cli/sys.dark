@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Cli.Sys.Tests
 
 // __text: a fixed-width field, cut at its first NUL
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
 test text =
   let buffer =
     Stdlib.Bytes.fromList(
@@ -21,7 +20,6 @@ test text =
 
 
 // __countBits, and the host facts cpuCount and hostname rest on
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test countBitsAndHostFacts =
   Stdlib.Test.all(
     [ Stdlib.Cli.Sys.__countBits(255) |> Stdlib.Test.equal(8)

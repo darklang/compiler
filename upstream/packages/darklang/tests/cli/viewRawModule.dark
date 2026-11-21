@@ -13,7 +13,6 @@ val source: String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aModuleRoundTrips = Instance.withInstance(fun i ->
   let first = Instance.home(i) + "/first.dark"
   let _ = Stdlib.Cli.File.writeAtomic(first, source) |> Builtin.unwrap
@@ -44,7 +43,6 @@ test aModuleRoundTrips = Instance.withInstance(fun i ->
 
 
 // `dark module` puts an impl under its type's name, so it comes back with the type.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test anImplForTheModulesTypeIsPrinted = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/impl.dark"
   let src =
@@ -58,7 +56,6 @@ test anImplForTheModulesTypeIsPrinted = Instance.withInstance(fun i ->
       Instance.says(raw, "Display for Badge =", "the impl") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test submodulesAreLeftOut = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/outer.dark"
   let _ =
@@ -78,7 +75,6 @@ test submodulesAreLeftOut = Instance.withInstance(fun i ->
       Instance.doesNotSay(raw, "deep", "the submodule's fn") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test helpSaysSubmodulesAreLeftOut = Instance.withInstance(fun i ->
   let out = Instance.said(i, [ "help", "view" ])
   Instance.says(out, "not its submodules", "the module form of --raw"))

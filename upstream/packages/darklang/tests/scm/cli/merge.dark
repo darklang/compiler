@@ -2,7 +2,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aMergeLandsTheBranchOnMainAsOneCommit = scenario(fun dark ->
   [ saveNumber(dark, "Tests.App.base", "1")
     commit(dark, "base")
@@ -62,7 +61,6 @@ test aMergeLandsTheBranchOnMainAsOneCommit = scenario(fun dark ->
 
 // Odd, but today's behaviour: a merge into a branch (not main) makes no merge commit. The work
 // reaches main's history when the parent itself merges.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aMergeIntoABranchMakesNoMergeCommit =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -115,7 +113,6 @@ test aMergeIntoABranchMakesNoMergeCommit =
 
 // #6039, exactly as reported: a caller added on a branch, then main changes what it calls. The merge
 // repoints the caller at main's version, as a rebase would.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aCallerAddedOnABranchFollowsWhatMainChangedWhenItMerges =
   scenario(fun dark ->
     [ switch(dark, "main")
@@ -154,7 +151,6 @@ test aCallerAddedOnABranchFollowsWhatMainChangedWhenItMerges =
       same(conflicts(dark), [], "and nothing collided") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test mergeRefusesAndSaysWhy =
   scenario(fun dark ->
     [ refuses(
@@ -203,7 +199,6 @@ test mergeRefusesAndSaysWhy =
       evals(dark, "Tests.App.a()", "1", "--allow-type-errors merges anyway") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aMergeLeavesMainsOwnDraftAlone =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -225,7 +220,6 @@ test aMergeLeavesMainsOwnDraftAlone =
       evals(dark, "Tests.App.onFeat()", "1", "which landed") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test docsAndDeprecationsMadeOnABranchArriveWithTheMerge =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")
@@ -281,7 +275,6 @@ test docsAndDeprecationsMadeOnABranchArriveWithTheMerge =
         "and the deprecation") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aValueMadeOnABranchWorksAfterTheMerge =
   scenario(fun dark ->
     [ switch(dark, "feat")

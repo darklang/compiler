@@ -28,6 +28,7 @@ def run():
         executable.parent.mkdir(parents=True)
         shutil.copy2(adapter, executable)
         (root / 'porting/compiler-reasons.json').write_text('{"test-counter":"Per-test counter is missing"}')
+        (root / 'porting/upstream-annotations.tsv').write_text('')
 
         def git(*args):
             return subprocess.check_output(['git', '-C', str(upstream), *args], text=True, stderr=subprocess.PIPE).strip()

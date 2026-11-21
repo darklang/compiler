@@ -1,7 +1,6 @@
 /// A `fn` save says where its type error is, counting columns in what the author typed.
 module Darklang.Cli.Tests.FnSaveLines
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test theShortFormCountsTheAuthorsColumns = Instance.withInstance(fun i ->
   let (_, out) =
     Instance.ran(i, [ "fn", "Me.Lines.add", "(n: Int64): Int64 = n + \"x\"" ])
@@ -12,7 +11,6 @@ test theShortFormCountsTheAuthorsColumns = Instance.withInstance(fun i ->
     "the operand, in the text as typed"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aFullDeclarationCountsItsLines = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/two.dark"
   let _ =

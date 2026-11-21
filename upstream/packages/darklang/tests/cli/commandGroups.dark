@@ -15,7 +15,6 @@ module Darklang.Cli.Tests.CommandGroups
 // empty input look the same from the outside.
 
 module Groups =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandGroups.Groups.registered: Unknown function or value 'Darklang.Cli.Registry.allCommands'"
   let registered(): List<String> =
     Cli.Registry.allCommands() |> Stdlib.List.map(fun c -> c.name)
 
@@ -27,7 +26,6 @@ module Groups =
 
 
   /// Registered, but in no group: these print under "Other:".
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandGroups.Groups.ungrouped: Unknown function or value 'registered'"
   let ungrouped(): List<String> =
     let g = grouped()
     registered()
@@ -35,7 +33,6 @@ module Groups =
 
 
   /// Named by a group, but not registered: these are silently dropped from help.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.CommandGroups.Groups.phantom: Unknown function or value 'registered'"
   let phantom(): List<String> =
     let r = registered()
     grouped()
@@ -44,7 +41,6 @@ module Groups =
 
 // The floor. Without it the two tests below pass over an empty registry, which is exactly
 // the shape of failure they exist to catch.
-// @compiler xfail compile: "Unknown function or value 'Groups.registered'" class=missing-support reason=upstream-dependency
 test theRegistryWasActuallyRead =
   Stdlib.List.length(Groups.registered()) > 40 |> Stdlib.Test.equal(true)
 
@@ -56,13 +52,11 @@ test everyGroupNameIsUnique =
 
 
 // A new command is registered and nobody adds it to a group. The failure names it.
-// @compiler xfail compile: "Unknown function or value 'Groups.ungrouped'" class=missing-support reason=upstream-dependency
 test everyRegisteredCommandIsInAGroup =
   Stdlib.List.sort(Groups.ungrouped()) |> Stdlib.Test.equal([])
 
 
 // A command is renamed or removed and its group row is left behind.
-// @compiler xfail compile: "Unknown function or value 'Groups.phantom'" class=missing-support reason=upstream-dependency
 test everyGroupedNameIsRegistered =
   Stdlib.List.sort(Groups.phantom()) |> Stdlib.Test.equal([])
 

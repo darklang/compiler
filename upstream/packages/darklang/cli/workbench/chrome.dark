@@ -4,7 +4,6 @@
 /// Part of `Darklang.Cli.Workbench`.
 module Darklang.Cli.Workbench
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderViewBody(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region)
@@ -125,7 +124,6 @@ let renderEditing(
 
 
 /// The jumpable search-results list. ⏎ navigates to the hit.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderSearchResults(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region)
@@ -151,7 +149,6 @@ let renderSearchResults(
 
 
 /// Dispatch the body: the editor, then a reader, then search results, else the active view's body.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderBody(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdlib.Cli.UI.Layout.Span> =
   match state.editing with
   | Some(es) -> renderEditing(es, region)
@@ -166,7 +163,6 @@ let renderBody(state: State, region: Stdlib.Cli.UI.Layout.Region): List<Stdlib.C
 
 
 /// A view's purpose and data caveat. An empty caveat means real data.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.viewBlurb: Unknown function or value 'extensionViewAt'"
 let viewBlurb(idx: Int64): (String * String) =
   if idx == vMatter then
     ("browse and edit the package tree", "")
@@ -196,7 +192,6 @@ let viewBlurb(idx: Int64): (String * String) =
 /// END, which are `?` (the keymap) and `q` (the way out) -- the two a person needs most when lost. The
 /// row drops whole hints cheapest-first instead: secondary globals, then the view's own actions, and
 /// `?`/`q` never.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let hintsForView(state: State, width: Int64): String =
   let view = state.activeView
   // Pane movement only applies when a preview exists.
@@ -331,7 +326,6 @@ val helpGroups =
 
 
 /// A centered, boxed keymap overlay drawn over the frame. The interior is cleared so nothing shows through.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.renderHelpOverlay: Unknown function or value 'Stdlib.Cli.UI.Box.panel'"
 let renderHelpOverlay(screen: Stdlib.Cli.UI.Layout.Region): List<Stdlib.Cli.UI.Layout.Span> =
   // Wide enough for the longest group, not a round number: a fixed width clips the Matter row - the single most
   // useful line in the keymap - on a terminal with room to spare. 11 is where the keys column starts, plus the

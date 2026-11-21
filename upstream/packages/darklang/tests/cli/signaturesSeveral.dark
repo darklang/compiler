@@ -2,7 +2,6 @@
 /// modules it needs in one call rather than one call per module.
 module Darklang.Cli.Tests.SignaturesSeveral
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test severalFiltersListEach = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "docs", "signatures", "Stdlib.Bool", "Stdlib.Uuid" ])
@@ -31,7 +30,6 @@ test severalFiltersListEach = Instance.withInstance(fun i ->
 
 
 // A filter that matches nothing is named, and the others are still listed.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aFilterThatMatchesNothingIsNamed = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "docs", "signatures", "Stdlib.Bool", "zzznope" ])
@@ -47,7 +45,6 @@ test aFilterThatMatchesNothingIsNamed = Instance.withInstance(fun i ->
 
 
 // A module that does not exist names the functions called by its last part.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aMissingModuleNamesItsFunctions = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "docs", "signatures", "Stdlib.Random" ])
   Stdlib.Test.all(
@@ -60,7 +57,6 @@ test aMissingModuleNamesItsFunctions = Instance.withInstance(fun i ->
 
 
 // A guessed module name points at the module with the shorter name.
-// @compiler blocked: upstream-dependency diagnostic="aLongerModuleNamePointsAtTheShortOne: Unknown type 'Model.Environment'"
 test aLongerModuleNamePointsAtTheShortOne = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "docs", "signatures", "Stdlib.Cli.Environment" ])
@@ -71,7 +67,6 @@ test aLongerModuleNamePointsAtTheShortOne = Instance.withInstance(fun i ->
 
 
 // A filter naming a module lists that module, not the ones whose names start the same way.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aModuleFilterIsThatModule = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "docs", "signatures", "Stdlib.Http" ])
   Stdlib.Test.all(

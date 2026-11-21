@@ -1,7 +1,6 @@
 /// A name saved into one module that lives in the module next to it gets that module's name.
 module Darklang.Cli.Tests.NearbyNames
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test siblingModuleIsSuggested = Instance.withInstance(fun i ->
   let types = Instance.home(i) + "/types.dark"
   let lexer = Instance.home(i) + "/lexer.dark"

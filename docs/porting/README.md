@@ -6,18 +6,22 @@ Every `.dark` file under interpreter `packages/` and
 `backend/testfiles/execution/` is included at the revision in
 [`sources.yaml`](../../porting/sources.yaml).
 
-Compiler decisions live beside each imported item. There are no file-level
-exclusions or separately maintained test/declaration ledgers:
+`upstream/` is byte-identical to darklang/dark at that revision, so a re-pin is
+`python3 scripts/sync-upstream.py /path/to/dark REVISION`. Compiler decisions
+live in [`upstream-annotations.tsv`](../../porting/upstream-annotations.tsv), one
+line per item: the path below `upstream/`, the item's qualified name and the
+decision, separated by tabs. Assertions and top-level expressions are named by
+line (`Module.assertion@12`). There are no file-level exclusions:
 
 - No annotation selects the original declaration or test.
-- `// @compiler error-message compile: "diagnostic" reason=diagnostic-difference`
+- `error-message compile: "diagnostic" reason=diagnostic-difference`
   selects a runnable negative test with an accepted compiler diagnostic and
   required phase (`compile` or `runtime`), preserving the upstream expectation.
-- `// @compiler blocked: tag` retains an item awaiting compiler support.
-- `// @compiler excluded: tag` records an intentional compiler exclusion.
-- `// @compiler replace: packages/path.dark#Qualified.name reason=tag` selects
+- `blocked: tag` retains an item awaiting compiler support.
+- `excluded: tag` records an intentional compiler exclusion.
+- `replace: packages/path.dark#Qualified.name reason=tag` selects
   a separately maintained compiler implementation with a checked public contract.
-- `// @compiler xfail compile: "diagnostic" class=missing-support reason=tag` runs a test that must
+- `xfail compile: "diagnostic" class=missing-support reason=tag` runs a test that must
   currently fail compilation with the specified diagnostic. `runtime` requires
   a runtime failure instead. Unexpected passes, wrong phases, unrelated output
   and abnormal process termination fail the check.
@@ -41,9 +45,9 @@ that test have not thereby acquired passing execution coverage.
 
 Reasons are short tags from the [glossary](../../porting/compiler-reasons.json).
 The [import guide](upstream-import.md) describes source selection and validation.
-Annotations are real lexer comments; marker text in strings and documentation
-examples is not metadata. Named tests containing multiple assertions remain one
-case. Test discovery and counting do not require successful compilation.
+An annotation naming an item its source does not have is an error, so a re-pin
+reports every decision that needs moving. Named tests containing multiple
+assertions remain one case. Test discovery and counting do not require successful compilation.
 
 Existing adapted fixtures remain compiler regression tests. They are not used
 to infer counterparts, partial test coverage or ambiguous source equivalence.
@@ -61,9 +65,9 @@ python3 scripts/update-ledger.py
 python3 scripts/update-ledger.py --check
 ```
 
-Use `--build-dir=...` for a separate Dune directory. To verify that every imported
-source body is byte-for-byte identical to the pin after removing only actual
-annotation comments:
+Use `--build-dir=...` for a separate Dune directory. Every run checks that
+`upstream/packages` has the Git tree id recorded as `upstream_packages_tree` in
+`sources.yaml`. To also compare every imported source byte for byte with the pin:
 
 ```bash
 python3 scripts/update-ledger.py --check --upstream /path/to/interpreter
@@ -73,7 +77,7 @@ The check reads committed Git blobs, ignoring dirty and untracked interpreter
 files, and verifies the complete source scope. `scripts/check-porting` runs the
 helper tests and obtains an isolated pinned checkout when none is supplied.
 The only generated source ledger artifacts are aggregate counts and the status
-page; names, compiler targets and per-item dispositions remain in the sources.
+page; names, compiler targets and per-item dispositions remain in the annotation file.
 
 Language and parser capability assessments remain in
 [`language-features.yaml`](../../porting/language-features.yaml) and

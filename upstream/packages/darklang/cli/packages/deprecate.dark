@@ -44,7 +44,6 @@ let parseArgs(args: List<String>): ParsedArgs =
 /// TODO: the design doc also promises hash-prefix resolution (e.g.
 ///       `deprecate fn ab12cd34`); not implemented yet. Add when the first
 ///       caller needs it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let resolveTarget(
   branchId: Uuid,
   currentLocation: PackageLocation,
@@ -83,7 +82,6 @@ let resolveTarget(
 
 /// What `deprecate` is being pointed at: the kind, its word (for the messages), the name as typed,
 /// the name it means, which is what the deprecation is said at, and the item it resolved to there.
-// @compiler blocked: upstream-dependency diagnostic="Target: Unknown type 'Packages.PackageLocation'"
 type Target =
   { itemKind: LanguageTools.ProgramTypes.ItemKind
     itemTypeStr: String
@@ -93,7 +91,6 @@ type Target =
 
 
 /// `target` as a <type Target> of `itemKind`, or None when nothing of that kind is there.
-// @compiler blocked: upstream-dependency diagnostic="resolveAt: Unknown type 'Packages.PackageLocation'"
 let resolveAt(
   branchId: Uuid,
   currentLoc: PackageLocation,
@@ -129,7 +126,6 @@ val allItemKinds =
 /// `delete` and `undeprecate`. `locations` does not stop one name holding two
 /// kinds, so a name that resolves twice is refused rather than guessed at; the
 /// explicit form is how you say which.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let resolveKindAndTarget(
   branchId: Uuid,
   currentLoc: PackageLocation,
@@ -193,7 +189,6 @@ let parseKind(
 
 /// The other names holding the content `target` holds at `location`. Deprecated and deleted leave
 /// them alone; harmful marks them too, because it is about the code.
-// @compiler blocked: upstream-dependency diagnostic="twinsOf: Unknown type 'Packages.PackageLocation'"
 let twinsOf(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -216,7 +211,6 @@ let twinsOf(
 
 
 /// The one line that says other names share this code: `what` is what happens to them.
-// @compiler blocked: upstream-dependency diagnostic="sayShared: Unknown type 'Packages.PackageLocation'"
 let sayShared(
   twins: List<LanguageTools.ProgramTypes.PackageLocation>,
   what: String,
@@ -245,7 +239,6 @@ let sayShared(
 
 
 /// Whether the item at `location` is marked harmful.
-// @compiler blocked: upstream-dependency diagnostic="harmfulAt: Unknown type 'Packages.PackageLocation'"
 let harmfulAt(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -277,7 +270,6 @@ type DeprecateJson =
     dryRun: Bool }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let parsed = parseArgs(args)
   let branchId = state.currentBranchId
@@ -464,7 +456,6 @@ let execute(state: AppState, args: List<String>): AppState =
 ///
 /// The kind is inferred rather than asked for. You know the name; making you also name its kind to undo
 /// something is the sort of question a tool asks because it is easy to implement.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let executeUndeprecate(state: AppState, args: List<String>): AppState =
   let branchId = state.currentBranchId
   // Any dash-led argument, not just `--` ones. `delete <name> -y` is how you get here in the first
@@ -578,7 +569,6 @@ let executeUndeprecate(state: AppState, args: List<String>): AppState =
 
 /// `undeprecate`'s own help. Registered against `undeprecate`, not shared with `deprecate`, whose flags
 /// are not this command's.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let undeprecateHelp(_state: AppState): String =
   [ "Put a deprecated fn, type, value, trait or impl back on the shelf."
     ""
@@ -592,7 +582,6 @@ let undeprecateHelp(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Mark a function, type, value, trait, implementation or test as deprecated."
     ""
@@ -632,7 +621,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] -> [ "fn", "type", "value", "trait", "impl", "test" ] |> Stdlib.List.map(Completion.simple)

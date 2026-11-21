@@ -23,5 +23,4 @@ type FileKind =
 
 /// The words the parser reserves, from the lexer itself: each one is a name in
 /// backticks (`match`), or where only a name can go. `_` is among them.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.Parser.keywords: Unknown function or value 'Builtin.parserKeywords'"
 val keywords = Builtin.parserKeywords

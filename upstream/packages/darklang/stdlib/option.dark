@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Option
 
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.Option reason=compiler-implementation
 type Option<'v> =
   | Some('v)
   | None
@@ -16,7 +15,6 @@ impl Display for Option<'v> =
 /// If <param option> is {{Some <var value>}}, returns {{fn <var value>}}. The
 /// lambda <fn fn> is applied to <var value> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.map reason=compiler-implementation
 let map(option: Option<'a>, fn: 'a -> 'b): Option<'b> =
   match option with
   | Some(v) -> Option.Some(fn(v))
@@ -29,7 +27,6 @@ let map(option: Option<'a>, fn: 'a -> 'b): Option<'b> =
 ///  representing <var v1> and <var v2>. But if either <param option1> or
 ///  <param option2> are {{None}}, returns {{None}} without applying <param
 ///  fn>.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.map2 reason=compiler-implementation
 let map2(option1: Option<'a>, option2: Option<'b>, fn: ('a, 'b) -> 'c): Option<'c> =
   match option1, option2 with
   | Some(v1), Some(v2) -> Option.Some(fn(v1, v2))
@@ -41,7 +38,6 @@ let map2(option1: Option<'a>, option2: Option<'b>, fn: ('a, 'b) -> 'c): Option<'
 /// then return {{Some (fn <var v1> <var v2> <var v3>)}}. The lambda <param fn> should have three parameters,
 /// representing <var v1>, <var v2>, and <var v3>. But if any of <param option1>, <param option2>, or
 /// <param option3> are {{None}}, returns {{None}} without applying <param fn>.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.map3 reason=compiler-implementation
 let map3(
   option1: Option<'a>,
   option2: Option<'b>,
@@ -58,7 +54,6 @@ let map3(
 /// then return {{Some (fn <var v1> <var v2> <var v3> <var v4>)}}. The lambda <param fn> should have four parameters,
 /// representing <var v1>, <var v2>, <var v3>, and <var v4>. But if any of <param option1>, <param option2>, <param option3>, or
 /// <param option4> are {{None}}, returns {{None}} without applying <param fn>.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.map4 reason=compiler-implementation
 let map4(
   option1: Option<'a>,
   option2: Option<'b>,
@@ -76,7 +71,6 @@ let map4(
 /// then return {{Some (fn <var v1> <var v2> <var v3> <var v4> <var v5>)}}. The lambda <param fn> should have five parameters,
 /// representing <var v1>, <var v2>, <var v3>, <var v4>, and <var v5>. But if any of <param option1>, <param option2>, <param option3>, <param option4>, or
 /// <param option5> are {{None}}, returns {{None}} without applying <param fn>.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.map5 reason=compiler-implementation
 let map5(
   option1: Option<'a>,
   option2: Option<'b>,
@@ -91,7 +85,6 @@ let map5(
 
 
 /// If <param option> is {{Some <var value>}}, returns {{fn <var value>}}. The lambda <fn fn> is applied to <var value> and the result is wrapped in {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.mapWithDefault reason=compiler-implementation
 let mapWithDefault(option: Option<'a>, default_: 'b, fn: 'a -> 'b): 'b =
   match option with
   | Some(v) -> fn(v)
@@ -101,7 +94,6 @@ let mapWithDefault(option: Option<'a>, default_: 'b, fn: 'a -> 'b): 'b =
 /// If <param option> is {{Some <var value>}}, returns {{fn <var value>}}. The
 /// lambda <fn fn> is applied to <var value> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.andThen reason=compiler-implementation
 let andThen(option: Option<'a>, fn: 'a -> Option<'b>): Option<'b> =
   match option with
   | Some(v) -> fn(v)
@@ -111,7 +103,6 @@ let andThen(option: Option<'a>, fn: 'a -> Option<'b>): Option<'b> =
 /// If both <param option1> and <param option2> are {{Some}}, returns {{fn <var value1, value2>}}.
 /// The lambda <fn fn> is applied to <var value1> and <var value2> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.andThen2 reason=compiler-implementation
 let andThen2(option1: Option<'a>, option2: Option<'b>, fn: ('a, 'b) -> Option<'c>): Option<'c> =
   match option1, option2 with
   | Some(v1), Some(v2) -> fn(v1, v2)
@@ -121,7 +112,6 @@ let andThen2(option1: Option<'a>, option2: Option<'b>, fn: ('a, 'b) -> Option<'c
 /// If all <param option1>, <param option2>, and <param option3> are {{Some}}, returns {{fn <var value1, value2, value3>}}.
 /// The lambda <fn fn> is applied to <var value1>, <var value2>, and <var value3> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.andThen3 reason=compiler-implementation
 let andThen3(
   option1: Option<'a>,
   option2: Option<'b>,
@@ -136,7 +126,6 @@ let andThen3(
 /// If all <param option1>, <param option2>, <param option3>, and <param option4> are {{Some}}, returns {{fn <var value1, value2, value3, value4>}}.
 /// The lambda <fn fn> is applied to <var value1>, <var value2>, <var value3>, and <var value4> and the result is wrapped in
 /// {{Some}}. Otherwise, returns {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.andThen4 reason=compiler-implementation
 let andThen4(
   option1: Option<'a>,
   option2: Option<'b>,
@@ -151,7 +140,6 @@ let andThen4(
 
 /// If <param option> is {{Some <var value>}}, returns <var value>. Otherwise,
 /// returns <param default>
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.withDefault reason=compiler-implementation
 let withDefault(option: Option<'a>, default_: 'a): 'a =
   match option with
   | Some(v) -> v
@@ -159,7 +147,6 @@ let withDefault(option: Option<'a>, default_: 'a): 'a =
 
 
 /// Returns true if <param option> is {{Some _}} and false if it is {{None}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.isSome reason=compiler-implementation
 let isSome(option: Option<'a>): Bool =
   match option with
   | Some(_) -> true
@@ -167,7 +154,6 @@ let isSome(option: Option<'a>): Bool =
 
 
 /// Returns true if <param option> is {{None}} and false if it is {{Some _}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.isNone reason=compiler-implementation
 let isNone(option: Option<'a>): Bool =
   match option with
   | Some(_) -> false
@@ -175,7 +161,6 @@ let isNone(option: Option<'a>): Bool =
 
 
 /// Turn a <type Option> into a <type Result>, using <param error> as the error message for Error. if <param option> is {{Some <var value>}}, returns {{Ok <var value>}}. Otherwise, returns {{Error <var error>}}
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.toResult reason=compiler-implementation
 let toResult(option: Option<'a>, error: 'e): Result<'a, 'e> =
   match option with
   | Some(v) -> Result.Ok(v)
@@ -184,7 +169,6 @@ let toResult(option: Option<'a>, error: 'e): Result<'a, 'e> =
 
 /// If <param option1> is {{Some _}}, then returns the value of <param option2>.
 /// Otherwise, returns {{None}}.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.and reason=compiler-implementation
 let and(option1: Option<'a>, option2: Option<'b>): Option<'b> =
   match option1 with
   | Some(_) -> option2
@@ -192,7 +176,6 @@ let and(option1: Option<'a>, option2: Option<'b>): Option<'b> =
 
 
 /// Returns <param option1> if it is {{Some _}}. Otherwise, returns <param option2>.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.or reason=compiler-implementation
 let or(option1: Option<'a>, option2: Option<'a>): Option<'a> =
   match option1 with
   | Some(_) -> option1
@@ -200,7 +183,6 @@ let or(option1: Option<'a>, option2: Option<'a>): Option<'a> =
 
 
 /// Returns a list containing the value of <param option> if it is {{Some _}}. Otherwise, returns an empty list.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.toList reason=compiler-implementation
 let toList(option: Option<'a>): List<'a> =
   match option with
   | Some(v) -> [ v ]
@@ -208,7 +190,6 @@ let toList(option: Option<'a>): List<'a> =
 
 
 /// Flattens a nested option. If <param option> is {{Some (Some <var value>)}}, returns {{Some <var value>}}. If <param option> is {{Some None}}, returns {{None}}.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.join reason=compiler-implementation
 let join(option: Option<Option<'a>>): Option<'a> =
   match option with
   | Some(v) -> v
@@ -218,7 +199,6 @@ let join(option: Option<Option<'a>>): Option<'a> =
 /// Combines a list of options into a single option containing a list of unwrapped values.
 /// If all options in the list are {{Some _}}, then return {{Some <list of unwrapped values>}}.
 /// If any option is {{None}}, then return {{None}}.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.combine reason=compiler-implementation
 let combine(options: List<Option<'a>>): Option<List<'a>> =
   // Built back to front and reversed once: `List.append acc value` copies the accumulator every
   // element, so this was quadratic in the list length.
@@ -232,6 +212,5 @@ let combine(options: List<Option<'a>>): Option<List<'a>> =
 
 
 /// Returns a list of all the values that are {{Some _}}, and ignores all the {{None}} values.
-// @compiler replace: packages/darklang/stdlib/option.dark#Darklang.Stdlib.Option.values reason=compiler-implementation
 let values(options: List<Option<'a>>): List<'a> =
   List.filterMap(options, fun option -> option)

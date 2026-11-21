@@ -43,7 +43,6 @@ test fallsBackToInspect =
       interpolated([ true ]) |> Stdlib.Test.equal("<[true]>")
       interpolated(5) |> Stdlib.Test.equal("<5>") ])
 
-// @compiler xfail compile: "Unbound local variable 'one'" class=aot-rejection reason=aot-name-error
 test unboundVariableRaises =
   (let two = 2 in "test 1" == $"test {one}")
   => raises "There is no variable named: one"

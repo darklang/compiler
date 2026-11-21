@@ -2,7 +2,6 @@ module Darklang.Cli.Tests.SearchLimits
 
 /// Batch searches show the same results as separate searches. An explicit limit applies
 /// to each query, and the limit value is not treated as a search term.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test batchLimits = Instance.withInstance(fun i ->
   let rows = fun out ->
     out
@@ -57,7 +56,6 @@ test batchLimits = Instance.withInstance(fun i ->
 
 
 /// Invalid limits are rejected before any search runs, including in batch mode.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test invalidLimits = Instance.withInstance(fun i ->
   [ "0", "-1", "nope", "9223372036854775808" ]
   |> Stdlib.List.map(fun value ->

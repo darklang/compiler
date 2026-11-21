@@ -114,8 +114,34 @@ let entries tokens (tree : W.sourceFile) =
   declarations [] tree.W.declarations
   @ List.map (expression []) tree.W.exprsToEval
 
-let parse ?(interpreterSource = false) ~reasons source =
-  let parsed = Parser.withInterpreterSource interpreterSource (fun () -> Parser.parse source) in
+(* Sidecar annotations name their item; tests and declarations share one namespace per file. *)
+let attach ~reasons annotations entries =
+  List.fold_left
+    (fun entries (name, text) ->
+      let* entries = entries in
+      let fail message = Error (name ^ ": " ^ message) in
+      match List.filter (fun entry -> entry.name = name) entries with
+      | [] -> fail "compiler annotation for an item this source does not have"
+      | _ :: _ :: _ -> fail "compiler annotation names more than one item"
+      | [ entry ] -> (
+          match
+            Result.bind (A.parse reasons text) (A.check ~isTest:(isTest entry.kind))
+          with
+          | Error message -> fail message
+          | Ok _ when entry.disposition <> A.Run ->
+              fail "Conflicting compiler annotations on the same item"
+          | Ok disposition ->
+              Ok
+                (List.map
+                   (fun other ->
+                     if other.position = entry.position && other.name = name
+                     then { other with disposition }
+                     else other)
+                   entries)))
+    (Ok entries) annotations
+
+let parse ?(annotations = []) ~reasons source =
+  let parsed = Parser.parse source in
   match (parsed.ParserSupport.diagnostics, parsed.ParserSupport.parsed) with
   | [], Some (W.SourceFile tree) ->
       let* tokens, _ = Lexer.tokenize source in
@@ -126,16 +152,15 @@ let parse ?(interpreterSource = false) ~reasons source =
             { A.position = entry.position; isTest = isTest entry.kind })
           entries
       in
-      let* annotations = A.read ~reasons ~items source in
-      Ok
-        {
-          tree;
-          entries =
-            List.map
-              (fun entry ->
-                { entry with disposition = A.at annotations entry.position })
-              entries;
-        }
+      let* inline = A.read ~reasons ~items source in
+      let* entries =
+        attach ~reasons annotations
+          (List.map
+             (fun entry ->
+               { entry with disposition = A.at inline entry.position })
+             entries)
+      in
+      Ok { tree; entries }
   | diagnostics, (None | Some (W.SourceFile _)) ->
       Error
         (String.concat "\n"

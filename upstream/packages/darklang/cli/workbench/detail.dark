@@ -6,7 +6,6 @@ module Darklang.Cli.Workbench
 
 /// Render Tree items as aligned name/description rows with selection state,
 /// WIP and deprecation badges, and a scrollable viewport.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let renderTreeList(
   state: State,
   region: Stdlib.Cli.UI.Layout.Region)
@@ -176,7 +175,6 @@ let factNote(note: String): String =
 val accessHeading = sectionHeading("access")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let accessSummaryLines(state: State, hash: String): List<String> =
   let facts = Permissions.Command.accessFacts(state.accountId, hash)
   let requires =
@@ -217,7 +215,6 @@ let accessSummaryLines(state: State, hash: String): List<String> =
 /// value's literal, a fn's signature with its requirements badge. One flat
 /// run of 25 `name  desc` rows read as a dump; the kinds are how a person
 /// scans a module, so they are how it is laid out.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let modulePreviewLines(state: State, item: BodyItem): List<String> =
   let path = Stdlib.List.append(Packages.modulePathOf(state.location), item.name)
   let location = Packages.PackageLocation.Module(path)
@@ -327,7 +324,6 @@ let testStatusText(status: String): String =
     Stdlib.Cli.UI.Colors.dimText(status)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.testOutcomeLines: Unknown function or value 'Packages.Test.lastOutcome'"
 let testOutcomeLines(branchId: Uuid, hash: LanguageTools.ProgramTypes.Hash): List<String> =
   match Packages.Test.lastOutcome(branchId, hash) with
   | Some(Passed) -> [ Stdlib.Cli.UI.Colors.success("✓ passed (this build)") ]
@@ -343,7 +339,6 @@ let testOutcomeLines(branchId: Uuid, hash: LanguageTools.ProgramTypes.Hash): Lis
 
 /// Tests that exercise the selected function. Kept separate from `detailLines`
 /// so the Inspect page can put the action after source, access, and references.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let selectedFunctionTestRows(state: State): List<String> =
   match Stdlib.List.getAt(state.items, state.selected) with
   | Some(item) when item.kind == "fn" ->
@@ -358,7 +353,6 @@ let selectedFunctionTestRows(state: State): List<String> =
 
 
 /// <fn selectedFunctionTestRows>, from a lookup and a dependents read the caller already made.
-// @compiler blocked: upstream-dependency diagnostic="functionTestRows: Unknown type 'Packages.PackageLocation'"
 let functionTestRows(
   branchId: Uuid,
   results: LanguageTools.ProgramTypes.Search.SearchResults,
@@ -376,7 +370,6 @@ let functionTestRows(
 
 
 /// The source/detail of the currently-selected item, as lines for the Inspect pane.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let detailLines(state: State): List<String> =
   // The flat lenses carry FULL paths (owner.mod.name), so they look up by full path rather than
   // leaf-in-location the way the tree does. Values renders one kind; Changed renders whichever kind the
@@ -402,7 +395,6 @@ let detailLines(state: State): List<String> =
 
 
 /// An item's source and access block, from the lookup the caller already made for it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let itemLines(
   state: State,
   item: BodyItem,
@@ -483,7 +475,6 @@ let itemLines(
 /// The row list is filterable (`f`), so `selected` indexes the FILTERED items and not `allTopics`. Indexing
 /// straight into `allTopics` meant a narrowed Docs list previewed and opened whatever topic happened to sit at
 /// that position in the full list: filter to `terminal-ui`, get `for-ai`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let selectedDocTopic(state: State): Option<Docs.Command.Topics.DocTopic> =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> Option.None
@@ -498,7 +489,6 @@ let selectedDocTopic(state: State): Option<Docs.Command.Topics.DocTopic> =
 
 
 /// The Docs topic content for the selected row.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let docContent(state: State): String =
   match selectedDocTopic(state) with
   | Some(t) -> t.content()
@@ -507,7 +497,6 @@ let docContent(state: State): String =
 
 /// A recorded divergence's detail for the Conflicts preview. It resolves by
 /// location because the section is filterable, like `selectedBranch`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let conflictDetail(state: State): String =
   match selectedConflict(state) with
   | Some(c) ->
@@ -552,7 +541,6 @@ let conflictDetail(state: State): String =
 
 /// The selected run: where it stands, what it was given, and what it did to the world. The same
 /// answer `dark traces inspect <id>` gives, because it is the same row.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let traceDetail(state: State): String =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None ->
@@ -617,7 +605,6 @@ let traceDetail(state: State): String =
 /// The item page's first line: the kind with its glyph, the short content
 /// hash, and a deprecation mark only when it is deprecated. Nothing that is
 /// true of every item earns a word here.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let itemMeta(
   state: State,
   item: BodyItem,
@@ -686,7 +673,6 @@ let itemMeta(
 /// The traces that called the selected fn, for the `x` reader: one row per
 /// trace, newest first, or a line saying nothing has called it yet and how to
 /// change that.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let tracesText(state: State): String =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> "(nothing selected)"
@@ -730,7 +716,6 @@ let tracesText(state: State): String =
 /// highlighted. Guard on line count: highlighting re-lexes the text, and a changed line count
 /// would land colors on the wrong rows -- fall back to plain source, and say so rather than
 /// silently losing highlighting.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.highlightSourceLines: Unknown function or value 'SyntaxHighlighting.highlightCode'"
 let highlightSourceLines(page: List<String>): List<String> =
   let srcCount =
     Stdlib.List.findFirstIndex(page, fun l -> l == accessHeading)
@@ -754,7 +739,6 @@ let highlightSourceLines(page: List<String>): List<String> =
   Stdlib.List.concat(highlighted, access)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let inspectPageLines(state: State): List<String> =
   match Stdlib.List.getAt(state.items, state.selected) with
   | None -> [ Stdlib.Cli.UI.Colors.dimText("(nothing selected - browse the tree)") ]
@@ -784,7 +768,6 @@ let inspectPageLines(state: State): List<String> =
 
 
 /// The key the Code view's item page is built against; see `PreviewKey`.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let previewKey(state: State): PreviewKey =
   PreviewKey
     { view = state.activeView
@@ -800,7 +783,6 @@ let previewKey(state: State): PreviewKey =
       draftOps = state.scmStatus.ops }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let matterPageLines(state: State): List<String> =
   if state.matter.lens == Lens.ValuesOnly || state.matter.lens == Lens.Changed then
     detailLines(state)
@@ -814,7 +796,6 @@ val previewsKept = 16
 
 /// Build the item page when the Code view is showing one it has not built. Kept on the state, so
 /// the frames in between, and a move back to it, draw it rather than reading the store again.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let refreshPreview(next: State): State =
   if next.activeView != vMatter then
     { next with previews = [] }
@@ -830,7 +811,6 @@ let refreshPreview(next: State): State =
 
 /// The preview content for the selected item in the current view. One function so the preview pane, its
 /// scroll bounds, and the full-screen reader all agree. SCM previews depend on the active section.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'State'"
 let previewLines(state: State): List<String> =
   if state.activeView == vHome then
     []

@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // Parse-then-print round trips: typeDeclarations. Moved from
 // backend/tests/Tests/LibParser.RoundTrip.Tests.fs; helpers are in roundTrip.dark.
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test typeDeclarationsUnit =
   Stdlib.Test.all(
     [ roundTrip("unit", "type SimpleAlias = Unit", "type SimpleAlias = Unit")
@@ -104,7 +103,6 @@ test typeDeclarationsUnit =
         "type Person =\n  { name: String\n    age: Int64\n    hasPet: Bool\n    pet: Pet }") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test typeDeclarationsEnumTypeDeclarations =
   Stdlib.Test.all(
     [ // Enum type declarations.

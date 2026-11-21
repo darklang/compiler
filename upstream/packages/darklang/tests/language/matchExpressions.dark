@@ -29,7 +29,6 @@ test int64Patterns =
        | 999999999999999 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test uint64Patterns =
   Stdlib.Test.all(
     [ (match 6u64 with
@@ -52,7 +51,6 @@ test uint64Patterns =
        | 18446744073709551615u64 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test int8Patterns =
   Stdlib.Test.all(
     [ (match 6s8 with
@@ -76,7 +74,6 @@ test int8Patterns =
        | 127s8 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test uint8Patterns =
   Stdlib.Test.all(
     [ (match 6u8 with
@@ -99,7 +96,6 @@ test uint8Patterns =
        | 255u8 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test int16Patterns =
   Stdlib.Test.all(
     [ (match 6s16 with
@@ -123,7 +119,6 @@ test int16Patterns =
        | 32767s16 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test uint16Patterns =
   Stdlib.Test.all(
     [ (match 6u16 with
@@ -146,7 +141,6 @@ test uint16Patterns =
        | 65535u16 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test int32Patterns =
   Stdlib.Test.all(
     [ (match 6s32 with
@@ -170,7 +164,6 @@ test int32Patterns =
        | 2147483647s32 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test uint32Patterns =
   Stdlib.Test.all(
     [ (match 6u32 with
@@ -193,7 +186,6 @@ test uint32Patterns =
        | 4294967295u32 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test int128Patterns =
   Stdlib.Test.all(
     [ (match 6s128 with
@@ -217,7 +209,6 @@ test int128Patterns =
        | 170141183460469231731687303715884105727s128 -> "pass")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test uint128Patterns =
   Stdlib.Test.all(
     [ (match 6u128 with
@@ -324,7 +315,6 @@ test floatPatterns =
       |> Stdlib.Test.equal("pass: -4.7") ])
 
 // Float64 patterns use numeric equality, so either signed zero matches the first zero pattern.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test signedZeroPatterns =
   Stdlib.Test.all(
     [ (match 0.0 with
@@ -471,7 +461,6 @@ let complexSum(list: List<List<Int64>>): Int64 =
   | [[a, ...ar], [b, ...brest], ...rest] -> a + b
   | _ -> 0
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test consPatterns =
   Stdlib.Test.all(
     [ (match [ 1, 2, 3 ] with
@@ -572,7 +561,6 @@ test restPatterns =
        | _ -> (0, []))
       |> Stdlib.Test.equal((1, [ Stdlib.Option.Option.None ])) ])
 
-// @compiler xfail compile: "Tuple pattern does not match the scrutinee type" class=aot-rejection reason=aot-match-error
 test tuplePatterns =
   Stdlib.Test.all(
     [ (match (1, 'a') with
@@ -637,7 +625,6 @@ test nestedTuplePatterns =
        | _ -> "fail")
       |> Stdlib.Test.equal("pass") ])
 
-// @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
 test resultPatterns =
   Stdlib.Test.all(
     [ (match Stdlib.Result.Result.Ok(5) with
@@ -719,7 +706,6 @@ test optionPatterns =
       |> Stdlib.Test.equal("pass") ])
 
 module Errors =
-  // @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
   test noMatchingCaseRaises =
     (match "nothing matches" with
      | "not this" -> "fail")
@@ -739,7 +725,6 @@ module Errors =
      | _ -> 6)
     => raises "Uncaught exception: cond is error, wildcard"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test selectedFirstArmErrorRaises =
     (match 1 with
      | 1 -> Stdlib.Test.raiseRuntimeError("a")
@@ -747,7 +732,6 @@ module Errors =
      | var -> "fail")
     => raises "Uncaught exception: a"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test unselectedArmErrorsSkipped =
     Stdlib.Test.all(
       [ (match 1 with
@@ -761,7 +745,6 @@ module Errors =
          | var -> "fail")
         |> Stdlib.Test.equal("pass") ])
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test selectedLaterArmErrorRaises =
     (match 1 with
      | 2 -> "pass"
@@ -769,7 +752,6 @@ module Errors =
      | var -> "fail")
     => raises "Uncaught exception: a"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test fallbackArmSkipsError =
     (match 3 with
      | 2 -> "pass"
@@ -785,7 +767,6 @@ module TypeErrors =
     | PortedTwoArgs(Int64, Int64)
 
   // enum with more pattern params than actual args
-  // @compiler xfail compile: "Constructor pattern 'Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.NoArgs' has wrong field count" class=aot-rejection reason=aot-match-error
   test tooManyPatternParamsRaises =
     (match TestType.NoArgs with
      | NoArgs(_) -> "wrong number")
@@ -793,7 +774,6 @@ module TypeErrors =
       "No matching case found for value Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.NoArgs in match expression"
 
   // enum with fewer pattern params than actual args
-  // @compiler xfail compile: "Constructor pattern 'Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.OneArg' has wrong field count" class=aot-rejection reason=aot-match-error
   test tooFewPatternParamsRaises =
     (match TestType.OneArg(1) with
      | OneArg -> "wrong number")
@@ -801,21 +781,18 @@ module TypeErrors =
       "No matching case found for value Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.OneArg(1) in match expression"
 
   // A single wildcard does not match several fields; (_, _) matches both fields.
-  // @compiler xfail compile: "Constructor pattern 'Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.PortedTwoArgs' has wrong field count" class=aot-rejection reason=aot-match-error
   test singleWildcardForTwoFieldsRaises =
     (match TestType.PortedTwoArgs(1, 2) with
      | PortedTwoArgs(_) -> "wildcards allowed")
     => raises
       "No matching case found for value Darklang.Language.Tests.MatchExpressions.TypeErrors.TestType.PortedTwoArgs(1, 2) in match expression"
 
-  // @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
   test oneWildcardPerField =
     (match TestType.PortedTwoArgs(1, 2) with
      | PortedTwoArgs(_, _) -> "wildcards allowed")
     |> Stdlib.Test.equal("wildcards allowed")
 
 module GuardClause =
-  // @compiler xfail compile: "Expected TString, got TBool" class=aot-rejection reason=aot-type-error
   test guardClauses =
     Stdlib.Test.all(
       [ (match 5 with
@@ -855,14 +832,12 @@ module GuardClause =
          | _ -> "fail")
         |> Stdlib.Test.equal("pass") ])
 
-  // @compiler xfail compile: "Unbound local variable 'y'" class=aot-rejection reason=aot-name-error
   test unboundGuardVariableRaises =
     (match -5 with
      | x when y > 0 -> true
      | _ -> false)
     => raises "There is no variable named: y"
 
-  // @compiler xfail compile: "Unbound local variable 'y'" class=aot-rejection reason=aot-name-error
   test guardEdgeCases =
     Stdlib.Test.all(
       [ (match 5 with
@@ -882,7 +857,6 @@ module GuardClause =
          | Error(_) -> true)
         |> Stdlib.Test.equal(true) ])
 
-  // @compiler xfail compile: "Unbound local variable 'x'" class=aot-rejection reason=aot-name-error
   test noArmMatchesRaises =
     (match 5 with
      | 2 when x > 2 -> false
@@ -890,7 +864,6 @@ module GuardClause =
     => raises "No matching case found for value 5 in match expression"
 
 module PatternGrouping =
-  // @compiler xfail compile: "Or-pattern binding 'y' has inconsistent types" class=aot-rejection reason=aot-match-error
   test orPatterns =
     Stdlib.Test.all(
       [ (match (1,2) with
@@ -961,7 +934,6 @@ module PatternGrouping =
         |> Stdlib.Test.equal("error") ])
 
 // `p as name` matches what `p` matches and also binds the whole value to `name`.
-// @compiler xfail compile: "can't compile: uses an `as` pattern inside another pattern, which this compiler does not support" class=missing-support reason=compiler-gap
 test asPatterns =
   Stdlib.Test.all(
     [ (match Stdlib.Option.Option.Some(1) with
@@ -1007,7 +979,6 @@ test asPatterns =
       |> Stdlib.Test.equal(6) ])
 
 // An or-pattern inside a bigger pattern, and as a list element.
-// @compiler xfail compile: "can't compile: uses an or-pattern inside a list pattern, which this compiler does not support" class=missing-support reason=compiler-gap
 test nestedOrPatterns =
   Stdlib.Test.all(
     [ // names bound before the or-pattern stay bound
@@ -1051,7 +1022,6 @@ module RecordPatterns =
   let account(status: Status): Account =
     Account { owner = jo(), status = status, pos = (1, 2) }
 
-  // @compiler xfail compile: "can't compile: uses a record pattern field that is not a name, which this compiler does not support" class=missing-support reason=compiler-gap
   test fields =
     Stdlib.Test.all(
       [ (match jo() with
@@ -1075,7 +1045,6 @@ module RecordPatterns =
          | _ -> "fail")
         |> Stdlib.Test.equal("pass") ])
 
-  // @compiler xfail compile: "can't compile: uses a record pattern field that is not a name, which this compiler does not support" class=missing-support reason=compiler-gap
   test shorthand =
     Stdlib.Test.all(
       [ (match jo() with
@@ -1089,7 +1058,6 @@ module RecordPatterns =
          | _ -> "fail")
         |> Stdlib.Test.equal("Jo") ])
 
-  // @compiler xfail compile: "can't compile: uses a record pattern field that is not a name, which this compiler does not support" class=missing-support reason=compiler-gap
   test nested =
     Stdlib.Test.all(
       [ (match account(Status.Active) with

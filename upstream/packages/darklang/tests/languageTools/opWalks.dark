@@ -2,7 +2,6 @@
 // `PackageManager.duplicateDeclarations` and `UnresolvedNames.inOps`.
 module Darklang.LanguageTools.OpWalks.Tests
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.Expr'"
 let fnWithBody(
   description: String,
   body: LanguageTools.ProgramTypes.Expr)
@@ -21,7 +20,6 @@ let fnWithBody(
       bounds = [] }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.PackageFn.PackageFn'"
 let declare(
   name: String,
   fn: LanguageTools.ProgramTypes.PackageFn.PackageFn)
@@ -34,13 +32,11 @@ let declare(
       Stdlib.Option.Option.None) ]
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.Expr'"
 let one(): LanguageTools.ProgramTypes.Expr =
   LanguageTools.ProgramTypes.Expr.EInt64(1, 1)
 
 
 /// A call to <param name>, which resolves to nothing.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Darklang.LanguageTools.ProgramTypes.Expr'"
 let unresolvedCall(name: String): LanguageTools.ProgramTypes.Expr =
   LanguageTools.ProgramTypes.Expr.EFnName(
     1,
@@ -55,7 +51,6 @@ let unresolvedCall(name: String): LanguageTools.ProgramTypes.Expr =
 
 // One name declared twice is reported once, with its kind; stabilization keys by
 // name, so such a batch would store one body under the other's hash.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.PackageManager.duplicateDeclarations'" class=missing-support reason=upstream-dependency
 test oneNameTwiceIsADuplicate =
   LanguageTools.PackageManager.duplicateDeclarations(
     Stdlib.List.concat(
@@ -64,7 +59,6 @@ test oneNameTwiceIsADuplicate =
   |> Stdlib.Test.equal([ "fn Test.Dup.twice" ])
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.PackageManager.duplicateDeclarations'" class=missing-support reason=upstream-dependency
 test twoNamesAreNotADuplicate =
   LanguageTools.PackageManager.duplicateDeclarations(
     Stdlib.List.concat(
@@ -74,7 +68,6 @@ test twoNamesAreNotADuplicate =
 
 
 // Each name once, in the order first found, against the content hash.
-// @compiler xfail compile: "Unknown type 'LanguageTools.ProgramTypes.Expr'" class=missing-support reason=upstream-dependency
 test unresolvedNamesAreCollectedOnce =
   let body =
     LanguageTools.ProgramTypes.Expr.EStatement(
@@ -89,7 +82,6 @@ test unresolvedNamesAreCollectedOnce =
   |> Stdlib.Test.equal([ ("h1", [ "Stdlib.List.hed", "Nope.x" ]) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.UnresolvedNames.inOps'" class=missing-support reason=upstream-dependency
 test anOpWithNothingUnresolvedIsLeftOut =
   declare("f", fnWithBody("h1", one()))
   |> LanguageTools.UnresolvedNames.inOps

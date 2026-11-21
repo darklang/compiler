@@ -30,7 +30,6 @@ let fromCall(input: String): Stdlib.Result.Result<Int64, Stdlib.Int64.ParseError
 
 let bomb(): Int64 = Builtin.unwrap(Error("should not execute"))
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.Unwrap.argumentOrder: Operator is unavailable for this type"
 let argumentOrder(
   first: Stdlib.Result.Result<Int64, String>)
   : Stdlib.Result.Result<Int64, String> =
@@ -61,7 +60,6 @@ test differentSuccessType =
       fromCall("invalid")
       |> Stdlib.Test.equal(Error(Stdlib.Int64.ParseError.BadFormat)) ])
 
-// @compiler xfail compile: "Unknown function or value 'argumentOrder'" class=missing-support reason=upstream-dependency
 test skipsLaterArguments =
   Stdlib.Test.all(
     [ argumentOrder(Error("first")) |> Stdlib.Test.equal(Error("first"))
@@ -136,7 +134,6 @@ test chained =
 
 // Evaluate the operand once. An error skips later effects without undoing earlier ones.
 module EvaluationCounts =
-  // @compiler blocked: test-counter diagnostic="Darklang.Language.Tests.Unwrap.EvaluationCounts.counted: Unknown function or value 'Stdlib.Test.incrementCounter'"
   let counted(
     value: Stdlib.Result.Result<Int64, String>)
     : Stdlib.Result.Result<Int64, String> =
@@ -144,13 +141,11 @@ module EvaluationCounts =
     let _ = Stdlib.Test.incrementCounter()
     Ok(number)
 
-  // @compiler xfail compile: "Unknown function or value 'counted'" class=missing-support reason=upstream-dependency
   test okRunsBothEffects =
     (let outcome = counted(Ok(7))
      (outcome, Stdlib.Test.counterValue()))
     |> Stdlib.Test.equal((Ok(7), 2))
 
-  // @compiler xfail compile: "Unknown function or value 'counted'" class=missing-support reason=upstream-dependency
   test errorSkipsLaterEffect =
     (let outcome = counted(Error("stop"))
      (outcome, Stdlib.Test.counterValue()))
@@ -225,19 +220,16 @@ test libraryCallAfterUnwrap =
 
 // This function declares an Option return but unwraps a Result.
 // If run without static checking, `?` rejects both Ok and Error at runtime.
-// @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.Unwrap.wrongKind: Expected TSum\n(\"Darklang.Stdlib.Option.Option\",\n [TInferenceVar (\"t$constraint_-31039_0\", \"t$constraint_-31039_0\")]), got TSum (\"Darklang.Stdlib.Result.Result\", [TInt; TString])"
 let wrongKind(
   value: Stdlib.Result.Result<Int64, String>)
   : Stdlib.Option.Option<Int64> =
   Some(value?)
 
-// @compiler xfail compile: "Unknown function or value 'wrongKind'" class=missing-support reason=upstream-dependency
 test wrongKindOkRaises =
   wrongKind(Ok(1))
   => raises
     "`?` got a Result (Ok(1)), but the enclosing function or lambda returns an Option; convert it first with Stdlib.Result.toOption"
 
-// @compiler xfail compile: "Unknown function or value 'wrongKind'" class=missing-support reason=upstream-dependency
 test wrongKindErrorRaises =
   wrongKind(Error("x"))
   => raises
@@ -378,38 +370,32 @@ test recursiveNone =
   countdown(3) |> Stdlib.Test.equal(None)
 
 // `?` rejects an Int64 operand at runtime.
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test intOperandRaises =
   (fun v -> Some(v? + 1))(4)
   => raises "`?` needs an Option or Result, but got 4 (an Int64)"
 
 // Final Some/None or Ok/Error expressions identify the lambda's return type.
 // `?` then rejects Result operands for Option returns, and vice versa.
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test resultInOptionLambdaRaises =
   (fun v -> Some(v? + 1))(Error("x"))
   => raises
     "`?` got a Result (Error(\"x\")), but the enclosing function or lambda returns an Option; convert it first with Stdlib.Result.toOption"
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test okInOptionLambdaRaises =
   (fun v -> Some(v? + 1))(Ok(1))
   => raises
     "`?` got a Result (Ok(1)), but the enclosing function or lambda returns an Option; convert it first with Stdlib.Result.toOption"
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test optionInResultLambdaRaises =
   (fun v -> Ok(v? + 1))(None)
   => raises
     "`?` got an Option (None), but the enclosing function or lambda returns a Result; convert it first with Stdlib.Option.toResult"
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test resultInIfOptionLambdaRaises =
   (fun v -> if true then Some(v?) else None)(Ok(1))
   => raises
     "`?` got a Result (Ok(1)), but the enclosing function or lambda returns an Option; convert it first with Stdlib.Result.toOption"
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test optionInMatchResultLambdaRaises =
   (fun v ->
     match v with
@@ -428,6 +414,5 @@ test innerLambdaResult =
 // Without static checking, the lambda can therefore return Error from `?`.
 let wrap(x: Int64): Stdlib.Option.Option<Int64> = Some(x)
 
-// @compiler xfail compile: "Expected TSum" class=missing-support reason=compiler-gap
 test errorThroughUnknownReturn =
   (fun v -> wrap(v?))(Error("x")) |> Stdlib.Test.equal(Error("x"))

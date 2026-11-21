@@ -4,7 +4,6 @@ module Darklang.Cli.Tests.SearchDefaults
 // its impl, and test helpers are left out and counted.
 // A trait method is listed with its impl, as the call, even when only the method's own name
 // matched the query.
-// @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test searchListsNoImplMethodAsAFunction =
   let found = Cli.Tests.TestSuite.runWithCommand([ "search", "Int64.display" ])
   if
@@ -18,7 +17,6 @@ test searchListsNoImplMethodAsAFunction =
 
 
 // `docs signatures` leaves out test helpers the same way.
-// @compiler blocked: interpreter-fixture diagnostic="Requires an isolated interpreter CLI and store fixture (./scripts/run-cli or DARK_CLI_UNDER_TEST); the compiler test harness does not provide it."
 test signaturesHideTestModules =
   let plain =
     Cli.Tests.TestSuite.runWithBothStreams(

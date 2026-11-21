@@ -11,7 +11,6 @@ module Darklang.SCM.Tests.Propagation
 // The two F# unit tests of the AST rewriter and the dependency extractor stay in
 // `Propagation.Tests.fs`: they build synthetic hashes no source can produce.
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aDependentRepointsWhenItsDependencyMoves =
   let m = "PropTestHop"
   let setup =
@@ -34,7 +33,6 @@ test aDependentRepointsWhenItsDependencyMoves =
 
 
 // A call that appears only in a dictionary KEY is still an edge the cascade follows.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aFunctionCalledOnlyInADictionaryKeyFollowsEdits =
   let m = "PropTestDictionaryKey"
   let setup =
@@ -56,7 +54,6 @@ test aFunctionCalledOnlyInADictionaryKeyFollowsEdits =
 
 // b moves because a did; c moves because b did. Stopping at b would leave c calling a
 // version of b nothing points at.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test theCascadeIsTransitive =
   let m = "PropTestChain"
   let setup =
@@ -75,7 +72,6 @@ test theCascadeIsTransitive =
       Authoring.moved(cBefore, Authoring.fnHash(m, "c")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test everyDependentMovesNotJustTheFirst =
   let m = "PropTestFan"
   let setup =
@@ -94,7 +90,6 @@ test everyDependentMovesNotJustTheFirst =
 
 
 // A caller under another owner follows too, and so does what calls it back from ours.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test theCascadeCrossesOwners =
   let m = "PropTestOwner"
   let setup =
@@ -132,7 +127,6 @@ test theCascadeCrossesOwners =
 
 // from == to: nothing changed. A cascade here would author a new version of every
 // dependent for no reason, and those ops live in the log forever.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aSourceThatDidNotMoveRepointsNothing =
   let m = "PropTestNoop"
   let setup =
@@ -153,7 +147,6 @@ test aSourceThatDidNotMoveRepointsNothing =
 
 // Whichever side is parsed first has a forward reference. If SCC-aware hashing got this
 // wrong the save would fail, or the two would keep re-hashing each other.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test aMutuallyRecursivePairAuthors =
   let m = "PropTestMutual"
   let setup =
@@ -173,7 +166,6 @@ test aMutuallyRecursivePairAuthors =
 
 // Three edits with no commit between, each cascading. The dependent must end on the LAST
 // version of `r`, and depend on no intermediate one.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test afterSeveralEditsTheDependentLandsOnTheFinalVersion =
   let m = "PropTestFinal"
   let setup =
@@ -226,7 +218,6 @@ test afterSeveralEditsTheDependentLandsOnTheFinalVersion =
 // `sh2`, which still means what it meant, so today it does NOT move: the cascade follows
 // the name a caller wrote, not the hash. If the crosswire decision changes that, this is
 // the test that has to change with it.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test identicalContentAtTwoNamesRepointsOnlyTheEditedNamesCallers =
   let m = "PropTestShared"
   let setup =
@@ -257,7 +248,6 @@ test identicalContentAtTwoNamesRepointsOnlyTheEditedNamesCallers =
 
 // `g`'s first body is the same as `same`'s. `f` moved off that body when `g` was edited,
 // so editing `same` later must leave `f` alone.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test editingAnItemThatSharedACallersOldDependencyLeavesTheCallerAlone =
   let m = "PropTestFormerTwin"
   let setup =
@@ -287,7 +277,6 @@ test editingAnItemThatSharedACallersOldDependencyLeavesTheCallerAlone =
 
 // A repoint records that it FOLLOWED, which is how `dark status` and `dark commit` tell
 // what you edited from what came along.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Propagation.repointIsReportedAsFollowedOnMain: Unknown function or value 'Authoring.authorAll'"
 let repointIsReportedAsFollowedOnMain(unit: Unit): Stdlib.Test.Result =
   let m = "PropTestProv"
   let setup =
@@ -318,7 +307,6 @@ let repointIsReportedAsFollowedOnMain(unit: Unit): Stdlib.Test.Result =
       |> Stdlib.Test.equal(false) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test aRepointIsReportedAsFollowed =
   // Run on main because the fixtures write to main.
   let defaults = Stdlib.Test.Process.defaults()
@@ -340,7 +328,6 @@ test aRepointIsReportedAsFollowed =
 // Propagating an edit that already propagated authors nothing. `dark commit` runs this
 // second pass, and a repeat SetName in one draft makes `Draft.collapse` drop the binding
 // the fold recorded, relisting the pre-edit version.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test propagatingAnAlreadyPropagatedEditAuthorsNothing =
   let m = "PropTestSecondPass"
   let setup =
@@ -364,7 +351,6 @@ test propagatingAnAlreadyPropagatedEditAuthorsNothing =
 
 
 // Propagation is kind-specific throughout, so a fn's coverage says nothing about a type's.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aFnUsingATypeRepointsWhenTheTypeMoves =
   let m = "PropTestType"
   let ty = LanguageTools.ProgramTypes.ItemKind.Type
@@ -388,7 +374,6 @@ test aFnUsingATypeRepointsWhenTheTypeMoves =
       Authoring.moved(mkBefore, Authoring.fnHash(m, "mk")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aFnReadingAValueRepointsWhenTheValueMoves =
   let m = "PropTestValue"
   let vk = LanguageTools.ProgramTypes.ItemKind.Value
@@ -414,7 +399,6 @@ test aFnReadingAValueRepointsWhenTheValueMoves =
 
 // A test is a graph leaf, but it follows what it exercises: a new hash is what makes a
 // cached result miss, so only affected tests rerun.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test aTestGetsANewHashWhenAFnItUsesMoves =
   let m = "PropTestPackageTest"
   let tk = LanguageTools.ProgramTypes.ItemKind.Test
@@ -439,7 +423,6 @@ test aTestGetsANewHashWhenAFnItUsesMoves =
 
 // There is no rename op. A SetName binds its own name and leaves every other name for the
 // hash alone, or renaming yours would take out a colleague's.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test aSetNameAtANewNameLeavesTheOldNameBound =
   let m = "RenameKeep"
   let setup = Authoring.author(m, "let old(x: Int64): Int64 = x")
@@ -468,7 +451,6 @@ test aSetNameAtANewNameLeavesTheOldNameBound =
 // Two names, one body, one caller each, and the callers are the same content too, so the
 // second caller's Add is an op the log already holds. Its edge still has to be recorded
 // under the name it used, or `deps usedby` on the second name says nobody calls it.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test aCallerOfEitherNameOfOneBodyIsFoundByThatName =
   let fn = LanguageTools.ProgramTypes.ItemKind.Fn
   let setup =

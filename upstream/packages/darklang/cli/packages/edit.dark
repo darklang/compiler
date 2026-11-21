@@ -29,7 +29,6 @@ let moduleArgFor(loc: LanguageTools.ProgramTypes.PackageLocation): String =
 
 
 /// The PT location inside whatever the traversal resolved, or None for a module.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let itemLocation(location: PackageLocation): Option<LanguageTools.ProgramTypes.PackageLocation> =
   match location with
   | Module(_) -> Option.None
@@ -42,7 +41,6 @@ let itemLocation(location: PackageLocation): Option<LanguageTools.ProgramTypes.P
 
 
 /// Hand the file to `dark module`, which validates and applies it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let applyFile(
   state: AppState,
   loc: LanguageTools.ProgramTypes.PackageLocation,
@@ -53,7 +51,6 @@ let applyFile(
 
 /// After an edit lands: the runs that went through this function, if any. A replay recomputes
 /// every pure value from the code as it is now, so this is the moment they are most useful.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let printTraceHint(state: AppState, location: PackageLocation): Unit =
   View.printTraceHintWith(state.currentBranchId, location, " for the new code's values")
 
@@ -154,7 +151,6 @@ let patchSource(source: String, patch: String): Result<String, String> =
 
 
 /// Explain a patch failure and print the current raw declaration for retry.
-// @compiler blocked: upstream-dependency diagnostic="reportPatchFailure: Unknown type 'AppState'"
 let reportPatchFailure(
   state: AppState,
   name: String,
@@ -173,7 +169,6 @@ let reportPatchFailure(
 
 
 /// Read a patch from stdin and send the result through the normal edit path.
-// @compiler blocked: upstream-dependency diagnostic="applyPatch: Unknown type 'AppState'"
 let applyPatch(
   state: AppState,
   location: PackageLocation,
@@ -213,7 +208,6 @@ let applyPatch(
         updatedState
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let branchId = state.currentBranchId
   let usePatch = Stdlib.List.contains(args, "--patch")
@@ -356,7 +350,6 @@ let execute(state: AppState, args: List<String>): AppState =
                         result
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "  dark edit <name>           open $EDITOR on the declaration, apply on save"
@@ -421,6 +414,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   View.complete(state, args)

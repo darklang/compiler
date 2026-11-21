@@ -5,19 +5,16 @@ module Darklang.Stdlib.String
 // exact bytes.
 
 /// Returns a string containing a single '\n'
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.newline reason=compiler-implementation
 val newline = "\n"
 
 
 /// Returns {{true}} if <param s> is the empty string {{""}}
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.isEmpty reason=compiler-implementation
 let isEmpty(s: String): Bool =
   Builtin.stringIsEmpty(s)
 
 
 /// Iterate over each Char (EGC, not byte) in the string, performing the
 /// operation in <param fn> on each one.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.map reason=compiler-implementation
 let map(s: String, fn: Char -> Char): String =
   s
   |> toList
@@ -60,14 +57,12 @@ let flatMap(s: String, fn: Char -> String): String =
 
 
 /// Returns the list of Characters (EGC, not byte) in the string
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.toList reason=compiler-implementation
 let toList(s: String): List<Char> =
   Builtin.stringToList(s)
 
 
 /// Replace every <param searchFor> in <param s> with <param replaceWith>. Matches
 /// whole Chars (EGC, not byte) only: replacing {{"👍"}} leaves {{"👍🏽"}} alone.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.replaceAll reason=compiler-implementation
 let replaceAll(s: String, searchFor: String, replaceWith: String): String =
   Builtin.stringReplaceAll(s, searchFor, replaceWith)
 
@@ -79,7 +74,6 @@ let replaceAll(s: String, searchFor: String, replaceWith: String): String =
 /// Turkish {{"İ"}}. Characters with no case, emoji among them, are left as they are.
 /// <fn Stdlib.Char.toUppercase> maps one Char to one Char instead, and leaves
 /// {{'ß'}} alone.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.toUppercase reason=compiler-implementation
 let toUppercase(s: String): String =
   Builtin.stringToUppercase(s)
 
@@ -89,7 +83,6 @@ let toUppercase(s: String): String =
 /// Turkish {{"ı"}}, and {{"İ"}} becomes {{"i̇"}}, an i and a combining dot. A Greek
 /// {{"Σ"}} that ends a word becomes the final {{"ς"}}: {{"ΟΔΟΣ"}} is {{"οδος"}}.
 /// <fn Stdlib.Char.toLowercase> maps one Char to one Char instead.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.toLowercase reason=compiler-implementation
 let toLowercase(s: String): String =
   Builtin.stringToLowercase(s)
 
@@ -104,19 +97,16 @@ let capitalize(s: String): String =
 
 
 /// Returns the length of the string
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.length reason=compiler-implementation
 let length(s: String): Int64 =
   Builtin.stringLength(s)
 
 
 /// Return the Unicode codepoints in <param s>.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.toCodepoints reason=compiler-implementation
 let toCodepoints(s: String): List<UInt32> =
   Builtin.stringToCodepoints(s)
 
 
 /// Return the number of Unicode codepoints in <param s>.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.codepointLength reason=compiler-implementation
 let codepointLength(s: String): Int64 =
   Builtin.stringCodepointLength(s)
 
@@ -130,7 +120,6 @@ let codepointLength(s: String): Int64 =
 /// A property of the text rather than of any one medium, so the answer is the same in a terminal, a
 /// monospaced buffer or a fixed-width report. Plain text only: escape sequences aren't text, and
 /// `Cli.Tui.Text` handles rows that carry them.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.displayWidth reason=compiler-implementation
 let displayWidth(s: String): Int64 =
   Builtin.stringDisplayWidth(s)
 
@@ -139,29 +128,23 @@ let displayWidth(s: String): Int64 =
 ///
 /// Names the builtin rather than interpolating, because this is what `"a" + "b"` runs through
 /// (`impl Add for String` below) and the interpreter answers the builtin without a call.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.append reason=compiler-implementation
 let append(s1: String, s2: String): String =
   Builtin.stringAppend(s1, s2)
 
 
 /// `"a" + "b"` is `"ab"`
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Add for String requires an explicit replacement contract"
 impl Add for String =
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Add for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Add for String requires an explicit replacement contract"
   let add = Stdlib.String.append
 
 
 /// ...and the empty string is what `+` starts from
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Zero for String requires an explicit replacement contract"
 impl Zero for String =
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Zero for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Zero for String requires an explicit replacement contract"
   let zero(): String =
     ""
 
 
 /// Concatenates the two strings by prepending <param s2> to <param s1> and
 /// returns the joined string
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.prepend reason=compiler-implementation
 let prepend(s1: String, s2: String): String =
   s2 + s1
 
@@ -174,7 +157,6 @@ let prepend(s1: String, s2: String): String =
 ///
 /// Was a builtin until `Stdlib.Regex` existed; its own comment had said for years that this
 /// belonged here. The vertical tab is called out separately because `\s` does not cover it.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.slugify reason=compiler-implementation
 let slugify(s: String): String =
   let lowered = toLowercase(s)
   let slug =
@@ -187,14 +169,12 @@ let slugify(s: String): String =
 
 
 /// Reverses <param string>
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.reverse reason=compiler-implementation
 let reverse(string: String): String =
   Builtin.stringReverse(string)
 
 
 /// Splits a string at the separator, returning a list of strings without the separator.
 /// If the separator is not present, returns a list containing only the initial string.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.split reason=compiler-implementation
 let split(string: String, separator: String): List<String> =
   Builtin.stringSplit(string, separator)
 
@@ -203,7 +183,6 @@ let split(string: String, separator: String): List<String> =
 /// {{Some (before, after)}}. Unlike {{split}}, the {{after}} half retains any further
 /// occurrences of the separator — useful for parsing `key=value` rows where the value
 /// may itself contain `=`. Returns {{None}} if the separator is empty or not found.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.splitFirst reason=compiler-implementation
 let splitFirst(string: String, separator: String): Option<(String * String)> =
   if separator == "" then
     Option.None
@@ -238,7 +217,6 @@ let splitLast(string: String, separator: String): Option<(String * String)> =
 /// useful for parsing rows of structured data where the value field may contain
 /// the separator. If <param n> <= 1, the separator is empty, or the separator
 /// is not found, returns {{[string]}} unchanged.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.splitN reason=compiler-implementation
 let splitN(string: String, separator: String, n: Int64): List<String> =
   if n <= 1 || separator == "" then
     [ string ]
@@ -252,26 +230,22 @@ let splitN(string: String, separator: String, n: Int64): List<String> =
 
 
 /// Combines a list of strings with the provided separator
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.join reason=compiler-implementation
 let join(l: List<String>, separator: String): String =
   Builtin.stringJoin(l, separator)
 
 
 /// Returns the list of characters as a string
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.fromList reason=compiler-implementation
 let fromList(lst: List<Char>): String =
   join(List.map(lst, fun c -> display(c)), "")
 
 
 /// Converts a <type Char> to a <type String>
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.fromChar reason=compiler-implementation
 let fromChar(c: Char): String =
   display(c)
 
 
 /// Generate a random alphanumeric <type String> of length <param length>.
 /// Charset is {{[A-Za-z0-9]}} (62 chars). Errors if <param length> is negative.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.random reason=compiler-implementation
 let random(length: Int64): Result<String, String> =
   if length < 0 then
     Result.Error($"Expected `length` to be positive, but it was `{length |> display}`")
@@ -291,14 +265,12 @@ let random(length: Int64): Result<String, String> =
 
 /// Checks if <param lookingIn> contains <param searchingFor> as whole Chars (EGC, not
 /// byte): {{contains "👍🏽" "👍"}} is {{false}}, and so is finding half of a flag.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.contains reason=compiler-implementation
 let contains(lookingIn: String, searchingFor: String): Bool =
   Builtin.stringContains(lookingIn, searchingFor)
 
 
 /// Returns the substring of <param string> between the <param from> and <param to> indices.
 /// Negative indices start counting from the end of <param string>.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.slice reason=compiler-implementation
 let slice(string: String, from: Int64, to: Int64): String =
   Builtin.stringSlice(string, from, to)
 
@@ -306,7 +278,6 @@ let slice(string: String, from: Int64, to: Int64): String =
 /// Returns the first <param characterCount> characters of <param string>, as a <type String>.
 /// If <param characterCount> is longer than <param string>, returns <param string>.
 /// If <param characterCount> is negative, returns the empty string.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.first reason=compiler-implementation
 let first(string: String, characterCount: Int64): String =
   if characterCount < 0 then
     ""
@@ -319,7 +290,6 @@ let first(string: String, characterCount: Int64): String =
 /// Returns the last <param characterCount> characters of <param string>, as a <type String>.
 /// If <param characterCount> is longer than <param string>, returns <param string>.
 /// If <param characterCount> is negative, returns the empty string.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.last reason=compiler-implementation
 let last(string: String, characterCount: Int64): String =
   let len = length(string)
   if characterCount < 0 then
@@ -333,7 +303,6 @@ let last(string: String, characterCount: Int64): String =
 /// Returns all but the last <param characterCount> characters of <param string>, as a <type String>.
 /// If <param characterCount> is longer than <param string>, returns the empty string.
 /// If <param characterCount> is negative, returns <param string>.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.dropLast reason=compiler-implementation
 let dropLast(string: String, characterCount: Int64): String =
   let len = length(string)
   if characterCount < 0 then
@@ -347,7 +316,6 @@ let dropLast(string: String, characterCount: Int64): String =
 /// Returns all but the first <param characterCount> characters of <param string>, as a <type String>.
 /// If <param characterCount> is longer than <param string>, returns the empty string.
 /// If <param characterCount> is negative, returns <param string>.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.dropFirst reason=compiler-implementation
 let dropFirst(string: String, characterCount: Int64): String =
   Builtin.stringDropFirst(string, characterCount)
 
@@ -359,7 +327,6 @@ let dropFirst(string: String, characterCount: Int64): String =
 /// 2147483647, returns an unchanged copy of <param string>.
 ///
 /// Counts characters, not display cells. To line up columns of text, use `Stdlib.Text.padStartToWidth`.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.padStart reason=compiler-implementation
 let padStart(string: String, padWith: Char, goalLength: Int64): String =
   let padCount = goalLength - length(string)
   if padCount <= 0 then
@@ -375,7 +342,6 @@ let padStart(string: String, padWith: Char, goalLength: Int64): String =
 /// 2147483647, returns an unchanged copy of <param string>.
 ///
 /// Counts characters, not display cells. To line up columns of text, use `Stdlib.Text.padEndToWidth`.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.padEnd reason=compiler-implementation
 let padEnd(string: String, padWith: Char, goalLength: Int64): String =
   let padCount = goalLength - length(string)
   if padCount <= 0 then
@@ -389,7 +355,6 @@ let padEnd(string: String, padWith: Char, goalLength: Int64): String =
 /// removed. 'whitespace' here means all Unicode characters with the
 /// {{White_Space}} property, which includes {{" "}}, {{"\t"}} and
 /// {{"\n"}}.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.trim reason=compiler-implementation
 let trim(str: String): String =
   Builtin.stringTrim(str)
 
@@ -398,7 +363,6 @@ let trim(str: String): String =
 /// Returns a copy of <param str> with all leading whitespace removed. 'whitespace'
 /// here means all Unicode characters with the {{White_Space}} property, which
 /// includes {{" "}}, {{"\t"}} and {{"\n"}}.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.trimStart reason=compiler-implementation
 let trimStart(str: String): String =
   Builtin.stringTrimStart(str)
 
@@ -407,26 +371,22 @@ let trimStart(str: String): String =
 /// Returns a copy of <param str> with all trailing whitespace removed.
 /// 'whitespace' here means all Unicode characters with the {{White_Space}}
 /// property, which includes {{" "}}, {{"\t"}} and {{"\n"}}.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.trimEnd reason=compiler-implementation
 let trimEnd(str: String): String =
   Builtin.stringTrimEnd(str)
 
 
 /// Return the byte at <param index> in <param str>'s UTF-8 encoding.
 /// Returns {{None}} when <param index> is outside the encoding.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.getByteAt reason=compiler-implementation
 let getByteAt(str: String, index: Int64): Option<UInt8> =
   Builtin.stringGetByteAt(str, index)
 
 
 /// Checks if <param subject> starts with <param prefix>
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.startsWith reason=compiler-implementation
 let startsWith(subject: String, prefix: String): Bool =
   Builtin.stringStartsWith(subject, prefix)
 
 
 /// Checks if <param subject> ends with <param suffix>
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.endsWith reason=compiler-implementation
 let endsWith(subject: String, suffix: String): Bool =
   Builtin.stringEndsWith(subject, suffix)
 
@@ -458,7 +418,6 @@ let stripSuffix(subject: String, suffix: String): Option<String> =
 /// Chars (EGC, not byte) like {{length}}, {{slice}} and {{dropFirst}}. Returns {{None}}
 /// if <param searchFor> does not occur. Matches whole Chars only: {{"👍"}} is not found
 /// in {{"👍🏽"}}.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.indexOf reason=compiler-implementation
 let indexOf(str: String, searchFor: String): Option<Int64> =
   let idx = Builtin.stringIndexOf(str, searchFor)
   if idx == -1 then Option.None else Option.Some(idx)
@@ -467,7 +426,6 @@ let indexOf(str: String, searchFor: String): Option<Int64> =
 /// Returns {{Some index}} of the last <param searchFor> in <param str>, counted in Chars
 /// (EGC, not byte). Returns {{None}} if <param searchFor> does not occur. Matches whole
 /// Chars only, as <fn indexOf> does.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.lastIndexOf reason=compiler-implementation
 let lastIndexOf(str: String, searchFor: String): Option<Int64> =
   let lastIndex = Builtin.stringLastIndexOf(str, searchFor)
   if lastIndex == -1 then Option.None else Option.Some(lastIndex)
@@ -475,7 +433,6 @@ let lastIndexOf(str: String, searchFor: String): Option<Int64> =
 
 /// Returns <param string> repeated <param count> times, or {{""}} if <param count>
 /// is 0 or less. Use <fn String.checkedRepeat> to get an error for a negative count.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.repeat reason=compiler-implementation
 let repeat(string: String, count: Int64): String =
   Builtin.stringRepeat(string, count)
 
@@ -500,7 +457,6 @@ let checkedRepeat(string: String, count: Int64): Result<String, RepeatError> =
 
 /// Splits the given <param str> at each line ending (LF or CRLF) and returns a
 /// list of substrings. If the <param str> is empty, it returns an empty list.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.splitOnNewline reason=compiler-implementation
 let splitOnNewline(str: String): List<String> =
   // CRLF is one grapheme cluster, so `split` on "\n" never sees inside it.
   if str == "" then
@@ -512,7 +468,6 @@ let splitOnNewline(str: String): List<String> =
 
 
 /// Returns {{Some char}} of the first character of <param str>, or returns {{None}} if <param str> is empty.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.head reason=compiler-implementation
 let head(str: String): Option<Char> =
   str
   |> slice(0, 1)
@@ -522,7 +477,6 @@ let head(str: String): Option<Char> =
 
 /// Returns {{Some c}} for the character at <param index> (0-based, EGC, not
 /// byte), or {{None}} if <param index> is negative or past the end.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.charAt reason=compiler-implementation
 let charAt(str: String, index: Int64): Option<Char> =
   // `slice` counts a negative index from the end, so it is ruled out first. No string is long
   // enough to reach the index where `index + 1` overflows.
@@ -542,34 +496,26 @@ let charAt(str: String, index: Int64): Option<Char> =
 /// are equal, positive when <param b> does. Only the sign is meaningful. Code point
 /// order is also UTF-8 byte order. It is not language-aware, so two machines order the
 /// same pair the same way.
-// @compiler replace: packages/darklang/stdlib/string.dark#Darklang.Stdlib.String.compare reason=compiler-implementation
 let compare(a: String, b: String): Int64 =
   Builtin.stringCompare(a, b)
 
 
 /// `"a" < "b"`, and with it `Stdlib.max`, `min` and `clamp` on Strings.
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Compare for String requires an explicit replacement contract"
 impl Compare for String =
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Compare for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Compare for String requires an explicit replacement contract"
   let lessThan(a: String, b: String): Bool =
     compare(a, b) < 0
 
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Compare for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Compare for String requires an explicit replacement contract"
   let lessThanOrEqualTo(a: String, b: String): Bool =
     compare(a, b) <= 0
 
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Compare for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Compare for String requires an explicit replacement contract"
   let greaterThan(a: String, b: String): Bool =
     compare(a, b) > 0
 
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Compare for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Compare for String requires an explicit replacement contract"
   let greaterThanOrEqualTo(a: String, b: String): Bool =
     compare(a, b) >= 0
 
 
 /// A String is already text
-// @compiler blocked: container-adaptation diagnostic="Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Display for String requires an explicit replacement contract"
 impl Display for String =
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.String.impl Display for String: Already selected from packages/darklang/stdlib/string.dark; importing another declaration of Darklang.Stdlib.String.impl Display for String requires an explicit replacement contract"
   let display(s: String): String =
     s

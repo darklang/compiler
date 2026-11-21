@@ -20,7 +20,6 @@ let inner(region: Layout.Region): Layout.Region =
 /// just the pill.
 ///
 /// Returns spans; colour codes carry no width (clipping goes through `Tui.Text`).
-// @compiler blocked: compiler-timeout diagnostic="SSA inlining of 'Darklang.Stdlib.Cli.UI.Box.draw' exceeded 90s during native library validation"
 let draw(region: Layout.Region, title: String, focus: Focus): List<Layout.Span> =
   let focused = focus == Focus.Focused
   let color = if focused then Colors.purple else Colors.brightBlack
@@ -88,7 +87,6 @@ let draw(region: Layout.Region, title: String, focus: Focus): List<Layout.Span> 
 
 /// Draw a box and render content into its inner region in one call. <param focus> picks the
 /// bright/dim border.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.Box.panel: Unknown function or value 'draw'"
 let panel(
   region: Layout.Region,
   title: String,

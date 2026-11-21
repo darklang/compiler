@@ -26,7 +26,6 @@ module Topics =
       subtopics: List<DocTopic> }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.allTopics: Unknown function or value 'Docs.Syntax.content'"
   let allTopics(): List<DocTopic> =
     [ DocTopic
         { name = "for-ai"
@@ -317,7 +316,6 @@ module Topics =
     |> Stdlib.String.join("\n")
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.findTopic: Unknown function or value 'allTopics'"
   let findTopic(name: String): Option<DocTopic> =
     let topics = allTopics()
     let lowerName = Stdlib.String.toLowercase(name)
@@ -334,7 +332,6 @@ module Topics =
 
   /// A topic printed from its text, so it can be read together with others.
   /// `signatures` renders from the store and runs on its own.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.findStaticTopic: Unknown function or value 'findTopic'"
   let findStaticTopic(name: String): Option<DocTopic> =
     let live = [ "signatures", "sigs", "api" ]
     if Stdlib.List.contains(live, Stdlib.String.toLowercase(name)) then
@@ -343,7 +340,6 @@ module Topics =
       findTopic(name)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Docs.Command.Topics.formatTopicList: Unknown function or value 'allTopics'"
   let formatTopicList(): String =
     let topics = allTopics()
     let lines =
@@ -375,7 +371,6 @@ module Topics =
 
 // Topics that don't render from static text — they delegate to a live command
 // with access to AppState. Returns Some new-state if `name` is a live topic.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let dispatchLive(state: AppState, name: String, rest: List<String>): Option<AppState> =
   let lower = Stdlib.String.toLowercase(name)
   match lower with
@@ -387,7 +382,6 @@ let dispatchLive(state: AppState, name: String, rest: List<String>): Option<AppS
   | _ -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -468,7 +462,6 @@ let execute(state: AppState, args: List<String>): AppState =
         failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ Stdlib.Cli.UI.Colors.info("Usage: ") + Stdlib.Cli.UI.Colors.command("docs [topic]")
     "Browse in-CLI documentation."
@@ -487,7 +480,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] ->

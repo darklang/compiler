@@ -1,12 +1,10 @@
 /// Inspect what code might do without running it.
 module Darklang.Cli.Effects
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Effects.reasons: Unknown function or value 'Builtin.pmFnEffectReasons'"
 let reasons(hash: String): (Bool * List<(LanguageTools.Permissions.Effect * List<String>)>) =
   Builtin.pmFnEffectReasons(hash)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [name] ->
@@ -35,11 +33,9 @@ let execute(state: AppState, args: List<String>): AppState =
     failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   "Usage: effects <function>\nShow possible effects and the calls that cause them, without running code.\nExample: effects Me.reports.report\nSee allowed access with: permissions show Me.reports.report"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

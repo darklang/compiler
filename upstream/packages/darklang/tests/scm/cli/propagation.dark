@@ -3,7 +3,6 @@
 /// The helpers are in `helpers.dark`.
 module Darklang.SCM.Tests.Cli
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test savingAFunctionRepointsItsCallers =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -25,7 +24,6 @@ test savingAFunctionRepointsItsCallers =
       draftIsEmpty(dark, "both commit together") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test callersOfCallersFollowOnABranchAndThroughTheMerge =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")
@@ -50,7 +48,6 @@ test callersOfCallersFollowOnABranchAndThroughTheMerge =
       evals(dark, "Tests.App.h()", "112", "and so does h") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test editsOnABranchOffABranchFollowAllTheWayToMain =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")
@@ -83,7 +80,6 @@ test editsOnABranchOffABranchFollowAllTheWayToMain =
 
 
 // Switching a function back to a version it had before must still move its callers each time.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aCallerFollowsAFunctionChangedBackAndForthOnMain =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")
@@ -111,7 +107,6 @@ test aCallerFollowsAFunctionChangedBackAndForthOnMain =
         "g follows in the draft") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test aCallerFollowsAFunctionChangedBackAndForthOnABranch =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.f", "1")
@@ -140,7 +135,6 @@ test aCallerFollowsAFunctionChangedBackAndForthOnABranch =
 // rows, and the first follow ran before the second had moved the caller. The package build's
 // incremental path saves each changed file this way, so it left the dev store with callers a full
 // reload does not have.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test savingAFunctionAndItsCalleeTogetherLeavesNoStaleCaller =
   scenario(fun dark ->
     let path = Cli.Tests.Instance.home(dark) + "/pair.dark"
@@ -162,7 +156,6 @@ test savingAFunctionAndItsCalleeTogetherLeavesNoStaleCaller =
 
 
 /// A helper return-type change must expose an incompatible saved Display.
-// @compiler xfail compile: "Unknown function or value 'scenario'" class=missing-support reason=upstream-dependency
 test savedDisplayMustMatchTheChangedReturnType = scenario(fun dark ->
   let caller = "(n: Int64): String = $\"<{Tests.ReturnChange.h(n)}>\""
   [ save(dark, "Tests.ReturnChange.h", "(n: Int64): String = $\"{n}\"")

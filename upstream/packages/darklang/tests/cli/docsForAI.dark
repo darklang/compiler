@@ -3,7 +3,6 @@ module Darklang.Cli.Tests.DocsForAI
 // `docs for-ai` is read in full at the start of every agent session and carried through every
 // call after, so it stays short; the reference sections are one more word away.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.DocsForAI.subtopic: Unknown function or value 'Darklang.Cli.Docs.Command.Topics.findTopic'"
 let subtopic(name: String): String =
   match Cli.Docs.Command.Topics.findTopic("for-ai") with
   | Some(topic) ->
@@ -22,7 +21,6 @@ test forAIStaysShort =
 
 
 // What moved out of `docs for-ai` is still there, under the part its More list names.
-// @compiler xfail compile: "Unknown function or value 'subtopic'" class=missing-support reason=upstream-dependency
 test movedSectionsAreOneWordAway =
   Stdlib.Test.all(
     [ ("packages", "view Some.fn --raw > /tmp/f.dark")
@@ -43,7 +41,6 @@ test movedSectionsAreOneWordAway =
         "docs for-ai names its parts")))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test unknownPartIsRefused = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "docs", "for-ai", "zzz" ])
   Stdlib.Test.all(
@@ -58,7 +55,6 @@ test unknownPartIsRefused = Instance.withInstance(fun i ->
 
 // One call prints every part asked for, each once and under its own header, so an agent
 // needs two turns at most: the main page, then the parts it names.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test severalPartsInOneCall = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(
@@ -90,7 +86,6 @@ test severalPartsInOneCall = Instance.withInstance(fun i ->
 
 
 // Another topic joins the parts in the same call, and the main page stays out: it was read first.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test otherTopicsJoinInOneCall = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "docs", "for-ai", "http-server", "tests" ])
@@ -114,7 +109,6 @@ test otherTopicsJoinInOneCall = Instance.withInstance(fun i ->
         "parts alone leave the main page out") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test unknownPartsAreNamed = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "docs", "for-ai", "tests", "zzz", "yyy" ])
   Stdlib.Test.all(
@@ -133,7 +127,6 @@ test unknownPartsAreNamed = Instance.withInstance(fun i ->
 // `docs for-ai` says which values `Stdlib.display` takes, that interpolation falls back to
 // `Stdlib.inspect`, and that lists, tuples and Unit have no `Display`. If that changes, the
 // sentence needs changing.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test displayAdviceHolds = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "eval", "Stdlib.display([1, 2])" ])
   Stdlib.Test.all(
@@ -151,7 +144,6 @@ test displayAdviceHolds = Instance.withInstance(fun i ->
 
 
 // Each function the main page lists by name is one a program can call.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test listedFunctionsExist =
   let names =
     [ "Stdlib.Int64.parse"

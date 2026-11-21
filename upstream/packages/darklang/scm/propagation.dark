@@ -3,7 +3,6 @@ module Darklang.SCM.Propagation
 // Every edit propagates to all callers on its branch.
 
 /// Resolve a binding on an explicit branch, including package tests.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.hashOn: Unknown function or value 'LanguageTools.PackageManager.Function.find'"
 let hashOn(
   branchId: Uuid,
   loc: LanguageTools.ProgramTypes.PackageLocation,
@@ -19,7 +18,6 @@ let hashOn(
 
 
 /// Rebind exactly this branch, including when it is not the process's branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.rebindOn: Unknown function or value 'Builtin.pmSetName'"
 let rebindOn(
   branchId: Uuid,
   loc: LanguageTools.ProgramTypes.PackageLocation,
@@ -35,7 +33,6 @@ let rebindOn(
 /// Lives here rather than in the CLI because a RESOLUTION needs it too: overriding a conflict rebinds
 /// a name, and a rebind that does not repoint its callers leaves the name saying one thing and
 /// everything that calls it doing another.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.repointDependents: Unknown function or value 'Builtin.pmPropagate'"
 let repointDependents(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,
@@ -51,7 +48,6 @@ let modulesOf(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   Stdlib.String.join(loc.modules, ".")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.rebind: Unknown function or value 'rebindOn'"
 let rebind(
   loc: LanguageTools.ProgramTypes.PackageLocation,
   kind: LanguageTools.ProgramTypes.ItemKind,
@@ -62,7 +58,6 @@ let rebind(
 
 /// What kind of item lives at this name, if anything does. The CLI takes an FQN from a human, who does not
 /// type "fn" after it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.kindAt: Unknown function or value 'SCM.PackageOps.liveBindingAt'"
 let kindAt(
   loc: LanguageTools.ProgramTypes.PackageLocation)
   : Option<LanguageTools.ProgramTypes.ItemKind> =
@@ -70,7 +65,6 @@ let kindAt(
 
 
 /// The hash currently live at this name, on the branch you're on.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.currentHash: Unknown function or value 'SCM.PackageOps.liveBindingAt'"
 let currentHash(
   loc: LanguageTools.ProgramTypes.PackageLocation)
   : Option<LanguageTools.ProgramTypes.Hash> =
@@ -79,7 +73,6 @@ let currentHash(
 
 
 /// The version this branch inherited when it first changed this name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.forkBaseOf: Unknown function or value 'SCM.Conflicts.branchBases'"
 let forkBaseOf(branchId: Uuid, loc: LanguageTools.ProgramTypes.PackageLocation): Option<String> =
   if Branch.isMain(branchId) then
     Option.None
@@ -92,7 +85,6 @@ let forkBaseOf(branchId: Uuid, loc: LanguageTools.ProgramTypes.PackageLocation):
 
 /// Body versions for history displays and live values, including propagated versions.
 /// Undo uses PackageOps.previousRevision so it can also distinguish reference-only edits.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.authoringOrder: Unknown function or value 'SCM.Bindings.query'"
 let authoringOrder(loc: LanguageTools.ProgramTypes.PackageLocation): List<String> =
   let fromMain =
     // main-scoped: main's half of the sequence, cut at the fork below when on a branch.
@@ -138,7 +130,6 @@ let authoringOrder(loc: LanguageTools.ProgramTypes.PackageLocation): List<String
 ///
 /// Main's, and the caller is expected to know it: on a branch this is the history you FORKED FROM.
 /// `Cli.Packages.Propagate.getAllPreviousHashes` appends the branch's own versions to it.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.everBoundHashes: Unknown function or value 'everBoundHashesFor'"
 let everBoundHashes(
   loc: LanguageTools.ProgramTypes.PackageLocation,
   itemKind: LanguageTools.ProgramTypes.ItemKind)
@@ -156,7 +147,6 @@ let everBoundKey(owner: String, modules: String, name: String, itemType: String)
 
 /// <fn everBoundHashes> for many names in one query, keyed by <fn everBoundKey>; a name that was never
 /// bound is absent.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Propagation.everBoundHashesFor: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let everBoundHashesFor(
   names: List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)>)
   : Dict<String, List<LanguageTools.ProgramTypes.Hash>> =

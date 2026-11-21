@@ -3,61 +3,61 @@
 
 module Darklang.Stdlib.String.__Unicode.__Data
 
-let __generalCategoryLookup (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup0 codepoint with
-    | Some value -> Some value
+let __generalCategoryLookup(codepoint: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup0(codepoint) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup1 codepoint with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup1(codepoint) with
+        | Some(value) -> Some(value)
         | None ->
-            match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup2 codepoint with
-            | Some value -> Some value
+            match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup2(codepoint) with
+            | Some(value) -> Some(value)
             | None ->
-                match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup3 codepoint with
-                | Some value -> Some value
+                match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup3(codepoint) with
+                | Some(value) -> Some(value)
                 | None ->
-                    match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup4 codepoint with
-                    | Some value -> Some value
+                    match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup4(codepoint) with
+                    | Some(value) -> Some(value)
                     | None ->
-                        match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup5 codepoint with
-                        | Some value -> Some value
+                        match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup5(codepoint) with
+                        | Some(value) -> Some(value)
                         | None ->
-                            match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup6 codepoint with
-                            | Some value -> Some value
+                            match Stdlib.String.__Unicode.__Data.__generalCategoryLookupGroup6(codepoint) with
+                            | Some(value) -> Some(value)
                             | None ->
                                 None
 
-let __lowercaseLookupGroup1 (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn (Stdlib.String.__Unicode.__Data.__Table07.__lowercaseChunk4 ()) 0L key 6L 19L valueIndex with
-    | Some value -> Some value
+let __lowercaseLookupGroup1(key: Int64, valueIndex: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn(Stdlib.String.__Unicode.__Data.__Table07.__lowercaseChunk4(), 0, key, 6, 19, valueIndex) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn (Stdlib.String.__Unicode.__Data.__Table08.__lowercaseChunk5 ()) 0L key 6L 19L valueIndex with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn(Stdlib.String.__Unicode.__Data.__Table08.__lowercaseChunk5(), 0, key, 6, 19, valueIndex) with
+        | Some(value) -> Some(value)
         | None ->
-            match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn (Stdlib.String.__Unicode.__Data.__Table09.__lowercaseChunk6 ()) 0L key 6L 19L valueIndex with
-            | Some value -> Some value
+            match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn(Stdlib.String.__Unicode.__Data.__Table09.__lowercaseChunk6(), 0, key, 6, 19, valueIndex) with
+            | Some(value) -> Some(value)
             | None ->
-                match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn (Stdlib.String.__Unicode.__Data.__Table10.__lowercaseChunk7 ()) 0L key 6L 19L valueIndex with
-                | Some value -> Some value
+                match Stdlib.String.__Unicode.__Data.__lookupMappingValueIn(Stdlib.String.__Unicode.__Data.__Table10.__lowercaseChunk7(), 0, key, 6, 19, valueIndex) with
+                | Some(value) -> Some(value)
                 | None ->
                     None
 
-let __generalCategoryLookupGroup2 (codepoint: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table23.__generalCategoryChunk8 ()) 0L codepoint 14L with
-    | Some value -> Some value
+let __generalCategoryLookupGroup2(codepoint: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table23.__generalCategoryChunk8(), 0, codepoint, 14) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table24.__generalCategoryChunk9 ()) 0L codepoint 14L with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table24.__generalCategoryChunk9(), 0, codepoint, 14) with
+        | Some(value) -> Some(value)
         | None ->
-            match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table25.__generalCategoryChunk10 ()) 0L codepoint 14L with
-            | Some value -> Some value
+            match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table25.__generalCategoryChunk10(), 0, codepoint, 14) with
+            | Some(value) -> Some(value)
             | None ->
-                match Stdlib.String.__Unicode.__Data.__lookupRangeIn (Stdlib.String.__Unicode.__Data.__Table26.__generalCategoryChunk11 ()) 0L codepoint 14L with
-                | Some value -> Some value
+                match Stdlib.String.__Unicode.__Data.__lookupRangeIn(Stdlib.String.__Unicode.__Data.__Table26.__generalCategoryChunk11(), 0, codepoint, 14) with
+                | Some(value) -> Some(value)
                 | None ->
                     None
 
-let sourceHashes () : List<(String * String)> =
+let sourceHashes(): List<(String * String)> =
     [
         ("CompositionExclusions.txt", "2f239196ef3b5b61db5cc476e9bd80f534d15aa1b74e1be1dea5d042a344c85f"),
         ("DerivedCoreProperties.txt", "24c7fed1195c482faaefd5c1e7eb821c5ee1fb6de07ecdbaa64b56a99da22c08"),
@@ -68,28 +68,28 @@ let sourceHashes () : List<(String * String)> =
         ("emoji-data.txt", "2cb2bb9455cda83e8481541ecf5b6dfda66a3bb89efa3fa7c5297eccf607b72b")
     ]
 
-let __lowercaseLookup (key: Int64) (valueIndex: Int64) : Stdlib.Option.Option<Int64> =
-    match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup0 key valueIndex with
-    | Some value -> Some value
+let __lowercaseLookup(key: Int64, valueIndex: Int64): Stdlib.Option.Option<Int64> =
+    match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup0(key, valueIndex) with
+    | Some(value) -> Some(value)
     | None ->
-        match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup1 key valueIndex with
-        | Some value -> Some value
+        match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup1(key, valueIndex) with
+        | Some(value) -> Some(value)
         | None ->
-            match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup2 key valueIndex with
-            | Some value -> Some value
+            match Stdlib.String.__Unicode.__Data.__lowercaseLookupGroup2(key, valueIndex) with
+            | Some(value) -> Some(value)
             | None ->
                 None
 
-let __indicFromCode (value: Int64) : Stdlib.String.__Unicode.__Data.IndicConjunctBreak =
-    if value == 1L then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBConsonant
-    else if value == 2L then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBExtend
-    else if value == 3L then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBLinker
+let __indicFromCode(value: Int64): Stdlib.String.__Unicode.__Data.IndicConjunctBreak =
+    if value == 1 then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBConsonant
+    else if value == 2 then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBExtend
+    else if value == 3 then Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBLinker
     else Stdlib.String.__Unicode.__Data.IndicConjunctBreak.InCBNone
 
-let __hexDigit (byte: Int64) : Int64 =
-    if byte >= 48L && byte <= 57L then byte - 48L
-    else if byte >= 65L && byte <= 70L then byte - 55L
-    else Builtin.crash "Invalid generated Unicode data"
+let __hexDigit(byte: Int64): Int64 =
+    if byte >= 48 && byte <= 57 then byte - 48
+    else if byte >= 65 && byte <= 70 then byte - 55
+    else Builtin.crash("Invalid generated Unicode data")
 
-let isExtendedPictographic (codepoint: Int64) : Bool = Stdlib.Option.isSome (Stdlib.String.__Unicode.__Data.__extendedPictographicLookup codepoint)
-let unicodeVersion () : String = "17.0.0"
+let isExtendedPictographic(codepoint: Int64): Bool = Stdlib.Option.isSome(Stdlib.String.__Unicode.__Data.__extendedPictographicLookup(codepoint))
+let unicodeVersion(): String = "17.0.0"

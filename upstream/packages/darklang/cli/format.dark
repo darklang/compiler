@@ -47,7 +47,6 @@ let settle(
 
 /// Every file in <param files>, read, formatted and settled. The formatting, which is all
 /// computation, runs across the cores; reading and writing stay in order here.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Format.formatFiles: Unknown function or value 'Stdlib.List.parallelMap'"
 let formatFiles(
   branchId: Uuid,
   files: List<String>,
@@ -83,7 +82,6 @@ let formatFiles(
     (f, settle(f, read, result, check)))
 
 
-// @compiler blocked: upstream-dependency diagnostic="execute: Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let check = Stdlib.List.contains(args, "--check")
   let showAsWritten = Stdlib.List.contains(args, "--as-written")
@@ -121,7 +119,6 @@ let execute(state: AppState, args: List<String>): AppState =
 
 /// Format every `.dark` file under <param paths>, writing them back unless <param check>, and say
 /// how it went.
-// @compiler blocked: upstream-dependency diagnostic="formatAll: Unknown type 'AppState'"
 let formatAll(state: AppState, paths: List<String>, check: Bool, showAsWritten: Bool): AppState =
   let files =
     paths
@@ -173,12 +170,10 @@ let formatAll(state: AppState, paths: List<String>, check: Bool, showAsWritten: 
     state
 
 
-// @compiler blocked: upstream-dependency diagnostic="complete: Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []
 
 
-// @compiler blocked: upstream-dependency diagnostic="help: Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: format [--check] [--as-written] <file-or-directory>..."
     "       format -"

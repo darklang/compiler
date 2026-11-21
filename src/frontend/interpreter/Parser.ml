@@ -229,24 +229,7 @@ let parseSyntaxWithRootScope rootScope source =
    Tree-wide rules have one implementation in Validation. Run them only
    after a clean syntax pass so recovery holes do not create cascaded errors.
 *)
-(* Interpreter sources at the pin in porting/sources.yaml (everything under
-   upstream/) read a bare integer as an Int64 and `1s` as an Int64, as that
-   interpreter does; this compiler's own sources read a bare integer as an
-   Int. Set for the extent of reading or compiling such a source. *)
-let interpreterSource = ref false
-
-let withInterpreterSource enabled f =
-  let previous = !interpreterSource in
-  interpreterSource := enabled;
-  Fun.protect ~finally:(fun () -> interpreterSource := previous) f
-
-let withLiterals bareIsInt64 f =
-  let previous = !Lexer.bareIntegerIsInt64 in
-  Lexer.bareIntegerIsInt64 := bareIsInt64;
-  Fun.protect ~finally:(fun () -> Lexer.bareIntegerIsInt64 := previous) f
-
 let parseUnchecked source =
-  withLiterals !interpreterSource @@ fun () ->
   let result = parseSyntaxWithRootScope ItemScope.Script source in
   let structural =
     match (result.diagnostics, result.parsed) with
@@ -261,9 +244,6 @@ let parseUnchecked source =
    once, and only a validated source file can be returned on success.
 *)
 let parseForUnchecked ~adaptStdlib mode source =
-  withLiterals
-    (!interpreterSource || mode <> Validation.Package)
-  @@ fun () ->
   let scope =
     match mode with
     | Validation.Package -> ItemScope.Module

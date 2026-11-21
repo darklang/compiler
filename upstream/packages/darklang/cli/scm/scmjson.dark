@@ -156,17 +156,14 @@ type BranchJson =
 type JsonText = Result<String, Stdlib.Json.SerializeError.SerializeError>
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.depsJson: Type arguments require a named function"
 let depsJson(d: DepsJson): JsonText =
   Stdlib.Json.checkedSerialize<DepsJson>(d)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.commitsJson: Type arguments require a named function"
 let commitsJson(cs: List<CommitRowJson>): JsonText =
   Stdlib.Json.checkedSerialize<List<CommitRowJson>>(cs)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.branchesJson: Type arguments require a named function"
 let branchesJson(bs: List<BranchJson>): JsonText =
   Stdlib.Json.checkedSerialize<List<BranchJson>>(bs)
 
@@ -181,7 +178,6 @@ type BranchOpJson =
     op: String }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.branchOpsJson: Type arguments require a named function"
 let branchOpsJson(os: List<BranchOpJson>): JsonText =
   Stdlib.Json.checkedSerialize<List<BranchOpJson>>(os)
 
@@ -195,21 +191,18 @@ type DraftDiffJson =
     removed: List<String> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.draftDiffJson: Type arguments require a named function"
 let draftDiffJson(d: DraftDiffJson): JsonText =
   Stdlib.Json.checkedSerialize<DraftDiffJson>(d)
 
 
 /// `dark diff <branch> --json`. The SCM record is serialized directly rather than copied into a shape of
 /// its own: there is nothing to add here, and a second shape would be a second thing to keep in step.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.branchDiffJson: Type arguments require a named function"
 let branchDiffJson(es: List<SCM.PackageOps.BranchDiffEntry>): JsonText =
   Stdlib.Json.checkedSerialize<List<SCM.PackageOps.BranchDiffEntry>>(es)
 
 
 /// Classify what an update did to a name. Shared by the pretty CHANGED line and the JSON, so they can't
 /// disagree about whether a signature moved.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.changeKind: Unknown function or value 'LanguageTools.PackageManager.Function.get'"
 let changeKind(
   branchId: Uuid,
   b: SCM.Conflicts.Binding,
@@ -238,7 +231,6 @@ let changeKind(
       | _ -> "updated"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.changedItem: Unknown function or value 'changeKind'"
 let changedItem(
   branchId: Uuid,
   propagated: List<String>,
@@ -257,7 +249,6 @@ let changedItem(
 
 /// Work out whether each item is new, updated, or has a changed signature.
 /// Read the committed bindings once for the whole review.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.changedItems: Unknown function or value 'SCM.PackageOps.committedBindingsOn'"
 let changedItems(
   branchId: Uuid,
   propagated: List<String>,
@@ -300,27 +291,22 @@ let changeNoteFor(item: ChangedItem): String =
     changeNote(item.change)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.statusJson: Type arguments require a named function"
 let statusJson(s: StatusJson): JsonText =
   Stdlib.Json.checkedSerialize<StatusJson>(s)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.commitJson: Type arguments require a named function"
 let commitJson(c: CommitJson): JsonText =
   Stdlib.Json.checkedSerialize<CommitJson>(c)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.conflictListJson: Type arguments require a named function"
 let conflictListJson(c: ConflictListJson): JsonText =
   Stdlib.Json.checkedSerialize<ConflictListJson>(c)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.conflictJson: Type arguments require a named function"
 let conflictJson(c: SCM.Conflicts.Conflict): JsonText =
   Stdlib.Json.checkedSerialize<ConflictJson>(conflictWithFqn(c))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.ScmJson.conflictActionJson: Type arguments require a named function"
 let conflictActionJson(a: ConflictActionJson): JsonText =
   Stdlib.Json.checkedSerialize<ConflictActionJson>(a)
 

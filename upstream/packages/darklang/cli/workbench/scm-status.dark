@@ -57,13 +57,11 @@ let emptyScmStatus(): ScmStatus =
 
 
 /// Read the whole SCM picture for <param branchId>.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.readScmStatus: Unknown function or value 'scmStatusFrom'"
 let readScmStatus(branchId: Uuid): ScmStatus =
   scmStatusFrom(branchId, SCM.Draft.read())
 
 
 /// `readScmStatus` over a draft already read.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Workbench.scmStatusFrom: Unknown function or value 'SCM.PackageOps.commitsOnBranch'"
 let scmStatusFrom(branchId: Uuid, p: SCM.Draft.Picture): ScmStatus =
   // This branch's commits, not the store's: the row says "N commits on this branch", and a store-wide
   // count is the same number everywhere and right only on main.

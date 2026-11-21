@@ -6,13 +6,13 @@ module Darklang.Stdlib.Bool
 
 // Stdlib.Bool - Boolean operations
 
-let and (a: Bool) (b: Bool) : Bool = a && b
+let and(a: Bool, b: Bool): Bool = a && b
 
-let or (a: Bool) (b: Bool) : Bool = a || b
+let or(a: Bool, b: Bool): Bool = a || b
 
-let xor (a: Bool) (b: Bool) : Bool = if a then Stdlib.Bool.not b else b
+let xor(a: Bool, b: Bool): Bool = if a then Stdlib.Bool.not(b) else b
 
-let toString (b: Bool) : String = if b then "true" else "false"
+let toString(b: Bool): String = if b then "true" else "false"
 
 impl Stdlib.Display for Bool =
   let display = Stdlib.Bool.toString

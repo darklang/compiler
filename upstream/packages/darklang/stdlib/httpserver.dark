@@ -3,7 +3,6 @@ module Darklang.Stdlib.HttpServer
 // HTTP Server functionality for Darklang
 
 /// An HTTP handler definition
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.Handler reason=compiler-implementation
 type Handler =
   { route: String
     method: String
@@ -11,26 +10,22 @@ type Handler =
 
 
 /// A GET route, so a handler table reads as routes rather than record boilerplate.
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.get reason=compiler-implementation
 let get(route: String, fn: Http.Request -> Http.Response): Handler =
   Handler { route = route, method = "GET", handler = fn }
 
 
 /// A POST route. See <fn Stdlib.HttpServer.get>.
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.post reason=compiler-implementation
 let post(route: String, fn: Http.Request -> Http.Response): Handler =
   Handler { route = route, method = "POST", handler = fn }
 
 
 /// Result of matching a route pattern against a request path
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.RouteMatch reason=compiler-implementation
 type RouteMatch =
   { matched: Bool
     vars: List<(String * String)> }
 
 
 /// Segment type for route parsing
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.RouteSegment reason=compiler-implementation
 type RouteSegment =
   | Literal(String)
   | Variable(String)
@@ -68,7 +63,6 @@ let __matchSegment(
 
 /// Match a request path against a route pattern
 /// Split a request path into non-empty segments.
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.splitPath reason=compiler-implementation
 let splitPath(requestPath: String): List<String> =
   String.split(requestPath, "/") |> List.filter(fun s -> Bool.not(String.isEmpty(s)))
 
@@ -103,7 +97,6 @@ let __matchRouteSegments(routeSegs: List<RouteSegment>, pathSegs: List<String>):
     | None -> RouteMatch { matched = false, vars = [] }
 
 
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.matchRoute reason=compiler-implementation
 let matchRoute(routePattern: String, requestPath: String): RouteMatch =
   __matchRouteSegments(__parseRouteSegments(routePattern), splitPath(requestPath))
 
@@ -138,7 +131,6 @@ let __findHandler(
 /// The path of a request's url, as written (not decoded), always starting with
 /// {{/}}. Read from the request-target alone (<fn Http.requestTarget>), so the
 /// host, which a client supplies, cannot change it.
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.getPath reason=compiler-implementation
 let getPath(req: Http.Request): String =
   let path = (Http.requestTarget(req.url)).path
   if String.startsWith(path, "/") then path else "/" + path
@@ -146,7 +138,6 @@ let getPath(req: Http.Request): String =
 
 /// Route a request through a list of handlers
 /// Returns the response from the first matching handler, or 404
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.routeRequest reason=compiler-implementation
 let routeRequest(handlers: List<Handler>, req: Http.Request): Http.Response =
   let path = getPath(req)
   match __findHandler(handlers, req.method, path) with
@@ -156,7 +147,6 @@ let routeRequest(handlers: List<Handler>, req: Http.Request): Http.Response =
 
 /// Extract a path parameter from a request given a route pattern
 /// Example: getPathParam req "/user/:id" "id" returns Some "123" for path "/user/123"
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.getPathParam reason=compiler-implementation
 let getPathParam(req: Http.Request, routePattern: String, paramName: String): Option<String> =
   let path = getPath(req)
   let routeSegs = __parseRouteSegments(routePattern)
@@ -361,7 +351,6 @@ module Config =
 /// Start an HTTP server: bind `handler` per `config`, run `onListening` once the port is bound (announce
 /// there, so a banner is never a lie), and serve until SIGTERM (blocks). Returns Error with a plain message
 /// if the port can't be bound. Every request runs through `config.middleware`.
-// @compiler replace: packages/darklang/stdlib/httpserver.dark#Darklang.Stdlib.HttpServer.serve reason=compiler-implementation
 let serve(
   config: Config.Config,
   handler: Http.Request -> Http.Response,
@@ -394,7 +383,6 @@ type Reload =
 /// to use this time. <param first> is the handler as resolved at start, for the bind-time approval
 /// root. `LanguageTools.Live.Router` is the step a router-by-name wants. <param reload> says whether an open
 /// page reloads itself on a save.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.HttpServer.serveLive: Unknown function or value 'Builtin.httpServerServeLive'"
 let serveLive(
   config: Config.Config,
   init: 's,

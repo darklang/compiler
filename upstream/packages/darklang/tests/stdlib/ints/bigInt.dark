@@ -184,19 +184,16 @@ test checkedFromFloat64 =
         Stdlib.Result.Result.Error(Stdlib.Math.NonFinite.Overflow)) ])
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromFloatRejectsNaN =
   Stdlib.BigInt.fromFloat64(0.0 / 0.0)
   => raises "Float64 has no integer value: NaN"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromFloatRejectsInfinity =
   Stdlib.BigInt.fromFloat64(1.0 / 0.0)
   => raises "Float64 has no integer value: Infinity"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test fromFloatRejectsNegativeInfinity =
   Stdlib.BigInt.fromFloat64(-1.0 / 0.0)
   => raises "Float64 has no integer value: -Infinity"
@@ -264,13 +261,11 @@ test shifts =
       256z >> 4z |> Stdlib.Test.equal(16z) ])
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test shiftLeftRejectsHugeCount =
   1z << 2z ** 40z
   => raises "Shift count out of range (0 to 2147483647): 1099511627776z"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test shiftRightRejectsHugeCount =
   1z >> 2z ** 40z
   => raises "Shift count out of range (0 to 2147483647): 1099511627776z"
@@ -515,7 +510,6 @@ test checkedPowerTrivialBases =
 
 
 /// 2 has 2 bits, so 2 ** 4194304 is estimated at exactly 8388608 bits.
-// @compiler blocked: compiler-timeout diagnostic="2 ** 4194304 and the 8388608-bit shifts run for 16 minutes in the compiled test"
 test checkedPowerAtTheLimit =
   Stdlib.Test.all(
     [ Stdlib.BigInt.checkedPower(2z, 4194304z)

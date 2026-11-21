@@ -4,7 +4,6 @@ module Darklang.Cli.Packages.Rename
 // Reference names are metadata; content hashes remain unchanged.
 
 /// Prepare one atomic rename, including its current callers' reference names.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let ops(
   branchId: Uuid,
   oldLocation: LanguageTools.ProgramTypes.PackageLocation,
@@ -16,7 +15,6 @@ let ops(
 
 /// What lives at <param location> right now, as the reference a rename rebinds. `None` when the
 /// name holds nothing here -- a typo, or a name that only exists on another branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.Rename.referenceAt: Unknown function or value 'Packages.Query.searchExactMatch'"
 let referenceAt(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation)
@@ -45,7 +43,6 @@ let referenceAt(
             | [] -> Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [oldName, newName] ->
@@ -96,7 +93,6 @@ let execute(state: AppState, args: List<String>): AppState =
     { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ ""
     "  dark rename <name> <new-name>"
@@ -112,7 +108,6 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   match args with
   | [] -> Nav.complete(state, args)

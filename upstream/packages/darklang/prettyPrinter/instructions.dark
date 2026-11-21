@@ -37,7 +37,6 @@ let registerPairs(
 
 /// Register-aware pattern rendering. `PrettyPrinter.RuntimeTypes.letPattern` prints `LPVariable` by
 /// name; in a listing the register is the whole point.
-// @compiler blocked: compiler-contract diagnostic="Darklang.PrettyPrinter.RuntimeTypes.Instructions.letPattern: Constructor pattern 'Darklang.LanguageTools.RuntimeTypes.LetPattern.LPVariable' has wrong field count"
 let letPattern(pat: LanguageTools.RuntimeTypes.LetPattern): String =
   match pat with
   | LPVariable(reg, _name) -> register(reg)
@@ -52,7 +51,6 @@ let letPattern(pat: LanguageTools.RuntimeTypes.LetPattern): String =
     $"({parts})"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.MatchPattern'"
 let matchPattern(pat: LanguageTools.RuntimeTypes.MatchPattern): String =
   match pat with
   | MPVariable(reg) -> register(reg)
@@ -114,7 +112,6 @@ let segment(branchId: Uuid, s: LanguageTools.RuntimeTypes.StringSegment): String
 
 /// Values baked into the instruction stream, rendered short. A listing is for reading, and one 4 KB
 /// docstring pushes everything else off the page, so anything long is summarised by shape instead.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.PrettyPrinter.RuntimeTypes.Instructions.inlineDval: Unknown constructor 'Darklang.LanguageTools.RuntimeTypes.Dval.DBigInt' in pattern"
 let inlineDval(branchId: Uuid, dv: LanguageTools.RuntimeTypes.Dval): String =
   let clip(s: String): String =
     if Stdlib.String.length(s) <= 40 then
@@ -159,7 +156,6 @@ let inlineDval(branchId: Uuid, dv: LanguageTools.RuntimeTypes.Dval): String =
 
 
 /// The opcode name on its own, so callers can color or align it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instruction'"
 let opcode(i: LanguageTools.RuntimeTypes.Instruction): String =
   match i with
   | LoadVal(_, _) -> "LoadVal"
@@ -200,7 +196,6 @@ let boolSkip(index: Int64, skip: Option<Int32>, decidesOn: String): String =
 
 /// Everything after the opcode. <param index> is the instruction's own position: jump offsets are stored
 /// relative, and a relative jump is unreadable in a listing, so they're shown both ways.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instruction'"
 let operands(branchId: Uuid, index: Int64, i: LanguageTools.RuntimeTypes.Instruction): String =
   match i with
   | LoadVal(r, v) -> $"{register(r)} <- {inlineDval(branchId, v)}"
@@ -251,7 +246,6 @@ let operands(branchId: Uuid, index: Int64, i: LanguageTools.RuntimeTypes.Instruc
 
 /// Every lambda defined inside these instructions, flattened, so a listing isn't a dead end at
 /// `CreateLambda`. A lambda inside a lambda gets its own entry rather than nesting.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instructions'"
 let lambdas(
   instrs: LanguageTools.RuntimeTypes.Instructions)
   : List<LanguageTools.RuntimeTypes.LambdaImpl> =
@@ -264,7 +258,6 @@ let lambdas(
   |> Stdlib.List.flatten
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instructions'"
 let header(instrs: LanguageTools.RuntimeTypes.Instructions): String =
   let n = Stdlib.display(Stdlib.List.length(instrs.instructions))
   let regs = Stdlib.display(instrs.registerCount)
@@ -272,7 +265,6 @@ let header(instrs: LanguageTools.RuntimeTypes.Instructions): String =
 
 
 /// Plain-text listing, for callers that don't want to lay it out themselves.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.RuntimeTypes.Instructions'"
 let listing(branchId: Uuid, instrs: LanguageTools.RuntimeTypes.Instructions): String =
   let body =
     instrs.instructions

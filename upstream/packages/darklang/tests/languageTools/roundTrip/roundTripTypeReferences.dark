@@ -3,7 +3,6 @@ module Darklang.LanguageTools.Parser.RoundTrip.Tests
 // Parse-then-print round trips: typeReferences. Moved from
 // backend/tests/Tests/LibParser.RoundTrip.Tests.fs; helpers are in roundTrip.dark.
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test typeReferencesAllBuiltIns =
   Stdlib.Test.all(
     [ // all built-ins
@@ -90,7 +89,6 @@ test typeReferencesAllBuiltIns =
         "type MyStream = Stream<Bytes>") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test typeReferencesStreamOfGeneric =
   Stdlib.Test.all(
     [ roundTrip(
@@ -193,7 +191,6 @@ test typeReferencesStreamOfGeneric =
         "type MyBox = Box<Person>") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'roundTrip'" class=missing-support reason=upstream-dependency
 test typeReferencesGenericAlias =
   Stdlib.Test.all(
     [ roundTrip(

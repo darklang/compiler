@@ -1,6 +1,5 @@
 module Darklang.Cli.Packages.ModuleCommand
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.ModuleDeclaration.Declaration'"
 let collectDecls(
   modules: List<String>,
   decls: List<LanguageTools.WrittenTypes.ModuleDeclaration.Declaration>)
@@ -15,7 +14,6 @@ let collectDecls(
   |> Stdlib.List.flatten
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.ModuleDeclaration.Declaration'"
 let declarationName(
   decl: LanguageTools.WrittenTypes.ModuleDeclaration.Declaration)
   : Option<String> =
@@ -36,7 +34,6 @@ let declarationName(
 /// Return every declaration path that occurs more than once in the input.
 /// `collectDecls` has already flattened submodules, so the relative module path
 /// plus declaration name uniquely identifies the eventual package location.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.ModuleDeclaration.Declaration'"
 let duplicateDeclarationNames(
   declarations: List<(List<String> * LanguageTools.WrittenTypes.ModuleDeclaration.Declaration)>)
   : List<String> =
@@ -62,7 +59,6 @@ let duplicateDeclarationNames(
 /// `dark fn` says it (`updateDocsThatChanged`). Per item, because a module is one batch and
 /// `updateDocsThatChanged` reads every doc in the ops it is given: an item's words are compared with
 /// that item's own declaration, never with another's.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let landDocEdits(branchId: Uuid, ops: List<LanguageTools.ProgramTypes.PackageOp>): Int64 =
   // The Add for the item a SetName binds: they carry the same placeholder hash before the save.
   let addFor(h: LanguageTools.ProgramTypes.Hash): Option<LanguageTools.ProgramTypes.PackageOp> =
@@ -116,7 +112,6 @@ type Caller =
 /// What is in the module at <param home> (owner first) that this save did not define, as (kind,
 /// name): names an earlier save left behind, which still run, get type-checked and can block a
 /// commit.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.ModuleCommand.leftOver: Unknown function or value 'Query.allDirectDescendantNamesAndHashes'"
 let leftOver(branchId: Uuid, home: List<String>, defined: List<String>): List<(String * String)> =
   let (_, types, values, fns, traits, _, tests) =
     Query.allDirectDescendantNamesAndHashes(branchId, home)
@@ -131,7 +126,6 @@ let leftOver(branchId: Uuid, home: List<String>, defined: List<String>): List<(S
   |> Stdlib.List.unique
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let define(state: AppState, modulePath: String, source: String, caller: Caller): AppState =
   let bundled = caller == Caller.DevBuild
   // Package input is declaration scope at its root. In particular, `val x`
@@ -308,7 +302,6 @@ let define(state: AppState, modulePath: String, source: String, caller: Caller):
               failed(state)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let input =
     match args with
@@ -331,7 +324,6 @@ let execute(state: AppState, args: List<String>): AppState =
 /// main in place of a reload. An unresolved name fails it, leaving that to the reload. The dependents
 /// that follow are not type-checked: for a core function that is most of the time, and a reload
 /// doesn't check them either.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Packages.ModuleCommand.defineBundled: Unknown function or value 'Cli.initState'"
 let defineBundled(modulePath: String, source: String): Int64 =
   let state =
     { Cli.initState() with nonInteractive = true, currentBranchId = SCM.Branch.mainBranchId }
@@ -339,7 +331,6 @@ let defineBundled(modulePath: String, source: String): Int64 =
   (define(state, modulePath, source, Caller.DevBuild)).exitCode
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Define a module from multiple package declarations atomically"
     ""
@@ -364,6 +355,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

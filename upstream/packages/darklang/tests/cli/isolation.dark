@@ -5,24 +5,20 @@ test stdinIsNonInteractive =
   Stdlib.Cli.Sys.isTerminal(0) |> Stdlib.Test.equal(false)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.writeConfig: Unknown function or value 'Stdlib.LocalStore.configSet'"
 let writeConfig(key: String): String =
   let _ = LanguageTools.LocalStore.configSet(key, "child")
   LanguageTools.LocalStore.path()
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.cleanConfig: Unknown function or value 'Stdlib.LocalStore.configGet'"
 let cleanConfig(key: String): Bool =
   LanguageTools.LocalStore.configGet(key) == Stdlib.Option.Option.None
   && Stdlib.Env.get("DARK_MATTER_WRITE_SECRET") == Stdlib.Option.Option.None
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.readConfig: Unknown function or value 'Stdlib.LocalStore.configGet'"
 let readConfig(key: String): Stdlib.Option.Option<String> =
   LanguageTools.LocalStore.configGet(key)
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.incrementCounter'" class=missing-support reason=test-counter
 test snapshotScopeKeepsTestCounter =
   let _ = Stdlib.Test.incrementCounter()
   let branch = SCM.PackageOps.currentBranch()
@@ -33,7 +29,6 @@ test snapshotScopeKeepsTestCounter =
   Stdlib.Test.counterValue() |> Stdlib.Test.equal(2)
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.LocalStore.configSet'" class=missing-support reason=upstream-dependency
 test nestedWorkerSeesCallingTestWrites =
   let key = "test.nested-worker-starting-store"
   let _ = LanguageTools.LocalStore.configSet(key, "written by this test")
@@ -52,7 +47,6 @@ test nestedWorkerSeesCallingTestWrites =
             Stdlib.Option.Option.Some("written by this test"))) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.LocalStore.path'" class=missing-support reason=upstream-dependency
 test stateAndEnvironmentAreIsolated =
   let parentDb = LanguageTools.LocalStore.path()
   let parentBranch = SCM.PackageOps.currentBranch()
@@ -83,20 +77,17 @@ test stateAndEnvironmentAreIsolated =
 
 /// Ignore the write error to check that the runner still detects it and retries
 /// on a writable copy. When sharing is unavailable, the test starts on a copy.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.LocalStore.configSet'" class=missing-support reason=upstream-dependency
 test writingTestGetsItsOwnCopy =
   let _ = LanguageTools.LocalStore.configSet("test.isolation-probe", "written")
   LanguageTools.LocalStore.configGet("test.isolation-probe")
   |> Stdlib.Test.equal(Stdlib.Option.Option.Some("written"))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.runtimeFailure: Unknown function or value 'Stdlib.LocalStore.path'"
 let runtimeFailure(): Int64 =
   Stdlib.printLine(LanguageTools.LocalStore.path())
   1 / 0
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test runtimeFailureStillRemovesSnapshot =
   match Stdlib.Test.Process.run(
           Stdlib.Test.Process.defaults(),
@@ -125,7 +116,6 @@ let assertionFailure(): Stdlib.Test.Result =
   Stdlib.Test.fail("intentional isolation failure")
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test assertionFailureIsPreserved =
   match Stdlib.Test.Process.run(
           Stdlib.Test.Process.defaults(),
@@ -147,7 +137,6 @@ let createBranch(): String =
     [ "branch", "create", "isolated-child-branch" ])
 
 
-// @compiler xfail compile: "Unknown function or value 'SCM.PackageOps.currentBranch'" class=missing-support reason=upstream-dependency
 test branchChangesStayIsolated =
   let parentBranch = SCM.PackageOps.currentBranch()
   match Stdlib.Test.Process.run(
@@ -161,12 +150,10 @@ test branchChangesStayIsolated =
         SCM.PackageOps.currentBranch() |> Stdlib.Test.equal(parentBranch) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.currentBranch: Unknown function or value 'Darklang.SCM.PackageOps.currentBranch'"
 let currentBranch(): Uuid =
   SCM.PackageOps.currentBranch()
 
 
-// @compiler xfail compile: "Unknown function or value 'currentBranch'" class=missing-support reason=upstream-dependency
 test runsOnTheCallersBranch =
   let here = currentBranch()
   match Stdlib.Test.Process.run(
@@ -178,7 +165,6 @@ test runsOnTheCallersBranch =
     output.result |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(here))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.Isolation.checkInheritedBranch: Unknown function or value 'Stdlib.Test.Process.run'"
 let checkInheritedBranch(expected: Uuid): Stdlib.Test.Result =
   match Stdlib.Test.Process.run(
           Stdlib.Test.Process.defaults(),
@@ -190,7 +176,6 @@ let checkInheritedBranch(expected: Uuid): Stdlib.Test.Result =
 
 
 // Uses an actual non-main branch, then a nested worker with default options.
-// @compiler xfail compile: "Unknown function or value 'Cli.Branch.lookupRef'" class=missing-support reason=upstream-dependency
 test explicitBranchBecomesTheNestedWorkersDefault =
   let name = "isolated-selection-" + Stdlib.display(Stdlib.Uuid.generate())
   let _ = Cli.Tests.TestSuite.runWithCommand([ "branch", "create", name ])
@@ -212,7 +197,6 @@ let noisyResult(value: String): String =
   value
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test resultIsSeparateFromOutput =
   match Stdlib.Test.Process.run(
           Stdlib.Test.Process.defaults(),
@@ -231,7 +215,6 @@ let waitsTooLong(): Unit =
   Stdlib.Cli.Posix.sleep(10000.0)
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test timeoutIsReported =
   let defaults = Stdlib.Test.Process.defaults()
   match Stdlib.Test.Process.run(
@@ -247,7 +230,6 @@ let inheritedEnvironment(): Option<String> =
   Stdlib.Env.get("DARK_TELEMETRY")
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.Process.run'" class=missing-support reason=upstream-dependency
 test workerInheritsTestPermissions =
   let expected = inheritedEnvironment()
   match Stdlib.Test.Process.run(

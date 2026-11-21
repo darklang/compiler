@@ -13,26 +13,22 @@ module Darklang.Cli.Telemetry
 /// Where telemetry lines go. A fn, not a `val`: a val is evaluated once, when the
 /// package store is built, so it would hold the build machine's log dir rather than
 /// the one this CLI is actually using. `cliGetLogDir` already ends in `/`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.logFilePath: Unknown function or value 'Builtin.cliGetLogDir'"
 let logFilePath(): String =
   Builtin.cliGetLogDir() + "telemetry.jsonl"
 
 
 /// Returns monotonic millisecond timestamp (only differences are meaningful)
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.now: Expected TInt64, got TInt"
 let now(): Int64 =
   Stdlib.DateTime.__monotonicMilliseconds()
 
 
 /// Compute elapsed ms between a start timestamp and now
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.elapsedMs: Unknown function or value 'now'"
 let elapsedMs(startMs: Int64): Int64 =
   now() - startMs
 
 
 /// Write a single telemetry event line to the log file.
 /// Format: {"event":"<label>","ms":<elapsed>,"wall":"<ISO8601>","ctx":{...}}
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.logWithContext: Unknown function or value 'elapsedMs'"
 let logWithContext(label: String, startMs: Int64, context: List<(String * String)>): Unit =
   let elapsed = elapsedMs(startMs)
   let ctxPairs =
@@ -55,13 +51,11 @@ let logWithContext(label: String, startMs: Int64, context: List<(String * String
 
 
 /// Shorthand: log a timing event with no extra context
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.log: Unknown function or value 'logWithContext'"
 let log(label: String, startMs: Int64): Unit =
   logWithContext(label, startMs, [])
 
 
 /// Log a raw message (not a timing span) — useful for one-off markers
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.logMessage: Unknown function or value 'logFilePath'"
 let logMessage(label: String, message: String): Unit =
   let wall = Stdlib.display(Stdlib.DateTime.now())
   let escaped = Stdlib.String.replaceAll(message, "\"", "\\\"")
@@ -71,7 +65,6 @@ let logMessage(label: String, message: String): Unit =
 
 
 /// Log the start of a session so we can separate runs in the log
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Telemetry.logSessionStart: Unknown function or value 'logFilePath'"
 let logSessionStart(): Unit =
   let wall = Stdlib.display(Stdlib.DateTime.now())
   let line = $"{{\"event\":\"session_start\",\"wall\":\"{wall}\"}}"

@@ -1614,7 +1614,6 @@ module UInt128 =
 module Float64 =
   // TODO: review Float64.tests for more values to test against
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Float64>(0.0) |> Stdlib.Test.equal("0.0")
@@ -2077,7 +2076,6 @@ module Uuid =
 
 
 module BadTypes =
-  // @compiler xfail compile: "Cannot parse JSON into function type (Int64) -> Int64: JSON cannot represent executable functions" class=missing-support reason=compiler-gap
   test rejects1 =
     Stdlib.Json.parse<Int64 -> Int64>("{}")
     |> err
@@ -2086,20 +2084,17 @@ module BadTypes =
         "Can't parse JSON as type `Int64 -> Int64`, which has no JSON form"))
 
 
-  // @compiler xfail compile: "Unsupported type in JSON: (Int64) -> Int64. Some types are not supported in Json serialization" class=missing-support reason=compiler-gap
   test rejects2 =
     Stdlib.Json.serialize<Int64 -> Int64>(fun i -> 5)
     => raises "Cannot serialize (lambda) into JSON"
 
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
   test checkedRejects =
     Stdlib.Json.checkedSerialize<Int64 -> Int64>(fun i -> 5)
     |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
     |> Stdlib.Test.equal(Result.Error("Cannot serialize a function into JSON"))
 
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=upstream-dependency
   test checkedRejectsIntKeys =
     Stdlib.Json.checkedSerialize<Dict<Int64, String>>(Dict { 1: "a" })
     |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
@@ -2117,7 +2112,6 @@ module List =
   type MyString = String
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<List<Int64>>([]) |> Stdlib.Test.equal("[]")
@@ -2188,7 +2182,6 @@ module List =
 
 
   module Errors =
-    // @compiler xfail compile: "Expected TList TInt64, got TTuple [TInt64; TInt64; TString]" class=aot-rejection reason=aot-type-error
     test rejects1 =
       Stdlib.Json.serialize<List<Int64>>((1, 2, "three"))
       => raises "Darklang.Stdlib.Json.serialize's 1st parameter `value` expects List<Int64>, but got (Int64 * Int64 * String) ((1, 2, \"three\"))"
@@ -2222,7 +2215,6 @@ module List =
 
 
 module Tuples =
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<(Int64 * String * Int64)>((1, "two", 3))
@@ -2460,7 +2452,6 @@ module Option =
         |> Stdlib.Test.equal("{\"Some\":[null]}") ])
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serializeFields =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Reading>(
@@ -2561,7 +2552,6 @@ module Option =
 
 
   /// `parse<T>(serialize<T>(x))` is `Ok(x)`, with either `NoneFields`.
-  // @compiler xfail runtime: "Json.parse was not specialized" class=missing-support reason=compiler-gap
   test roundTrips =
     Stdlib.Test.all(
       [ [ Option.None, Option.Some(Option.None), Option.Some(Option.Some(1)) ]
@@ -2656,7 +2646,6 @@ module Option =
 
 
 module ParseErrorToString =
-  // @compiler xfail runtime: "expected Error(\"Can't parse JSON `\\\"x\\\"` as type `Int64` at path: `root.Age`\"), got Error(\"Stdlib.Json.ParseError.ParseE" class=missing-support reason=compiler-gap
   test interpolates =
     Stdlib.Json.parse<Person>("{\"Name\":\"Bob\",\"Age\":\"x\"}")
     |> Stdlib.Result.mapError(fun e -> $"{e}")
@@ -2665,7 +2654,6 @@ module ParseErrorToString =
         "Can't parse JSON `\"x\"` as type `Int64` at path: `root.Age`"))
 
 
-  // @compiler xfail compile: "No implementation of trait 'Darklang.Stdlib.Display'" class=missing-support reason=compiler-gap
   test toStringNeedsNoBranch =
     Stdlib.Json.parse<Int64>("1 2")
     |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
@@ -2760,13 +2748,11 @@ module Dict =
         |> Stdlib.Test.equal(Result.Ok(Dict { "a": "b", "c": "d" })) ])
 
 
-  // @compiler error-message runtime: "Cannot serialize dictionary into JSON: keys must be String, but this dictionary has Int64 keys" reason=diagnostic-difference
   test rejects1 =
     Stdlib.Json.serialize<Dict<Int64, String>>(Dict { 1: "a" })
     => raises "Cannot serialize { 1: \"a\" } into JSON: JSON object keys must be Strings, but this dict's keys are Int64"
 
 
-  // @compiler error-message runtime: "Cannot serialize dictionary into JSON: keys must be String, but this dictionary has Int64 keys" reason=diagnostic-difference
   test rejectsNested =
     Stdlib.Json.serialize<List<Dict<Int64, String>>>([ Dict { 1: "a" } ])
     => raises "Cannot serialize { 1: \"a\" } into JSON: JSON object keys must be Strings, but this dict's keys are Int64"
@@ -2887,7 +2873,6 @@ module UserDefinedEnums =
 
 
 module UserDefinedRecords =
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Person>(Person { Name = "Bob", Age = 42 })
@@ -3109,7 +3094,6 @@ module UserDefinedAliases =
   type MyInt = Int64
 
 
-  // @compiler xfail compile: "Expected TRecord (\"Darklang.Stdlib.Json.Tests.UserDefinedAliases.Person2\", []), got TRecord (\"Darklang.Stdlib.Json.Tests.UserDefinedAliases.Person1\", [])" class=missing-support reason=compiler-gap
   test serialize =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<MyInt>(42) |> Stdlib.Test.equal("42")
@@ -3165,7 +3149,6 @@ module UserDefinedAliases =
 
   // This test currently slips by the typechecker, and so we get an internal
   // exception
-  // @compiler xfail compile: "Expected TSum (\"Darklang.Stdlib.Result.Result\", [TInt64; TString]), got TSum" class=aot-rejection reason=aot-type-error
   test rejects1 =
     Stdlib.Json.serialize<StringResult<Int64>>(Result.Error(1))
     => raises "Darklang.Stdlib.Json.serialize's 1st parameter `value` expects Darklang.Stdlib.Result.Result<Int64, String>, but got Darklang.Stdlib.Result.Result<_, Int64> (Error(1))"
@@ -3352,7 +3335,6 @@ module RestoredArchive =
     |> Stdlib.Test.all
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test floatBoundariesAndPrecisionRoundTrip =
     [ 1.7976931348623157e308
       -1.7976931348623157e308
@@ -3388,7 +3370,6 @@ module RangedInts =
       status: Stdlib.Http.Status }
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test serializeAsNumbers =
     Stdlib.Test.all(
       [ Stdlib.Json.serialize<Stdlib.Net.Port>(Stdlib.Net.Port.httpAlt)
@@ -3412,7 +3393,6 @@ module RangedInts =
         |> Stdlib.Test.equal("{\"port\":443,\"status\":200}") ])
 
 
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test parseNumbers =
     Stdlib.Test.all(
       [ Stdlib.Json.parse<Stdlib.Net.Port>("8080")
@@ -3450,7 +3430,6 @@ module RangedInts =
 
   // Each type's ends and one past them, against its `fromInt64`: the F# range table has to
   // agree with the Dark one.
-  // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
   test rangesMatchFromInt64 =
     Stdlib.Test.all(
       [ [ -1, 0, 65535, 65536 ]
@@ -3484,7 +3463,6 @@ module RangedInts =
 
 
   module Errors =
-    // @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
     test parseErrors =
       Stdlib.Test.all(
         [ Stdlib.Json.parse<Server>("{\"port\":70000,\"status\":200}")

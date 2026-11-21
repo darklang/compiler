@@ -21,13 +21,11 @@ test errorPayloadErrorRaises =
 
 module Errors =
   module Builtins =
-    // @compiler xfail compile: "Constructor 'Darklang.Stdlib.Option.Option.None' expects 0 fields" class=aot-rejection reason=aot-arity-error
     test noneWithPayloadRaises =
       Stdlib.Option.Option.None(5)
       => raises
         "Expected 0 fields in Darklang.Stdlib.Option.Option.`None`, but got 1"
 
-    // @compiler xfail compile: "Constructor 'Darklang.Stdlib.Option.Option.Some' expects 1 fields" class=aot-rejection reason=aot-arity-error
     test someWithTwoPayloadsRaises =
       Stdlib.Option.Option.Some(5, 6)
       => raises
@@ -37,25 +35,21 @@ module Errors =
     // Distinct enum cases give this type its own content hash for stable error names.
     type MyEnum = | PortedFixtureA | B | C(String)
 
-    // @compiler xfail compile: "Unknown constructor 'Darklang.Language.Tests.Enums.Errors.User.MyEnum.D'" class=aot-rejection reason=aot-name-error
     test unknownCaseRaises =
       MyEnum.D
       => raises
         "There is no case named `D` in Darklang.Language.Tests.Enums.Errors.User.MyEnum"
 
-    // @compiler xfail compile: "Constructor 'Darklang.Language.Tests.Enums.Errors.User.MyEnum.C' expects 1 fields" class=aot-rejection reason=aot-arity-error
     test missingPayloadRaises =
       MyEnum.C
       => raises
         "Expected 1 field in Darklang.Language.Tests.Enums.Errors.User.MyEnum.`C`, but got 0"
 
-    // @compiler xfail compile: "Constructor 'Darklang.Language.Tests.Enums.Errors.User.MyEnum.B' expects 0 fields" class=aot-rejection reason=aot-arity-error
     test extraPayloadRaises =
       MyEnum.B(5)
       => raises
         "Expected 0 fields in Darklang.Language.Tests.Enums.Errors.User.MyEnum.`B`, but got 1"
 
-    // @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
     test matching =
       Stdlib.Test.all(
         [ (match MyEnum.C("test") with | C(v) -> v) |> Stdlib.Test.equal("test")
@@ -68,14 +62,12 @@ module Errors =
            | C(_) -> 2)
           |> Stdlib.Test.equal(2) ])
 
-    // @compiler xfail compile: "Constructor pattern 'Darklang.Language.Tests.Enums.Errors.User.MyEnum.C' has wrong field count" class=aot-rejection reason=aot-match-error
     test patternWithoutPayloadRaises =
       (match MyEnum.C("test") with
        | C -> "unmatched because we didn't provide a space for the field")
       => raises
         "No matching case found for value Darklang.Language.Tests.Enums.Errors.User.MyEnum.C(\"test\") in match expression"
 
-    // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
     test wrongPayloadTypeRaises =
       (MyEnum.C(5))
       => raises
@@ -121,26 +113,22 @@ module MixedCases =
       [ (EnumOfMixedCases.W == (EnumOfMixedCases.Y(1))) |> Stdlib.Test.equal(false)
         (EnumOfMixedCases.Y(1) == EnumOfMixedCases.Y(1)) |> Stdlib.Test.equal(true) ])
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test xWrongTypeRaises =
     EnumOfMixedCases.X(1)
     => raises
       "Failed to create enum. Expected String for field 0 in `X`, but got Int64 (1)"
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test yWrongTypeRaises =
     EnumOfMixedCases.Y("test")
     => raises
       "Failed to create enum. Expected Int64 for field 0 in `Y`, but got String (\"test\")"
 
-  // @compiler xfail compile: "Constructor 'Darklang.Language.Tests.Enums.MixedCases.EnumOfMixedCases.Z' expects 2 fields" class=aot-rejection reason=aot-arity-error
   test zMissingFieldRaises =
     EnumOfMixedCases.Z(1)
     => raises
       "Expected 2 fields in Darklang.Language.Tests.Enums.MixedCases.EnumOfMixedCases.`Z`, but got 1"
 
   // Test ordering of evaluation
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test firstPayloadErrorRaises =
     EnumOfMixedCases.Z(
       Stdlib.Test.raiseRuntimeError("1"),
@@ -177,7 +165,6 @@ module TuplesVsNonTuples =
     | NotTuple(String, Int64)
     | Tuple(String * Int64)
 
-  // @compiler xfail compile: "Non-exhaustive match expression" class=aot-rejection reason=aot-match-error
   test matching =
     Stdlib.Test.all(
       [ (match Tuples.NotTuple("printer broke", 7) with
@@ -187,13 +174,11 @@ module TuplesVsNonTuples =
          | Tuple((reason, 7)) -> reason)
         |> Stdlib.Test.equal("printer broke") ])
 
-  // @compiler xfail compile: "Constructor 'Darklang.Language.Tests.Enums.TuplesVsNonTuples.Tuples.NotTuple' expects 2 fields" class=aot-rejection reason=aot-arity-error
   test tupleForTwoFieldsRaises =
     (Tuples.NotTuple(("printer broke", 7)))
     => raises
       "Expected 2 fields in Darklang.Language.Tests.Enums.TuplesVsNonTuples.Tuples.`NotTuple`, but got 1"
 
-  // @compiler xfail compile: "Constructor 'Darklang.Language.Tests.Enums.TuplesVsNonTuples.Tuples.Tuple' expects 1 fields" class=aot-rejection reason=aot-arity-error
   test twoFieldsForTupleRaises =
     Tuples.Tuple("printer broke", 7)
     => raises

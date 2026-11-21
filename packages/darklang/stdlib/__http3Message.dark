@@ -24,159 +24,153 @@ type Event =
   | TrailerFields of List<(String * String)>
 type Received = { state: Stdlib.__Http3Message.State, events: List<Stdlib.__Http3Message.Event>, feedback: Blob }
 
-let create (mode: Stdlib.__Http3Message.Mode) : Stdlib.__Http3Message.State =
+let create(mode: Stdlib.__Http3Message.Mode): Stdlib.__Http3Message.State =
   Stdlib.__Http3Message.State { framing = Stdlib.__Http3Stream.empty, mode = mode, phase = AwaitHead,
-    expected = None, received = 0L, noBody = false, informational = 0L, headers = [], parts = 0L, waiting = None, deferred = [] }
+    expected = None, received = 0, noBody = false, informational = 0, headers = [], parts = 0, waiting = None, deferred = [] }
 
-let __streamFailure (message: String) : Stdlib.__Http3Wire.Failure =
-  Stdlib.__Http3Wire.Failure { scope = Stream, code = 270L, message = message }
+let __streamFailure(message: String): Stdlib.__Http3Wire.Failure =
+  Stdlib.__Http3Wire.Failure { scope = Stream, code = 270, message = message }
 
-let __fields (fields: List<(String * String)>) (request: Bool) : Stdlib.Result.Result<Unit, Stdlib.__Http3Wire.Failure> =
+let __fields(fields: List<(String * String)>, request: Bool): Stdlib.Result.Result<Unit, Stdlib.__Http3Wire.Failure> =
   match fields with
-  | [] -> Ok ()
+  | [] -> Ok()
   | (name, value) :: rest ->
-    let length = Stdlib.String.__byteLength value in
+    let length = Stdlib.String.__byteLength(value) in
     let whitespace =
-      if length == 0L then false
+      if length == 0 then false
       else
-        let first = Stdlib.String.__byteAtUnchecked value 0L in
-        let last = Stdlib.String.__byteAtUnchecked value (length - 1L) in
-        first == 32L || first == 9L || last == 32L || last == 9L in
-    if whitespace then Error (Stdlib.__Http3Message.__streamFailure "Whitespace at HTTP/3 field value boundary")
-    else if name == "te" && request == false then Error (Stdlib.__Http3Message.__streamFailure "TE outside HTTP/3 request headers")
-    else Stdlib.__Http3Message.__fields rest request
+        let first = Stdlib.String.__byteAtUnchecked(value, 0) in
+        let last = Stdlib.String.__byteAtUnchecked(value, length - 1) in
+        first == 32 || first == 9 || last == 32 || last == 9 in
+    if whitespace then Error(Stdlib.__Http3Message.__streamFailure("Whitespace at HTTP/3 field value boundary"))
+    else if name == "te" && request == false then Error(Stdlib.__Http3Message.__streamFailure("TE outside HTTP/3 request headers"))
+    else Stdlib.__Http3Message.__fields(rest, request)
 
-let __begin (state: Stdlib.__Http3Message.State) (kind: Int64) (size: Int64)
-  : Stdlib.Result.Result<Stdlib.__Http3Message.State, Stdlib.__Http3Wire.Failure> =
+let __begin(state: Stdlib.__Http3Message.State, kind: Int64, size: Int64): Stdlib.Result.Result<Stdlib.__Http3Message.State, Stdlib.__Http3Wire.Failure> =
   // This profile never grants MAX_PUSH_ID; any promised push is unpermitted.
-  if kind == 5L then
+  if kind == 5 then
     match state.mode with
-    | Response _ -> Error (Stdlib.__Http3Wire.connectionFailure 264L "Unpermitted HTTP/3 PUSH_PROMISE")
-    | Request -> Error (Stdlib.__Http3Wire.connectionFailure 261L "Unexpected HTTP/3 frame on message stream")
-  else if kind == 4L || kind == 7L || kind == 3L || kind == 13L then
-    Error (Stdlib.__Http3Wire.connectionFailure 261L "Unexpected HTTP/3 frame on message stream")
-  else if kind == 1L then
-    if size > 65536L then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 header block exceeds limit")
-    else if state.phase == Trailers then Error (Stdlib.__Http3Wire.connectionFailure 261L "HEADERS after HTTP/3 trailers")
-    else Ok { state with headers = [], parts = 0L }
-  else if kind == 0L then
-    if state.phase != Body then Error (Stdlib.__Http3Wire.connectionFailure 261L "HTTP/3 DATA outside message body")
-    else if state.noBody then Error (Stdlib.__Http3Message.__streamFailure "HTTP/3 DATA forbidden for this response")
-    else if size > 104857600L - state.received then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 body exceeds limit")
+    | Response(_) -> Error(Stdlib.__Http3Wire.connectionFailure(264, "Unpermitted HTTP/3 PUSH_PROMISE"))
+    | Request -> Error(Stdlib.__Http3Wire.connectionFailure(261, "Unexpected HTTP/3 frame on message stream"))
+  else if kind == 4 || kind == 7 || kind == 3 || kind == 13 then
+    Error(Stdlib.__Http3Wire.connectionFailure(261, "Unexpected HTTP/3 frame on message stream"))
+  else if kind == 1 then
+    if size > 65536 then Error(Stdlib.__Http3Wire.connectionFailure(263, "HTTP/3 header block exceeds limit"))
+    else if state.phase == Trailers then Error(Stdlib.__Http3Wire.connectionFailure(261, "HEADERS after HTTP/3 trailers"))
+    else Ok({ state with headers = [], parts = 0 })
+  else if kind == 0 then
+    if state.phase != Body then Error(Stdlib.__Http3Wire.connectionFailure(261, "HTTP/3 DATA outside message body"))
+    else if state.noBody then Error(Stdlib.__Http3Message.__streamFailure("HTTP/3 DATA forbidden for this response"))
+    else if size > 104857600 - state.received then Error(Stdlib.__Http3Wire.connectionFailure(263, "HTTP/3 body exceeds limit"))
     else
       match state.expected with
-      | Some length -> if size > length - state.received then Error (Stdlib.__Http3Message.__streamFailure "HTTP/3 Content-Length exceeded") else Ok state
-      | None -> Ok state
-  else Ok state
+      | Some(length) -> if size > length - state.received then Error(Stdlib.__Http3Message.__streamFailure("HTTP/3 Content-Length exceeded")) else Ok(state)
+      | None -> Ok(state)
+  else Ok(state)
 
-let __head (state: Stdlib.__Http3Message.State) (fields: List<(String * String)>)
-  : Stdlib.Result.Result<(Stdlib.__Http3Message.State * Stdlib.__Http3Message.Event), Stdlib.__Http3Wire.Failure> =
+let __head(state: Stdlib.__Http3Message.State, fields: List<(String * String)>): Stdlib.Result.Result<(Stdlib.__Http3Message.State * Stdlib.__Http3Message.Event), Stdlib.__Http3Wire.Failure> =
   match state.mode with
   | Request ->
-    (match Stdlib.__Http2Fields.request fields |> Stdlib.Result.mapError Stdlib.__Http3Message.__streamFailure with
-    | Error message -> Error message
-    | Ok head ->
-      match Stdlib.__Http2Fields.length head.headers |> Stdlib.Result.mapError Stdlib.__Http3Message.__streamFailure with
-      | Error message -> Error message
-      | Ok length -> Ok (({ state with phase = Body, expected = length }, RequestHead head)))
-  | Response headOnly ->
-    match Stdlib.__Http2Fields.response fields |> Stdlib.Result.mapError Stdlib.__Http3Message.__streamFailure with
-    | Error message -> Error message
-    | Ok head ->
-      match Stdlib.__Http2Fields.length head.headers |> Stdlib.Result.mapError Stdlib.__Http3Message.__streamFailure with
-      | Error message -> Error message
-      | Ok length ->
-        if head.status < 200L then
-          if state.informational >= 8L then Error (Stdlib.__Http3Wire.connectionFailure 263L "Too many informational HTTP/3 responses")
-          else if Stdlib.Option.isSome length then Error (Stdlib.__Http3Message.__streamFailure "Content-Length on informational HTTP/3 response")
-          else Ok (({ state with informational = state.informational + 1L }, ResponseHead head))
-        else if head.status == 204L && Stdlib.Option.isSome length then Error (Stdlib.__Http3Message.__streamFailure "Content-Length on HTTP/3 204 response")
+    (match Stdlib.__Http2Fields.request(fields) |> Stdlib.Result.mapError(Stdlib.__Http3Message.__streamFailure) with
+    | Error(message) -> Error(message)
+    | Ok(head) ->
+      match Stdlib.__Http2Fields.length(head.headers) |> Stdlib.Result.mapError(Stdlib.__Http3Message.__streamFailure) with
+      | Error(message) -> Error(message)
+      | Ok(length) -> Ok(({ state with phase = Body, expected = length }, RequestHead(head))))
+  | Response(headOnly) ->
+    match Stdlib.__Http2Fields.response(fields) |> Stdlib.Result.mapError(Stdlib.__Http3Message.__streamFailure) with
+    | Error(message) -> Error(message)
+    | Ok(head) ->
+      match Stdlib.__Http2Fields.length(head.headers) |> Stdlib.Result.mapError(Stdlib.__Http3Message.__streamFailure) with
+      | Error(message) -> Error(message)
+      | Ok(length) ->
+        if head.status < 200 then
+          if state.informational >= 8 then Error(Stdlib.__Http3Wire.connectionFailure(263, "Too many informational HTTP/3 responses"))
+          else if Stdlib.Option.isSome(length) then Error(Stdlib.__Http3Message.__streamFailure("Content-Length on informational HTTP/3 response"))
+          else Ok(({ state with informational = state.informational + 1 }, ResponseHead(head)))
+        else if head.status == 204 && Stdlib.Option.isSome(length) then Error(Stdlib.__Http3Message.__streamFailure("Content-Length on HTTP/3 204 response"))
         else
-          let noBody = headOnly || head.status == 204L || head.status == 304L in
+          let noBody = headOnly || head.status == 204 || head.status == 304 in
           let expected = if noBody then None else length in
-          Ok (({ state with phase = Body, expected = expected, noBody = noBody }, ResponseHead head))
+          Ok(({ state with phase = Body, expected = expected, noBody = noBody }, ResponseHead(head)))
 
-let __decodedHeaders (state: Stdlib.__Http3Message.State) (fields: List<(String * String)>)
-  : Stdlib.Result.Result<(Stdlib.__Http3Message.State * Stdlib.__Http3Message.Event), Stdlib.__Http3Wire.Failure> =
-    let cleared = { state with headers = [], parts = 0L, waiting = None, deferred = [] } in
+let __decodedHeaders(state: Stdlib.__Http3Message.State, fields: List<(String * String)>): Stdlib.Result.Result<(Stdlib.__Http3Message.State * Stdlib.__Http3Message.Event), Stdlib.__Http3Wire.Failure> =
+    let cleared = { state with headers = [], parts = 0, waiting = None, deferred = [] } in
     let request = state.mode == Request && state.phase == AwaitHead in
-    Stdlib.__Http3Message.__fields fields request |> Stdlib.Result.andThen (fun _unit ->
-      if state.phase == AwaitHead then Stdlib.__Http3Message.__head cleared fields
+    Stdlib.__Http3Message.__fields(fields, request) |> Stdlib.Result.andThen(fun _unit ->
+      if state.phase == AwaitHead then Stdlib.__Http3Message.__head(cleared, fields)
       else
-        match Stdlib.__Http2Fields.trailers fields |> Stdlib.Result.mapError Stdlib.__Http3Message.__streamFailure with
-        | Error message -> Error message
-        | Ok _ -> Ok (({ cleared with phase = Trailers }, TrailerFields fields)))
+        match Stdlib.__Http2Fields.trailers(fields) |> Stdlib.Result.mapError(Stdlib.__Http3Message.__streamFailure) with
+        | Error(message) -> Error(message)
+        | Ok(_) -> Ok(({ cleared with phase = Trailers }, TrailerFields(fields))))
 
-let __buffer (state: Stdlib.__Http3Message.State) (input: List<Stdlib.__Http3Stream.Event>) : Stdlib.Result.Result<Stdlib.__Http3Message.State, Stdlib.__Http3Wire.Failure> =
+let __buffer(state: Stdlib.__Http3Message.State, input: List<Stdlib.__Http3Stream.Event>): Stdlib.Result.Result<Stdlib.__Http3Message.State, Stdlib.__Http3Wire.Failure> =
   let deferred = state.deferred @ input in
-  let size = Stdlib.List.fold deferred 0L (fun size event -> match event with | Chunk ((_kind, bytes)) -> size + Stdlib.Blob.__byteLength bytes | _ -> size) in
-  if Stdlib.List.__lengthInt deferred > 1024 || size > 65536L then Error (Stdlib.__Http3Wire.connectionFailure 263L "HTTP/3 blocked message buffer exceeds limit")
-  else Ok { state with deferred = deferred }
+  let size = Stdlib.List.fold(deferred, 0, fun(size, event) -> match event with | Chunk((_kind, bytes)) -> size + Stdlib.Blob.__byteLength(bytes) | _ -> size) in
+  if Stdlib.List.__lengthInt(deferred) > 1024z || size > 65536 then Error(Stdlib.__Http3Wire.connectionFailure(263, "HTTP/3 blocked message buffer exceeds limit"))
+  else Ok({ state with deferred = deferred })
 
-let __events (table: Stdlib.__QpackDecoder.State) (id: Int64) (state: Stdlib.__Http3Message.State) (input: List<Stdlib.__Http3Stream.Event>)
-  (events: List<Stdlib.__Http3Message.Event>) (feedback: List<Blob>) : Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
-  if Stdlib.Option.isSome state.waiting then
-    Stdlib.__Http3Message.__buffer state input |> Stdlib.Result.map (fun state -> Stdlib.__Http3Message.Received { state = state, events = Stdlib.List.reverse events, feedback = Stdlib.Blob.concat (Stdlib.List.reverse feedback) })
+let __events(table: Stdlib.__QpackDecoder.State, id: Int64, state: Stdlib.__Http3Message.State, input: List<Stdlib.__Http3Stream.Event>, events: List<Stdlib.__Http3Message.Event>, feedback: List<Blob>): Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
+  if Stdlib.Option.isSome(state.waiting) then
+    Stdlib.__Http3Message.__buffer(state, input) |> Stdlib.Result.map(fun state -> Stdlib.__Http3Message.Received { state = state, events = Stdlib.List.reverse(events), feedback = Stdlib.Blob.concat(Stdlib.List.reverse(feedback)) })
   else match input with
-  | [] -> Ok (Stdlib.__Http3Message.Received { state = state, events = Stdlib.List.reverse events, feedback = Stdlib.Blob.concat (Stdlib.List.reverse feedback) })
+  | [] -> Ok(Stdlib.__Http3Message.Received { state = state, events = Stdlib.List.reverse(events), feedback = Stdlib.Blob.concat(Stdlib.List.reverse(feedback)) })
   | event :: rest ->
     match event with
-    | Begin ((kind, size)) ->
-      (match Stdlib.__Http3Message.__begin state kind size with
-      | Error message -> Error message
-      | Ok next -> Stdlib.__Http3Message.__events table id next rest events feedback)
-    | Chunk ((kind, data)) ->
-      if kind == 1L then
-        if state.parts >= 1024L then Error (Stdlib.__Http3Wire.connectionFailure 263L "Too many HTTP/3 header fragments")
-        else Stdlib.__Http3Message.__events table id { state with headers = Stdlib.List.push state.headers data, parts = state.parts + 1L } rest events feedback
-      else if kind == 0L then
-        Stdlib.__Http3Message.__events table id { state with received = state.received + Stdlib.Blob.__byteLength data }
-          rest (Stdlib.List.push events (BodyChunk data)) feedback
-      else Stdlib.__Http3Message.__events table id state rest events feedback
-    | End kind ->
-      if kind != 1L then Stdlib.__Http3Message.__events table id state rest events feedback
+    | Begin((kind, size)) ->
+      (match Stdlib.__Http3Message.__begin(state, kind, size) with
+      | Error(message) -> Error(message)
+      | Ok(next) -> Stdlib.__Http3Message.__events(table, id, next, rest, events, feedback))
+    | Chunk((kind, data)) ->
+      if kind == 1 then
+        if state.parts >= 1024 then Error(Stdlib.__Http3Wire.connectionFailure(263, "Too many HTTP/3 header fragments"))
+        else Stdlib.__Http3Message.__events(table, id, { state with headers = Stdlib.List.push(state.headers, data), parts = state.parts + 1 }, rest, events, feedback)
+      else if kind == 0 then
+        Stdlib.__Http3Message.__events(table, id, { state with received = state.received + Stdlib.Blob.__byteLength(data) },
+          rest, Stdlib.List.push(events, BodyChunk(data)), feedback)
+      else Stdlib.__Http3Message.__events(table, id, state, rest, events, feedback)
+    | End(kind) ->
+      if kind != 1 then Stdlib.__Http3Message.__events(table, id, state, rest, events, feedback)
       else
-        let bytes = Stdlib.Blob.concat (Stdlib.List.reverse state.headers) in
-        match Stdlib.__QpackDecoder.decode table bytes |> Stdlib.Result.mapError (Stdlib.__Http3Wire.connectionFailure 512L) with
-        | Error message -> Error message
-        | Ok (Blocked prefix) ->
+        let bytes = Stdlib.Blob.concat(Stdlib.List.reverse(state.headers)) in
+        match Stdlib.__QpackDecoder.decode(table, bytes) |> Stdlib.Result.mapError(Stdlib.__Http3Wire.connectionFailure(512)) with
+        | Error(message) -> Error(message)
+        | Ok(Blocked(prefix)) ->
           let waiting = Stdlib.__Http3Message.Waiting { bytes = bytes, prefix = prefix } in
-          Stdlib.__Http3Message.__events table id { state with waiting = Some waiting, headers = [], parts = 0L } rest events feedback
-        | Ok (Decoded fields) -> Stdlib.__Http3Message.__decodedHeaders state fields.fields |> Stdlib.Result.andThen (fun parsed ->
+          Stdlib.__Http3Message.__events(table, id, { state with waiting = Some(waiting), headers = [], parts = 0 }, rest, events, feedback)
+        | Ok(Decoded(fields)) -> Stdlib.__Http3Message.__decodedHeaders(state, fields.fields) |> Stdlib.Result.andThen(fun parsed ->
           let (next, head) = parsed in
-          let feedback = if fields.required == 0L then feedback else Stdlib.List.push feedback (Stdlib.__QpackDecoder.acknowledge id) in
-          Stdlib.__Http3Message.__events table id next rest (Stdlib.List.push events head) feedback)
+          let feedback = if fields.required == 0 then feedback else Stdlib.List.push(feedback, Stdlib.__QpackDecoder.acknowledge(id)) in
+          Stdlib.__Http3Message.__events(table, id, next, rest, Stdlib.List.push(events, head), feedback))
 
-let resume (table: Stdlib.__QpackDecoder.State) (id: Int64) (state: Stdlib.__Http3Message.State) : Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
+let resume(table: Stdlib.__QpackDecoder.State, id: Int64, state: Stdlib.__Http3Message.State): Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
   match state.waiting with
-  | None -> Ok (Stdlib.__Http3Message.Received { state = state, events = [], feedback = Stdlib.Blob.empty })
-  | Some waiting ->
-    Stdlib.__QpackDecoder.decodeReady table waiting.bytes waiting.prefix |> Stdlib.Result.mapError (Stdlib.__Http3Wire.connectionFailure 512L) |> Stdlib.Result.andThen (fun section ->
+  | None -> Ok(Stdlib.__Http3Message.Received { state = state, events = [], feedback = Stdlib.Blob.empty })
+  | Some(waiting) ->
+    Stdlib.__QpackDecoder.decodeReady(table, waiting.bytes, waiting.prefix) |> Stdlib.Result.mapError(Stdlib.__Http3Wire.connectionFailure(512)) |> Stdlib.Result.andThen(fun section ->
       match section with
-      | Blocked _ -> Ok (Stdlib.__Http3Message.Received { state = state, events = [], feedback = Stdlib.Blob.empty })
-      | Decoded fields -> Stdlib.__Http3Message.__decodedHeaders state fields.fields |> Stdlib.Result.andThen (fun parsed ->
+      | Blocked(_) -> Ok(Stdlib.__Http3Message.Received { state = state, events = [], feedback = Stdlib.Blob.empty })
+      | Decoded(fields) -> Stdlib.__Http3Message.__decodedHeaders(state, fields.fields) |> Stdlib.Result.andThen(fun parsed ->
         let (next, head) = parsed in
-        let feedback = if fields.required == 0L then [] else [Stdlib.__QpackDecoder.acknowledge id] in
-        Stdlib.__Http3Message.__events table id next state.deferred [head] feedback))
+        let feedback = if fields.required == 0 then [] else [Stdlib.__QpackDecoder.acknowledge(id)] in
+        Stdlib.__Http3Message.__events(table, id, next, state.deferred, [head], feedback)))
 
-let feedWithTable (table: Stdlib.__QpackDecoder.State) (id: Int64) (state: Stdlib.__Http3Message.State) (data: Blob)
-  : Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
-  Stdlib.__Http3Message.resume table id state |> Stdlib.Result.andThen (fun resumed ->
-    Stdlib.__Http3Stream.feed resumed.state.framing data |> Stdlib.Result.andThen (fun received ->
-      Stdlib.__Http3Message.__events table id { resumed.state with framing = received.state } received.events [] []
-        |> Stdlib.Result.map (fun next -> { next with events = resumed.events @ next.events, feedback = Stdlib.Blob.concat [resumed.feedback, next.feedback] })))
+let feedWithTable(table: Stdlib.__QpackDecoder.State, id: Int64, state: Stdlib.__Http3Message.State, data: Blob): Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
+  Stdlib.__Http3Message.resume(table, id, state) |> Stdlib.Result.andThen(fun resumed ->
+    Stdlib.__Http3Stream.feed(resumed.state.framing, data) |> Stdlib.Result.andThen(fun received ->
+      Stdlib.__Http3Message.__events(table, id, { resumed.state with framing = received.state }, received.events, [], [])
+        |> Stdlib.Result.map(fun next -> { next with events = resumed.events @ next.events, feedback = Stdlib.Blob.concat([resumed.feedback, next.feedback]) })))
 
-let feed (state: Stdlib.__Http3Message.State) (data: Blob)
-  : Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
-  Stdlib.__QpackDecoder.create 0L |> Stdlib.Result.mapError (Stdlib.__Http3Wire.connectionFailure 512L) |> Stdlib.Result.andThen (fun table -> Stdlib.__Http3Message.feedWithTable table 0L state data)
+let feed(state: Stdlib.__Http3Message.State, data: Blob): Stdlib.Result.Result<Stdlib.__Http3Message.Received, Stdlib.__Http3Wire.Failure> =
+  Stdlib.__QpackDecoder.create(0) |> Stdlib.Result.mapError(Stdlib.__Http3Wire.connectionFailure(512)) |> Stdlib.Result.andThen(fun table -> Stdlib.__Http3Message.feedWithTable(table, 0, state, data))
 
-let finish (state: Stdlib.__Http3Message.State) : Stdlib.Result.Result<Unit, Stdlib.__Http3Wire.Failure> =
-  if Stdlib.Option.isSome state.waiting then Error (Stdlib.__Http3Wire.Failure { scope = Stream, code = 270L, message = "HTTP/3 headers are blocked" })
-  else match Stdlib.__Http3Stream.finish state.framing with
-  | Error failure -> Error failure
-  | Ok _ ->
-    if state.phase == AwaitHead then Error (Stdlib.__Http3Wire.Failure { scope = Stream, code = if state.mode == Request then 269L else 270L, message = "HTTP/3 stream ended before final HEADERS" })
+let finish(state: Stdlib.__Http3Message.State): Stdlib.Result.Result<Unit, Stdlib.__Http3Wire.Failure> =
+  if Stdlib.Option.isSome(state.waiting) then Error(Stdlib.__Http3Wire.Failure { scope = Stream, code = 270, message = "HTTP/3 headers are blocked" })
+  else match Stdlib.__Http3Stream.finish(state.framing) with
+  | Error(failure) -> Error(failure)
+  | Ok(_) ->
+    if state.phase == AwaitHead then Error(Stdlib.__Http3Wire.Failure { scope = Stream, code = if state.mode == Request then 269 else 270, message = "HTTP/3 stream ended before final HEADERS" })
     else
       match state.expected with
-      | Some length -> if length != state.received then Error (Stdlib.__Http3Wire.Failure { scope = Stream, code = 270L, message = "HTTP/3 Content-Length mismatch" }) else Ok ()
-      | None -> Ok ()
+      | Some(length) -> if length != state.received then Error(Stdlib.__Http3Wire.Failure { scope = Stream, code = 270, message = "HTTP/3 Content-Length mismatch" }) else Ok()
+      | None -> Ok()

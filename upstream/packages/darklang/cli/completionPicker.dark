@@ -206,7 +206,6 @@ type Session =
     terminal: Stdlib.Cli.Tui.TerminalSession.State }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.CompletionPicker.startAtSize: Unknown function or value 'Stdlib.Cli.Tui.TerminalSession.startAtSize'"
 let startAtSize(state: State, size: Stdlib.Cli.Tui.Size): Result<Session, String> =
   if Stdlib.Bool.not(supportsSize(size)) then
     Result.Error(unsupportedSizeMessage)
@@ -216,7 +215,6 @@ let startAtSize(state: State, size: Stdlib.Cli.Tui.Size): Result<Session, String
     | Error(message) -> Result.Error(message)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.CompletionPicker.presentAtSize: Unknown function or value 'Stdlib.Cli.Tui.TerminalSession.presentAtSize'"
 let presentAtSize(session: Session, state: State, size: Stdlib.Cli.Tui.Size): Session =
   let terminal =
     Stdlib.Cli.Tui.TerminalSession.presentAtSize(session.terminal, size, viewAtSize(state, size))
@@ -228,7 +226,6 @@ let presentAtSize(session: Session, state: State, size: Stdlib.Cli.Tui.Size): Se
 ///
 /// Selection, cancel, and Ctrl-C all release the region this way: the picker
 /// leaves nothing behind, and the prompt re-anchors where the region began.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.CompletionPicker.stop: Unknown function or value 'Stdlib.Cli.Tui.TerminalSession.stopInlineWithView'"
 let stop(session: Session): Session =
   let cleared =
     Stdlib.Cli.Tui.View

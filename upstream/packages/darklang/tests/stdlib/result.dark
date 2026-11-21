@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Result.Tests
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test display =
   Stdlib.Test.all(
     [ Stdlib.display<Result<Int64, String>>(Stdlib.Result.Result.Ok(3))
@@ -237,7 +236,6 @@ test map5 =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(3)) ])
 
 
-// @compiler xfail compile: "Expected TSum" class=aot-rejection reason=aot-type-error
 test mapWithDefault =
   Stdlib.Test.all(
     [ Stdlib.Result.mapWithDefault(

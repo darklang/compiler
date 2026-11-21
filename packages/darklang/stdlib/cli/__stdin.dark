@@ -3,392 +3,392 @@ module Darklang.Stdlib.Cli.__Stdin
 
 // State: pushed byte/scalar, UTF-16 remainder, CRLF flag, pushed key event,
 // then the cursor/length of a 384-byte input buffer at offset 128.
-let __stdinWord (state: RawPtr) (offset: Int64) : Int64 = __raw_get state offset
+let __stdinWord(state: RawPtr, offset: Int64): Int64 = __raw_get(state, offset)
 
-let __stdinByte (state: RawPtr) : Int64 =
-    let pending = Stdlib.Cli.__Stdin.__stdinWord state 0L in
-    if pending > 0L then
-        let _ = __raw_write_word state 0L 0L in pending - 1L
+let __stdinByte(state: RawPtr): Int64 =
+    let pending = Stdlib.Cli.__Stdin.__stdinWord(state, 0) in
+    if pending > 0 then
+        let _ = __raw_write_word(state, 0, 0) in pending - 1
     else
-        let cursor = Stdlib.Cli.__Stdin.__stdinWord state 64L in
-        let length = Stdlib.Cli.__Stdin.__stdinWord state 72L in
+        let cursor = Stdlib.Cli.__Stdin.__stdinWord(state, 64) in
+        let length = Stdlib.Cli.__Stdin.__stdinWord(state, 72) in
         if cursor < length then
-            let _ = __raw_write_word state 64L (cursor + 1L) in
-            __raw_get_byte state (128L + cursor)
+            let _ = __raw_write_word(state, 64, cursor + 1) in
+            __raw_get_byte(state, 128 + cursor)
         else
-            let rc = Stdlib.Cli.__Posix.__read 0L (Builtin.__stdinState 128L) 384L in
-            if rc == -4L then Stdlib.Cli.__Stdin.__stdinByte state
-            else if rc < 0L then
-                let _ = __raw_write_word state 80L (0L - rc) in -1L
-            else if rc == 0L then -1L
+            let rc = Stdlib.Cli.__Posix.__read(0, Builtin.__stdinState(128), 384) in
+            if rc == -4 then Stdlib.Cli.__Stdin.__stdinByte(state)
+            else if rc < 0 then
+                let _ = __raw_write_word(state, 80, 0 - rc) in -1
+            else if rc == 0 then -1
             else
-                let _ = __raw_write_word state 64L 0L in
-                let _ = __raw_write_word state 72L rc in
-                Stdlib.Cli.__Stdin.__stdinByte state
+                let _ = __raw_write_word(state, 64, 0) in
+                let _ = __raw_write_word(state, 72, rc) in
+                Stdlib.Cli.__Stdin.__stdinByte(state)
 
-let __stdinContinuation (state: RawPtr) (remaining: Int64) (value: Int64) (minimum: Int64) : Int64 =
-    if remaining == 0L then
-        if value < minimum || value > 1114111L || (value >= 55296L && value <= 57343L) then 65533L else value
+let __stdinContinuation(state: RawPtr, remaining: Int64, value: Int64, minimum: Int64): Int64 =
+    if remaining == 0 then
+        if value < minimum || value > 1114111 || (value >= 55296 && value <= 57343) then 65533 else value
     else
-        let byte = Stdlib.Cli.__Stdin.__stdinByte state in
-        if byte < 128L || byte > 191L || (remaining == 2L && minimum == 2048L && ((value == 0L && byte < 160L) || (value == 13L && byte >= 160L))) || (remaining == 3L && ((value == 0L && byte < 144L) || (value == 4L && byte > 143L))) then
-            let _ = if byte >= 0L then __raw_write_word state 0L (byte + 1L) else () in
-            65533L
-        else Stdlib.Cli.__Stdin.__stdinContinuation state (remaining - 1L) (value * 64L + byte - 128L) minimum
+        let byte = Stdlib.Cli.__Stdin.__stdinByte(state) in
+        if byte < 128 || byte > 191 || (remaining == 2 && minimum == 2048 && ((value == 0 && byte < 160) || (value == 13 && byte >= 160))) || (remaining == 3 && ((value == 0 && byte < 144) || (value == 4 && byte > 143))) then
+            let _ = if byte >= 0 then __raw_write_word(state, 0, byte + 1) else () in
+            65533
+        else Stdlib.Cli.__Stdin.__stdinContinuation(state, remaining - 1, value * 64 + byte - 128, minimum)
 
-let __stdinScalar (state: RawPtr) : Int64 =
-    let pending = Stdlib.Cli.__Stdin.__stdinWord state 16L in
-    if pending > 0L then
-        let _ = __raw_write_word state 16L 0L in pending - 1L
+let __stdinScalar(state: RawPtr): Int64 =
+    let pending = Stdlib.Cli.__Stdin.__stdinWord(state, 16) in
+    if pending > 0 then
+        let _ = __raw_write_word(state, 16, 0) in pending - 1
     else
-        let byte = Stdlib.Cli.__Stdin.__stdinByte state in
-        if byte < 128L then byte
-        else if byte >= 194L && byte <= 223L then Stdlib.Cli.__Stdin.__stdinContinuation state 1L (byte - 192L) 128L
-        else if byte >= 224L && byte <= 239L then Stdlib.Cli.__Stdin.__stdinContinuation state 2L (byte - 224L) 2048L
-        else if byte >= 240L && byte <= 244L then Stdlib.Cli.__Stdin.__stdinContinuation state 3L (byte - 240L) 65536L
-        else 65533L
+        let byte = Stdlib.Cli.__Stdin.__stdinByte(state) in
+        if byte < 128 then byte
+        else if byte >= 194 && byte <= 223 then Stdlib.Cli.__Stdin.__stdinContinuation(state, 1, byte - 192, 128)
+        else if byte >= 224 && byte <= 239 then Stdlib.Cli.__Stdin.__stdinContinuation(state, 2, byte - 224, 2048)
+        else if byte >= 240 && byte <= 244 then Stdlib.Cli.__Stdin.__stdinContinuation(state, 3, byte - 240, 65536)
+        else 65533
 
-let __stdinNext (state: RawPtr) : Int64 =
-    let low = Stdlib.Cli.__Stdin.__stdinWord state 8L in
-    if low > 0L then
-        let _ = __raw_write_word state 8L 0L in 65533L
+let __stdinNext(state: RawPtr): Int64 =
+    let low = Stdlib.Cli.__Stdin.__stdinWord(state, 8) in
+    if low > 0 then
+        let _ = __raw_write_word(state, 8, 0) in 65533
     else
-        let scalar = Stdlib.Cli.__Stdin.__stdinScalar state in
-        let skip = Stdlib.Cli.__Stdin.__stdinWord state 24L in
-        let _ = __raw_write_word state 24L 0L in
-        if skip > 0L && scalar == 10L then Stdlib.Cli.__Stdin.__stdinNext state else scalar
+        let scalar = Stdlib.Cli.__Stdin.__stdinScalar(state) in
+        let skip = Stdlib.Cli.__Stdin.__stdinWord(state, 24) in
+        let _ = __raw_write_word(state, 24, 0) in
+        if skip > 0 && scalar == 10 then Stdlib.Cli.__Stdin.__stdinNext(state) else scalar
 
-let __stdinSize (values: List<Int64>) (size: Int64) : Int64 =
+let __stdinSize(values: List<Int64>, size: Int64): Int64 =
     match values with
     | [] -> size
-    | scalar :: rest -> Stdlib.Cli.__Stdin.__stdinSize rest (size + Stdlib.String.__utf8ByteLength scalar)
+    | scalar :: rest -> Stdlib.Cli.__Stdin.__stdinSize(rest, size + Stdlib.String.__utf8ByteLength(scalar))
 
-let __stdinText (values: List<Int64>) : String =
-    let values = Stdlib.List.reverse values in
-    let size = Stdlib.Cli.__Stdin.__stdinSize values 0L in
-    if size == 0L then ""
+let __stdinText(values: List<Int64>): String =
+    let values = Stdlib.List.reverse(values) in
+    let size = Stdlib.Cli.__Stdin.__stdinSize(values, 0) in
+    if size == 0 then ""
     else
-        let pointer = __raw_alloc (16L + Stdlib.String.__alignedDataSize size) in
-        let _ = __raw_write_word pointer 0L 1L in
-        let _ = __raw_write_word pointer 8L size in
-        let _ = Stdlib.String.__encodeCodepoints pointer 16L values in
-        __rawptr_to_string pointer
+        let pointer = __raw_alloc(16 + Stdlib.String.__alignedDataSize(size)) in
+        let _ = __raw_write_word(pointer, 0, 1) in
+        let _ = __raw_write_word(pointer, 8, size) in
+        let _ = Stdlib.String.__encodeCodepoints(pointer, 16, values) in
+        __rawptr_to_string(pointer)
 
 // Text reads grow a mapped buffer rather than retaining one list node per
 // character. The final managed string is copied once; scratch storage is freed.
-let __stdinCopy (buffer: RawPtr) (output: RawPtr) (index: Int64) (length: Int64) (offset: Int64) : Int64 =
+let __stdinCopy(buffer: RawPtr, output: RawPtr, index: Int64, length: Int64, offset: Int64): Int64 =
     if index >= length then index
     else
-        let _ = __raw_write_byte output (index + offset) (__raw_get_byte buffer index) in
-        Stdlib.Cli.__Stdin.__stdinCopy buffer output (index + 1L) length offset
+        let _ = __raw_write_byte(output, index + offset, __raw_get_byte(buffer, index)) in
+        Stdlib.Cli.__Stdin.__stdinCopy(buffer, output, index + 1, length, offset)
 
-let __stdinFinish (buffer: RawPtr) (length: Int64) : String =
-    let error = Stdlib.Cli.__Stdin.__stdinWord (Builtin.__stdinState 0L) 80L in
-    if error > 0L then
-        let _ = __mapped_free buffer in
-        Builtin.crash ($"Unable to read standard input (errno {Stdlib.Int64.toString error})")
+let __stdinFinish(buffer: RawPtr, length: Int64): String =
+    let error = Stdlib.Cli.__Stdin.__stdinWord(Builtin.__stdinState(0), 80) in
+    if error > 0 then
+        let _ = __mapped_free(buffer) in
+        Builtin.crash($"Unable to read standard input (errno {Stdlib.Int64.toString error})")
     else
-        Stdlib.Cli.__Stdin.__stdinFinishValid buffer length
+        Stdlib.Cli.__Stdin.__stdinFinishValid(buffer, length)
 
-let __stdinFinishValid (buffer: RawPtr) (length: Int64) : String =
-    let output = __raw_alloc (16L + Stdlib.String.__alignedDataSize length) in
-    let _ = __raw_write_word output 0L 1L in
-    let _ = __raw_write_word output 8L length in
-    let _ = Stdlib.Cli.__Stdin.__stdinCopy buffer output 0L length 16L in
-    let _ = __mapped_free buffer in
-    __rawptr_to_string output
+let __stdinFinishValid(buffer: RawPtr, length: Int64): String =
+    let output = __raw_alloc(16 + Stdlib.String.__alignedDataSize(length)) in
+    let _ = __raw_write_word(output, 0, 1) in
+    let _ = __raw_write_word(output, 8, length) in
+    let _ = Stdlib.Cli.__Stdin.__stdinCopy(buffer, output, 0, length, 16) in
+    let _ = __mapped_free(buffer) in
+    __rawptr_to_string(output)
 
 // mode: 0=until EOF, 1=line, 2=count UTF-16 code units.
-let __stdinCollect (state: RawPtr) (buffer: RawPtr) (capacity: Int64) (length: Int64) (remaining: Int64) (mode: Int64) : String =
-    if mode == 2L && remaining == 0L then Stdlib.Cli.__Stdin.__stdinFinish buffer length
-    else if length + 4L > capacity then
-        let next = __mapped_alloc (capacity * 2L) in
-        let _ = Stdlib.Cli.__Stdin.__stdinCopy buffer next 0L length 0L in
-        let _ = __mapped_free buffer in
-        Stdlib.Cli.__Stdin.__stdinCollect state next (capacity * 2L) length remaining mode
+let __stdinCollect(state: RawPtr, buffer: RawPtr, capacity: Int64, length: Int64, remaining: Int64, mode: Int64): String =
+    if mode == 2 && remaining == 0 then Stdlib.Cli.__Stdin.__stdinFinish(buffer, length)
+    else if length + 4 > capacity then
+        let next = __mapped_alloc(capacity * 2) in
+        let _ = Stdlib.Cli.__Stdin.__stdinCopy(buffer, next, 0, length, 0) in
+        let _ = __mapped_free(buffer) in
+        Stdlib.Cli.__Stdin.__stdinCollect(state, next, capacity * 2, length, remaining, mode)
     else
-        let scalar = Stdlib.Cli.__Stdin.__stdinNext state in
-        if scalar < 0L || (mode == 1L && scalar == 10L) then Stdlib.Cli.__Stdin.__stdinFinish buffer length
-        else if mode == 1L && scalar == 13L then
-            let _ = __raw_write_word state 24L 1L in
-            Stdlib.Cli.__Stdin.__stdinFinish buffer length
+        let scalar = Stdlib.Cli.__Stdin.__stdinNext(state) in
+        if scalar < 0 || (mode == 1 && scalar == 10) then Stdlib.Cli.__Stdin.__stdinFinish(buffer, length)
+        else if mode == 1 && scalar == 13 then
+            let _ = __raw_write_word(state, 24, 1) in
+            Stdlib.Cli.__Stdin.__stdinFinish(buffer, length)
         else
-            let split = mode == 2L && scalar > 65535L && remaining == 1L in
-            let _ = if split then __raw_write_word state 8L 1L else () in
-            let emitted = if split then 65533L else scalar in
-            let length = Stdlib.String.__encodeUtf8At buffer length emitted in
-            let used = if scalar > 65535L && Stdlib.Bool.not split then 2L else 1L in
-            Stdlib.Cli.__Stdin.__stdinCollect state buffer capacity length (if mode == 2L then remaining - used else remaining) mode
+            let split = mode == 2 && scalar > 65535 && remaining == 1 in
+            let _ = if split then __raw_write_word(state, 8, 1) else () in
+            let emitted = if split then 65533 else scalar in
+            let length = Stdlib.String.__encodeUtf8At(buffer, length, emitted) in
+            let used = if scalar > 65535 && Stdlib.Bool.not(split) then 2 else 1 in
+            Stdlib.Cli.__Stdin.__stdinCollect(state, buffer, capacity, length, (if mode == 2 then remaining - used else remaining), mode)
 
-let __stdinStart () : RawPtr =
-    let state = Builtin.__stdinState 0L in
-    let _ = __raw_write_word state 80L 0L in state
+let __stdinStart(): RawPtr =
+    let state = Builtin.__stdinState(0) in
+    let _ = __raw_write_word(state, 80, 0) in state
 
-let __readLine () : String = Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdin.__stdinStart ()) (__mapped_alloc 4096L) 4096L 0L 0L 1L
+let __readLine(): String = Stdlib.Cli.__Stdin.__stdinCollect(Stdlib.Cli.__Stdin.__stdinStart(), __mapped_alloc(4096), 4096, 0, 0, 1)
 
-let __readAll () : String = Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdin.__stdinStart ()) (__mapped_alloc 4096L) 4096L 0L 0L 0L
+let __readAll(): String = Stdlib.Cli.__Stdin.__stdinCollect(Stdlib.Cli.__Stdin.__stdinStart(), __mapped_alloc(4096), 4096, 0, 0, 0)
 
-let __readExactly (length: Int) : String =
-    let count = Builtin.__posixInt32 length in
-    if count < 0L then Builtin.crash "Encountered an out-of-range integer value"
-    else Stdlib.Cli.__Stdin.__stdinCollect (Stdlib.Cli.__Stdin.__stdinStart ()) (__mapped_alloc 4096L) 4096L 0L count 2L
+let __readExactly(length: Int): String =
+    let count = Builtin.__posixInt32(length) in
+    if count < 0 then Builtin.crash("Encountered an out-of-range integer value")
+    else Stdlib.Cli.__Stdin.__stdinCollect(Stdlib.Cli.__Stdin.__stdinStart(), __mapped_alloc(4096), 4096, 0, count, 2)
 
-let __stdinReady (state: RawPtr) (milliseconds: Int64) : Bool =
-    if Stdlib.Cli.__Stdin.__stdinWord state 0L > 0L || Stdlib.Cli.__Stdin.__stdinWord state 16L > 0L || Stdlib.Cli.__Stdin.__stdinWord state 64L < Stdlib.Cli.__Stdin.__stdinWord state 72L then true
+let __stdinReady(state: RawPtr, milliseconds: Int64): Bool =
+    if Stdlib.Cli.__Stdin.__stdinWord(state, 0) > 0 || Stdlib.Cli.__Stdin.__stdinWord(state, 16) > 0 || Stdlib.Cli.__Stdin.__stdinWord(state, 64) < Stdlib.Cli.__Stdin.__stdinWord(state, 72) then true
     else
-        let pollfd = __mapped_alloc 8L in
-        let timeout = __mapped_alloc 16L in
-        let _ = __raw_write_word pollfd 0L 4294967296L in
-        let _ = __raw_write_word timeout 0L (milliseconds / 1000L) in
-        let _ = __raw_write_word timeout 8L ((milliseconds % 1000L) * 1000000L) in
-        let rc = Stdlib.__Network.__poll pollfd timeout in
-        let _ = __mapped_free pollfd in
-        let _ = __mapped_free timeout in
-        rc > 0L
+        let pollfd = __mapped_alloc(8) in
+        let timeout = __mapped_alloc(16) in
+        let _ = __raw_write_word(pollfd, 0, 4294967296) in
+        let _ = __raw_write_word(timeout, 0, milliseconds / 1000) in
+        let _ = __raw_write_word(timeout, 8, (milliseconds % 1000) * 1000000) in
+        let rc = Stdlib.__Network.__poll(pollfd, timeout) in
+        let _ = __mapped_free(pollfd) in
+        let _ = __mapped_free(timeout) in
+        rc > 0
 
 // Key events use scalar values for text, and private codes above Unicode for
 // terminal escape sequences. Modifiers use shift=1, alt=2, ctrl=4.
-let __stdinCsi (state: RawPtr) (text: String) (remaining: Int64) : (Int64 * Int64 * Int64) =
-    if remaining == 0L || Stdlib.Bool.not (Stdlib.Cli.__Stdin.__stdinReady state 30L) then (27L, 0L, 0L)
+let __stdinCsi(state: RawPtr, text: String, remaining: Int64): (Int64 * Int64 * Int64) =
+    if remaining == 0 || Stdlib.Bool.not(Stdlib.Cli.__Stdin.__stdinReady(state, 30)) then (27, 0, 0)
     else
-        let scalar = Stdlib.Cli.__Stdin.__stdinScalar state in
-        if scalar >= 64L && scalar <= 126L then
+        let scalar = Stdlib.Cli.__Stdin.__stdinScalar(state) in
+        if scalar >= 64 && scalar <= 126 then
             let key =
-                if scalar == 65L then 1114112L else if scalar == 66L then 1114113L
-                else if scalar == 67L then 1114114L else if scalar == 68L then 1114115L
-                else if scalar == 72L then 1114116L else if scalar == 70L then 1114117L
-                else if scalar >= 80L && scalar <= 83L then 1114124L + scalar - 80L
-                else if scalar == 126L then
-                    match Stdlib.List.head (Stdlib.String.split text ";") with
-                    | Some "1" -> 1114116L
-                    | Some "7" -> 1114116L
-                    | Some "4" -> 1114117L
-                    | Some "8" -> 1114117L
-                    | Some "2" -> 1114118L
-                    | Some "3" -> 1114119L
-                    | Some "5" -> 1114120L
-                    | Some "6" -> 1114121L
-                    | Some "11" -> 1114124L
-                    | Some "12" -> 1114125L
-                    | Some "13" -> 1114126L
-                    | Some "14" -> 1114127L
-                    | Some "15" -> 1114128L
-                    | Some "17" -> 1114129L
-                    | Some "18" -> 1114130L
-                    | Some "19" -> 1114131L
-                    | Some "20" -> 1114132L
-                    | Some "21" -> 1114133L
-                    | Some "23" -> 1114134L
-                    | Some "24" -> 1114135L
-                    | _ -> 1114122L
-                else if scalar == 90L then 9L else 1114122L in
+                if scalar == 65 then 1114112 else if scalar == 66 then 1114113
+                else if scalar == 67 then 1114114 else if scalar == 68 then 1114115
+                else if scalar == 72 then 1114116 else if scalar == 70 then 1114117
+                else if scalar >= 80 && scalar <= 83 then 1114124 + scalar - 80
+                else if scalar == 126 then
+                    match Stdlib.List.head(Stdlib.String.split(text, ";")) with
+                    | Some("1") -> 1114116
+                    | Some("7") -> 1114116
+                    | Some("4") -> 1114117
+                    | Some("8") -> 1114117
+                    | Some("2") -> 1114118
+                    | Some("3") -> 1114119
+                    | Some("5") -> 1114120
+                    | Some("6") -> 1114121
+                    | Some("11") -> 1114124
+                    | Some("12") -> 1114125
+                    | Some("13") -> 1114126
+                    | Some("14") -> 1114127
+                    | Some("15") -> 1114128
+                    | Some("17") -> 1114129
+                    | Some("18") -> 1114130
+                    | Some("19") -> 1114131
+                    | Some("20") -> 1114132
+                    | Some("21") -> 1114133
+                    | Some("23") -> 1114134
+                    | Some("24") -> 1114135
+                    | _ -> 1114122
+                else if scalar == 90 then 9 else 1114122 in
             let modifiers =
-                match Stdlib.String.split text ";" with
+                match Stdlib.String.split(text, ";") with
                 | _ :: modifier :: _ ->
-                    match Stdlib.Int64.parse modifier with
-                    | Ok number -> if number >= 1L && number <= 8L then number - 1L else 0L
-                    | Error _ -> 0L
-                | _ -> if scalar == 90L then 1L else 0L in
-            (key, 0L, modifiers)
-        else if scalar < 0L then (27L, 0L, 0L)
-        else Stdlib.Cli.__Stdin.__stdinCsi state (text + Stdlib.String.__fromCodepointsRaw [scalar]) (remaining - 1L)
+                    match Stdlib.Int64.parse(modifier) with
+                    | Ok(number) -> if number >= 1 && number <= 8 then number - 1 else 0
+                    | Error(_) -> 0
+                | _ -> if scalar == 90 then 1 else 0 in
+            (key, 0, modifiers)
+        else if scalar < 0 then (27, 0, 0)
+        else Stdlib.Cli.__Stdin.__stdinCsi(state, text + Stdlib.String.__fromCodepointsRaw([scalar]), remaining - 1)
 
-let __stdinEvent (state: RawPtr) : (Int64 * Int64 * Int64) =
-    if Stdlib.Cli.__Stdin.__stdinWord state 56L > 0L then
-        let _ = __raw_write_word state 56L 0L in
-        (Stdlib.Cli.__Stdin.__stdinWord state 32L, Stdlib.Cli.__Stdin.__stdinWord state 40L, Stdlib.Cli.__Stdin.__stdinWord state 48L)
+let __stdinEvent(state: RawPtr): (Int64 * Int64 * Int64) =
+    if Stdlib.Cli.__Stdin.__stdinWord(state, 56) > 0 then
+        let _ = __raw_write_word(state, 56, 0) in
+        (Stdlib.Cli.__Stdin.__stdinWord(state, 32), Stdlib.Cli.__Stdin.__stdinWord(state, 40), Stdlib.Cli.__Stdin.__stdinWord(state, 48))
     else
-        let scalar = Stdlib.Cli.__Stdin.__stdinNext state in
-        if scalar == 27L && Stdlib.Cli.__Stdin.__stdinReady state 30L then
-            let next = Stdlib.Cli.__Stdin.__stdinNext state in
-            if next == 91L || next == 79L then Stdlib.Cli.__Stdin.__stdinCsi state "" 32L
+        let scalar = Stdlib.Cli.__Stdin.__stdinNext(state) in
+        if scalar == 27 && Stdlib.Cli.__Stdin.__stdinReady(state, 30) then
+            let next = Stdlib.Cli.__Stdin.__stdinNext(state) in
+            if next == 91 || next == 79 then Stdlib.Cli.__Stdin.__stdinCsi(state, "", 32)
             else
-                let (key, text, mods) = Stdlib.Cli.__Stdin.__stdinPlain next in
-                (key, text, Stdlib.Int64.bitwiseOr mods 2L)
-        else Stdlib.Cli.__Stdin.__stdinPlain scalar
+                let (key, text, mods) = Stdlib.Cli.__Stdin.__stdinPlain(next) in
+                (key, text, Stdlib.Int64.bitwiseOr(mods, 2))
+        else Stdlib.Cli.__Stdin.__stdinPlain(scalar)
 
-let __stdinPlain (scalar: Int64) : (Int64 * Int64 * Int64) =
-    if scalar == 0L then (32L, 0L, 4L)
-    else if scalar >= 28L && scalar <= 31L then (scalar + 64L, 0L, 4L)
-    else if scalar >= 1L && scalar <= 26L && scalar != 9L && scalar != 10L && scalar != 13L && scalar != 8L then (scalar + 96L, 0L, 4L)
-    else (scalar, if scalar >= 32L && scalar != 127L && (scalar < 128L || scalar > 159L) then scalar else 0L, if (scalar >= 65L && scalar <= 90L) || Stdlib.List.any [33L,34L,35L,36L,37L,38L,40L,41L,42L,43L,58L,60L,62L,63L,64L,94L,95L,123L,124L,125L,126L] (fun code -> code == scalar) then 1L else 0L)
-let __stdinKey (code: Int64) : Stdlib.Cli.Stdin.Key.Key =
-    if code >= 65L && code <= 90L then Stdlib.Cli.__Stdin.__stdinKey (code + 32L)
-    else if code >= 97L && code <= 122L then
-        Stdlib.Option.withDefault (Stdlib.List.__getAtInt [Stdlib.Cli.Stdin.Key.Key.A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z] (Stdlib.Int.fromInt64 (code - 97L))) Stdlib.Cli.Stdin.Key.Key.None
-    else if code >= 48L && code <= 57L then
-        Stdlib.Option.withDefault (Stdlib.List.__getAtInt [Stdlib.Cli.Stdin.Key.Key.D0, D1, D2, D3, D4, D5, D6, D7, D8, D9] (Stdlib.Int.fromInt64 (code - 48L))) Stdlib.Cli.Stdin.Key.Key.None
+let __stdinPlain(scalar: Int64): (Int64 * Int64 * Int64) =
+    if scalar == 0 then (32, 0, 4)
+    else if scalar >= 28 && scalar <= 31 then (scalar + 64, 0, 4)
+    else if scalar >= 1 && scalar <= 26 && scalar != 9 && scalar != 10 && scalar != 13 && scalar != 8 then (scalar + 96, 0, 4)
+    else (scalar, if scalar >= 32 && scalar != 127 && (scalar < 128 || scalar > 159) then scalar else 0, if (scalar >= 65 && scalar <= 90) || Stdlib.List.any([33,34,35,36,37,38,40,41,42,43,58,60,62,63,64,94,95,123,124,125,126], fun code -> code == scalar) then 1 else 0)
+let __stdinKey(code: Int64): Stdlib.Cli.Stdin.Key.Key =
+    if code >= 65 && code <= 90 then Stdlib.Cli.__Stdin.__stdinKey(code + 32)
+    else if code >= 97 && code <= 122 then
+        Stdlib.Option.withDefault(Stdlib.List.__getAtInt([Stdlib.Cli.Stdin.Key.Key.A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T, U, V, W, X, Y, Z], Stdlib.Int.fromInt64(code - 97)), Stdlib.Cli.Stdin.Key.Key.None)
+    else if code >= 48 && code <= 57 then
+        Stdlib.Option.withDefault(Stdlib.List.__getAtInt([Stdlib.Cli.Stdin.Key.Key.D0, D1, D2, D3, D4, D5, D6, D7, D8, D9], Stdlib.Int.fromInt64(code - 48)), Stdlib.Cli.Stdin.Key.Key.None)
     else
         match code with
-        | 8L -> Stdlib.Cli.Stdin.Key.Key.Backspace
-        | 127L -> Stdlib.Cli.Stdin.Key.Key.Backspace
-        | 9L -> Stdlib.Cli.Stdin.Key.Key.Tab
-        | 10L -> Stdlib.Cli.Stdin.Key.Key.Enter
-        | 13L -> Stdlib.Cli.Stdin.Key.Key.Enter
-        | 27L -> Stdlib.Cli.Stdin.Key.Key.Escape
-        | -1L -> Stdlib.Cli.Stdin.Key.Key.Escape
-        | 32L -> Stdlib.Cli.Stdin.Key.Key.Spacebar
-        | 1114112L -> Stdlib.Cli.Stdin.Key.Key.UpArrow
-        | 1114113L -> Stdlib.Cli.Stdin.Key.Key.DownArrow
-        | 1114114L -> Stdlib.Cli.Stdin.Key.Key.RightArrow
-        | 1114115L -> Stdlib.Cli.Stdin.Key.Key.LeftArrow
-        | 1114116L -> Stdlib.Cli.Stdin.Key.Key.Home
-        | 1114117L -> Stdlib.Cli.Stdin.Key.Key.End
-        | 1114118L -> Stdlib.Cli.Stdin.Key.Key.Insert
-        | 1114119L -> Stdlib.Cli.Stdin.Key.Key.Delete
-        | 1114120L -> Stdlib.Cli.Stdin.Key.Key.PageUp
-        | 1114121L -> Stdlib.Cli.Stdin.Key.Key.PageDown
-        | 1114124L -> Stdlib.Cli.Stdin.Key.Key.F1
-        | 1114125L -> Stdlib.Cli.Stdin.Key.Key.F2
-        | 1114126L -> Stdlib.Cli.Stdin.Key.Key.F3
-        | 1114127L -> Stdlib.Cli.Stdin.Key.Key.F4
-        | 1114128L -> Stdlib.Cli.Stdin.Key.Key.F5
-        | 1114129L -> Stdlib.Cli.Stdin.Key.Key.F6
-        | 1114130L -> Stdlib.Cli.Stdin.Key.Key.F7
-        | 1114131L -> Stdlib.Cli.Stdin.Key.Key.F8
-        | 1114132L -> Stdlib.Cli.Stdin.Key.Key.F9
-        | 1114133L -> Stdlib.Cli.Stdin.Key.Key.F10
-        | 1114134L -> Stdlib.Cli.Stdin.Key.Key.F11
-        | 1114135L -> Stdlib.Cli.Stdin.Key.Key.F12
-        | 33L -> Stdlib.Cli.Stdin.Key.Key.D1
-        | 64L -> Stdlib.Cli.Stdin.Key.Key.D2
-        | 35L -> Stdlib.Cli.Stdin.Key.Key.D3
-        | 36L -> Stdlib.Cli.Stdin.Key.Key.D4
-        | 37L -> Stdlib.Cli.Stdin.Key.Key.D5
-        | 94L -> Stdlib.Cli.Stdin.Key.Key.D6
-        | 38L -> Stdlib.Cli.Stdin.Key.Key.D7
-        | 42L -> Stdlib.Cli.Stdin.Key.Key.D8
-        | 40L -> Stdlib.Cli.Stdin.Key.Key.D9
-        | 41L -> Stdlib.Cli.Stdin.Key.Key.D0
-        | 59L -> Stdlib.Cli.Stdin.Key.Key.Oem1
-        | 58L -> Stdlib.Cli.Stdin.Key.Key.Oem1
-        | 43L -> Stdlib.Cli.Stdin.Key.Key.OemPlus
-        | 61L -> Stdlib.Cli.Stdin.Key.Key.OemPlus
-        | 44L -> Stdlib.Cli.Stdin.Key.Key.OemComma
-        | 60L -> Stdlib.Cli.Stdin.Key.Key.OemComma
-        | 45L -> Stdlib.Cli.Stdin.Key.Key.OemMinus
-        | 95L -> Stdlib.Cli.Stdin.Key.Key.OemMinus
-        | 46L -> Stdlib.Cli.Stdin.Key.Key.OemPeriod
-        | 62L -> Stdlib.Cli.Stdin.Key.Key.OemPeriod
-        | 47L -> Stdlib.Cli.Stdin.Key.Key.Oem2
-        | 63L -> Stdlib.Cli.Stdin.Key.Key.Oem2
-        | 96L -> Stdlib.Cli.Stdin.Key.Key.Oem3
-        | 126L -> Stdlib.Cli.Stdin.Key.Key.Oem3
-        | 91L -> Stdlib.Cli.Stdin.Key.Key.Oem4
-        | 123L -> Stdlib.Cli.Stdin.Key.Key.Oem4
-        | 92L -> Stdlib.Cli.Stdin.Key.Key.Oem5
-        | 124L -> Stdlib.Cli.Stdin.Key.Key.Oem5
-        | 93L -> Stdlib.Cli.Stdin.Key.Key.Oem6
-        | 125L -> Stdlib.Cli.Stdin.Key.Key.Oem6
-        | 39L -> Stdlib.Cli.Stdin.Key.Key.Oem7
-        | 34L -> Stdlib.Cli.Stdin.Key.Key.Oem7
-        | 1114122L -> Stdlib.Cli.Stdin.Key.Key.NoName
+        | 8 -> Stdlib.Cli.Stdin.Key.Key.Backspace
+        | 127 -> Stdlib.Cli.Stdin.Key.Key.Backspace
+        | 9 -> Stdlib.Cli.Stdin.Key.Key.Tab
+        | 10 -> Stdlib.Cli.Stdin.Key.Key.Enter
+        | 13 -> Stdlib.Cli.Stdin.Key.Key.Enter
+        | 27 -> Stdlib.Cli.Stdin.Key.Key.Escape
+        | -1 -> Stdlib.Cli.Stdin.Key.Key.Escape
+        | 32 -> Stdlib.Cli.Stdin.Key.Key.Spacebar
+        | 1114112 -> Stdlib.Cli.Stdin.Key.Key.UpArrow
+        | 1114113 -> Stdlib.Cli.Stdin.Key.Key.DownArrow
+        | 1114114 -> Stdlib.Cli.Stdin.Key.Key.RightArrow
+        | 1114115 -> Stdlib.Cli.Stdin.Key.Key.LeftArrow
+        | 1114116 -> Stdlib.Cli.Stdin.Key.Key.Home
+        | 1114117 -> Stdlib.Cli.Stdin.Key.Key.End
+        | 1114118 -> Stdlib.Cli.Stdin.Key.Key.Insert
+        | 1114119 -> Stdlib.Cli.Stdin.Key.Key.Delete
+        | 1114120 -> Stdlib.Cli.Stdin.Key.Key.PageUp
+        | 1114121 -> Stdlib.Cli.Stdin.Key.Key.PageDown
+        | 1114124 -> Stdlib.Cli.Stdin.Key.Key.F1
+        | 1114125 -> Stdlib.Cli.Stdin.Key.Key.F2
+        | 1114126 -> Stdlib.Cli.Stdin.Key.Key.F3
+        | 1114127 -> Stdlib.Cli.Stdin.Key.Key.F4
+        | 1114128 -> Stdlib.Cli.Stdin.Key.Key.F5
+        | 1114129 -> Stdlib.Cli.Stdin.Key.Key.F6
+        | 1114130 -> Stdlib.Cli.Stdin.Key.Key.F7
+        | 1114131 -> Stdlib.Cli.Stdin.Key.Key.F8
+        | 1114132 -> Stdlib.Cli.Stdin.Key.Key.F9
+        | 1114133 -> Stdlib.Cli.Stdin.Key.Key.F10
+        | 1114134 -> Stdlib.Cli.Stdin.Key.Key.F11
+        | 1114135 -> Stdlib.Cli.Stdin.Key.Key.F12
+        | 33 -> Stdlib.Cli.Stdin.Key.Key.D1
+        | 64 -> Stdlib.Cli.Stdin.Key.Key.D2
+        | 35 -> Stdlib.Cli.Stdin.Key.Key.D3
+        | 36 -> Stdlib.Cli.Stdin.Key.Key.D4
+        | 37 -> Stdlib.Cli.Stdin.Key.Key.D5
+        | 94 -> Stdlib.Cli.Stdin.Key.Key.D6
+        | 38 -> Stdlib.Cli.Stdin.Key.Key.D7
+        | 42 -> Stdlib.Cli.Stdin.Key.Key.D8
+        | 40 -> Stdlib.Cli.Stdin.Key.Key.D9
+        | 41 -> Stdlib.Cli.Stdin.Key.Key.D0
+        | 59 -> Stdlib.Cli.Stdin.Key.Key.Oem1
+        | 58 -> Stdlib.Cli.Stdin.Key.Key.Oem1
+        | 43 -> Stdlib.Cli.Stdin.Key.Key.OemPlus
+        | 61 -> Stdlib.Cli.Stdin.Key.Key.OemPlus
+        | 44 -> Stdlib.Cli.Stdin.Key.Key.OemComma
+        | 60 -> Stdlib.Cli.Stdin.Key.Key.OemComma
+        | 45 -> Stdlib.Cli.Stdin.Key.Key.OemMinus
+        | 95 -> Stdlib.Cli.Stdin.Key.Key.OemMinus
+        | 46 -> Stdlib.Cli.Stdin.Key.Key.OemPeriod
+        | 62 -> Stdlib.Cli.Stdin.Key.Key.OemPeriod
+        | 47 -> Stdlib.Cli.Stdin.Key.Key.Oem2
+        | 63 -> Stdlib.Cli.Stdin.Key.Key.Oem2
+        | 96 -> Stdlib.Cli.Stdin.Key.Key.Oem3
+        | 126 -> Stdlib.Cli.Stdin.Key.Key.Oem3
+        | 91 -> Stdlib.Cli.Stdin.Key.Key.Oem4
+        | 123 -> Stdlib.Cli.Stdin.Key.Key.Oem4
+        | 92 -> Stdlib.Cli.Stdin.Key.Key.Oem5
+        | 124 -> Stdlib.Cli.Stdin.Key.Key.Oem5
+        | 93 -> Stdlib.Cli.Stdin.Key.Key.Oem6
+        | 125 -> Stdlib.Cli.Stdin.Key.Key.Oem6
+        | 39 -> Stdlib.Cli.Stdin.Key.Key.Oem7
+        | 34 -> Stdlib.Cli.Stdin.Key.Key.Oem7
+        | 1114122 -> Stdlib.Cli.Stdin.Key.Key.NoName
         | _ -> Stdlib.Cli.Stdin.Key.Key.Packet
 
-let __stdinMillis () : Int64 =
-    match Stdlib.__Network.monotonicMillis () with
-    | Ok value -> value
-    | Error _ -> 0L
+let __stdinMillis(): Int64 =
+    match Stdlib.__Network.monotonicMillis() with
+    | Ok(value) -> value
+    | Error(_) -> 0
 
 // SIGWINCH is consumed synchronously while waiting; the caller receives a
 // neutral event and can re-query its viewport. The previous signal mask is restored.
-let __stdinAwait (state: RawPtr) : Bool =
-    if Stdlib.Cli.__Stdin.__stdinWord state 56L > 0L || Stdlib.Cli.__Stdin.__stdinReady state 15L then true
+let __stdinAwait(state: RawPtr): Bool =
+    if Stdlib.Cli.__Stdin.__stdinWord(state, 56) > 0 || Stdlib.Cli.__Stdin.__stdinReady(state, 15) then true
     else
-        let mask = __mapped_alloc 8L in
-        let _ = __raw_write_word mask 0L 0L in
-        let rc = Stdlib.__Network.__signalPending mask in
-        let pending = Stdlib.Cli.__Stdin.__stdinWord mask 0L in
-        if rc >= 0L && Stdlib.Int64.bitwiseAnd pending 134217728L != 0L then
-            let info = __mapped_alloc 128L in
-            let _ = __raw_write_word mask 0L 134217728L in
-            let _ = Stdlib.__Network.__signalWait mask info in
-            let _ = __mapped_free info in
-            let _ = __mapped_free mask in false
+        let mask = __mapped_alloc(8) in
+        let _ = __raw_write_word(mask, 0, 0) in
+        let rc = Stdlib.__Network.__signalPending(mask) in
+        let pending = Stdlib.Cli.__Stdin.__stdinWord(mask, 0) in
+        if rc >= 0 && Stdlib.Int64.bitwiseAnd(pending, 134217728) != 0 then
+            let info = __mapped_alloc(128) in
+            let _ = __raw_write_word(mask, 0, 134217728) in
+            let _ = Stdlib.__Network.__signalWait(mask, info) in
+            let _ = __mapped_free(info) in
+            let _ = __mapped_free(mask) in false
         else
-            let _ = __mapped_free mask in Stdlib.Cli.__Stdin.__stdinAwait state
+            let _ = __mapped_free(mask) in Stdlib.Cli.__Stdin.__stdinAwait(state)
 
-let __stdinBurst (state: RawPtr) (first: Int64) (firstText: Int64) (modifiers: Int64) (text: List<Int64>) (repeat: Int) (budget: Int64) (deadline: Int64) : (Int64 * Int64 * List<Int64> * Int) =
-    if budget == 0L || Stdlib.Cli.__Stdin.__stdinMillis () >= deadline || Stdlib.Bool.not (Stdlib.Cli.__Stdin.__stdinReady state 4L) then (first, modifiers, text, repeat)
+let __stdinBurst(state: RawPtr, first: Int64, firstText: Int64, modifiers: Int64, text: List<Int64>, repeat: Int, budget: Int64, deadline: Int64): (Int64 * Int64 * List<Int64> * Int) =
+    if budget == 0 || Stdlib.Cli.__Stdin.__stdinMillis() >= deadline || Stdlib.Bool.not(Stdlib.Cli.__Stdin.__stdinReady(state, 4)) then (first, modifiers, text, repeat)
     else
-        let (key, scalar, mods) = Stdlib.Cli.__Stdin.__stdinEvent state in
-        if firstText > 0L then
-            let appended = if scalar > 0L then (Stdlib.List.push text scalar) else if key == 10L || key == 13L then (Stdlib.List.push text 10L) else if key == 9L then (Stdlib.List.push text 9L) else text in
-            Stdlib.Cli.__Stdin.__stdinBurst state (if scalar > 0L then key else first) firstText (if scalar > 0L then mods else modifiers) appended 1 (budget - 1L) deadline
+        let (key, scalar, mods) = Stdlib.Cli.__Stdin.__stdinEvent(state) in
+        if firstText > 0 then
+            let appended = if scalar > 0 then (Stdlib.List.push(text, scalar)) else if key == 10 || key == 13 then (Stdlib.List.push(text, 10)) else if key == 9 then (Stdlib.List.push(text, 9)) else text in
+            Stdlib.Cli.__Stdin.__stdinBurst(state, (if scalar > 0 then key else first), firstText, (if scalar > 0 then mods else modifiers), appended, 1z, budget - 1, deadline)
         else if key == first && mods == modifiers then
-            let appended = if key == 10L || key == 13L then Stdlib.List.push text 10L else if key == 9L then Stdlib.List.push text 9L else text in
-            Stdlib.Cli.__Stdin.__stdinBurst state first firstText modifiers appended (repeat + 1) (budget - 1L) deadline
+            let appended = if key == 10 || key == 13 then Stdlib.List.push(text, 10) else if key == 9 then Stdlib.List.push(text, 9) else text in
+            Stdlib.Cli.__Stdin.__stdinBurst(state, first, firstText, modifiers, appended, repeat + 1z, budget - 1, deadline)
         else
-            let _ = __raw_write_word state 32L key in
-            let _ = __raw_write_word state 40L scalar in
-            let _ = __raw_write_word state 48L mods in
-            let _ = __raw_write_word state 56L 1L in
+            let _ = __raw_write_word(state, 32, key) in
+            let _ = __raw_write_word(state, 40, scalar) in
+            let _ = __raw_write_word(state, 48, mods) in
+            let _ = __raw_write_word(state, 56, 1) in
             (first, modifiers, text, repeat)
 
-let __stdinKeyRead (state: RawPtr) : Stdlib.Cli.Stdin.KeyRead.KeyRead =
-    let (key, scalar, mods) = if Stdlib.Cli.__Stdin.__stdinAwait state then Stdlib.Cli.__Stdin.__stdinEvent state else (1114122L, 0L, 0L) in
-    let ready = Stdlib.Cli.__Stdin.__stdinReady state 0L in
-    let text = if scalar > 0L then [scalar] else if ready && (key == 10L || key == 13L) then [10L] else if ready && key == 9L then [9L] else [] in
-    let (key, mods, text, repeat) = if ready then Stdlib.Cli.__Stdin.__stdinBurst state key scalar mods text 1 4096L (Stdlib.Cli.__Stdin.__stdinMillis () + 40L) else (key, mods, text, 1) in
-    let repeat = if Stdlib.List.isEmpty text then repeat else 1 in
-    Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.__Stdin.__stdinKey key, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = Stdlib.Int64.bitwiseAnd mods 2L != 0L, ctrl = Stdlib.Int64.bitwiseAnd mods 4L != 0L, shift = Stdlib.Int64.bitwiseAnd mods 1L != 0L }, keyChar = Stdlib.Cli.__Stdin.__stdinText text, repeat = repeat }
+let __stdinKeyRead(state: RawPtr): Stdlib.Cli.Stdin.KeyRead.KeyRead =
+    let (key, scalar, mods) = if Stdlib.Cli.__Stdin.__stdinAwait(state) then Stdlib.Cli.__Stdin.__stdinEvent(state) else (1114122, 0, 0) in
+    let ready = Stdlib.Cli.__Stdin.__stdinReady(state, 0) in
+    let text = if scalar > 0 then [scalar] else if ready && (key == 10 || key == 13) then [10] else if ready && key == 9 then [9] else [] in
+    let (key, mods, text, repeat) = if ready then Stdlib.Cli.__Stdin.__stdinBurst(state, key, scalar, mods, text, 1z, 4096, Stdlib.Cli.__Stdin.__stdinMillis() + 40) else (key, mods, text, 1z) in
+    let repeat = if Stdlib.List.isEmpty(text) then repeat else 1z in
+    Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.__Stdin.__stdinKey(key), modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = Stdlib.Int64.bitwiseAnd(mods, 2) != 0, ctrl = Stdlib.Int64.bitwiseAnd(mods, 4) != 0, shift = Stdlib.Int64.bitwiseAnd(mods, 1) != 0 }, keyChar = Stdlib.Cli.__Stdin.__stdinText(text), repeat = repeat }
 
-let __readKey () : Stdlib.Cli.Stdin.KeyRead.KeyRead =
-    if Stdlib.Bool.not (Builtin.__isTerminal 0L) then
-        Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.Escape, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = false, shift = false }, keyChar = "", repeat = 1 }
+let __readKey(): Stdlib.Cli.Stdin.KeyRead.KeyRead =
+    if Stdlib.Bool.not(Builtin.__isTerminal(0)) then
+        Stdlib.Cli.Stdin.KeyRead.KeyRead { key = Stdlib.Cli.Stdin.Key.Key.Escape, modifiers = Stdlib.Cli.Stdin.Modifiers.Modifiers { alt = false, ctrl = false, shift = false }, keyChar = "", repeat = 1z }
     else
-        let mac = Stdlib.Cli.__Posix.__mac () in
-        let saved = __mapped_alloc 128L in
-        let raw = __mapped_alloc 128L in
-        let get = if mac then 1078490131L else 21505L in
-        let set = if mac then 2152231956L else 21506L in
-        let _ = Stdlib.Cli.__Posix.__ioctl 0L get saved in
-        let _ = Stdlib.Blob.__copyBytes saved raw 0L 128L in
-        let width = if mac then 8L else 4L in
-        let local = if mac then 24L else 12L in
-        let flags = Stdlib.Cli.__Posix.__unsigned raw local width in
-        let input = Stdlib.Cli.__Posix.__unsigned raw 0L width in
-        let _ = __raw_write_word raw local (Stdlib.Int64.bitwiseAnd flags (if mac then -1433L else -32844L)) in
-        let _ = __raw_write_word raw 0L (Stdlib.Int64.bitwiseAnd input (if mac then -1985L else -1473L)) in
+        let mac = Stdlib.Cli.__Posix.__mac() in
+        let saved = __mapped_alloc(128) in
+        let raw = __mapped_alloc(128) in
+        let get = if mac then 1078490131 else 21505 in
+        let set = if mac then 2152231956 else 21506 in
+        let _ = Stdlib.Cli.__Posix.__ioctl(0, get, saved) in
+        let _ = Stdlib.Blob.__copyBytes(saved, raw, 0, 128) in
+        let width = if mac then 8 else 4 in
+        let local = if mac then 24 else 12 in
+        let flags = Stdlib.Cli.__Posix.__unsigned(raw, local, width) in
+        let input = Stdlib.Cli.__Posix.__unsigned(raw, 0, width) in
+        let _ = __raw_write_word(raw, local, Stdlib.Int64.bitwiseAnd(flags, if mac then -1433 else -32844)) in
+        let _ = __raw_write_word(raw, 0, Stdlib.Int64.bitwiseAnd(input, if mac then -1985 else -1473)) in
         // Linux termios flag fields are 32-bit; restore the adjacent output field.
-        let _ = if mac then () else Stdlib.Blob.__copyBytes saved raw 4L 4L in
-        let _ = if mac then () else Stdlib.Blob.__copyBytes saved raw 16L 4L in
-        let _ = __raw_write_byte raw (if mac then 48L else 23L) 1L in
-        let _ = __raw_write_byte raw (if mac then 49L else 22L) 0L in
-        let _ = Stdlib.Cli.__Posix.__ioctl 0L set raw in
-        let mask = __mapped_alloc 8L in
-        let previous = __mapped_alloc 8L in
-        let _ = __raw_write_word mask 0L 134217728L in
-        let _ = __raw_write_word previous 0L 0L in
-        let _ = Stdlib.__Network.__signalBlock mask previous in
-        let result = Stdlib.Cli.__Stdin.__stdinKeyRead (Stdlib.Cli.__Stdin.__stdinStart ()) in
-        let _ = Stdlib.__Network.__signalRestore previous in
-        let _ = __mapped_free mask in
-        let _ = __mapped_free previous in
-        let _ = Stdlib.Cli.__Posix.__ioctl 0L set saved in
-        let _ = __mapped_free saved in
-        let _ = __mapped_free raw in
-        let error = Stdlib.Cli.__Stdin.__stdinWord (Builtin.__stdinState 0L) 80L in
-        if error > 0L then Builtin.crash ($"Unable to read standard input (errno {Stdlib.Int64.toString error})") else result
+        let _ = if mac then () else Stdlib.Blob.__copyBytes(saved, raw, 4, 4) in
+        let _ = if mac then () else Stdlib.Blob.__copyBytes(saved, raw, 16, 4) in
+        let _ = __raw_write_byte(raw, (if mac then 48 else 23), 1) in
+        let _ = __raw_write_byte(raw, (if mac then 49 else 22), 0) in
+        let _ = Stdlib.Cli.__Posix.__ioctl(0, set, raw) in
+        let mask = __mapped_alloc(8) in
+        let previous = __mapped_alloc(8) in
+        let _ = __raw_write_word(mask, 0, 134217728) in
+        let _ = __raw_write_word(previous, 0, 0) in
+        let _ = Stdlib.__Network.__signalBlock(mask, previous) in
+        let result = Stdlib.Cli.__Stdin.__stdinKeyRead(Stdlib.Cli.__Stdin.__stdinStart()) in
+        let _ = Stdlib.__Network.__signalRestore(previous) in
+        let _ = __mapped_free(mask) in
+        let _ = __mapped_free(previous) in
+        let _ = Stdlib.Cli.__Posix.__ioctl(0, set, saved) in
+        let _ = __mapped_free(saved) in
+        let _ = __mapped_free(raw) in
+        let error = Stdlib.Cli.__Stdin.__stdinWord(Builtin.__stdinState(0), 80) in
+        if error > 0 then Builtin.crash($"Unable to read standard input (errno {Stdlib.Int64.toString error})") else result
 
 // Keep owned input chunks across reads; materialize text for editing or return.
-let __secretLoop (chunks: List<String>) : String =
-    let k = Builtin.stdinReadKey () in
+let __secretLoop(chunks: List<String>): String =
+    let k = Builtin.stdinReadKey() in
     match k.key with
     | Enter ->
-        let _ = Stdlib.printLine "" in
-        Stdlib.String.join (Stdlib.List.reverse chunks) ""
+        let _ = Stdlib.printLine("") in
+        Stdlib.String.join(Stdlib.List.reverse(chunks), "")
     | Backspace ->
-        let acc = Stdlib.String.join (Stdlib.List.reverse chunks) "" in
-        let shortened = Stdlib.String.__dropLastInt acc 1 in
-        Stdlib.Cli.__Stdin.__secretLoop (if shortened == "" then [] else [shortened])
+        let acc = Stdlib.String.join(Stdlib.List.reverse(chunks), "") in
+        let shortened = Stdlib.String.__dropLastInt(acc, 1z) in
+        Stdlib.Cli.__Stdin.__secretLoop(if shortened == "" then [] else [shortened])
     | _ ->
-        if k.keyChar == "" then Stdlib.Cli.__Stdin.__secretLoop chunks
+        if k.keyChar == "" then Stdlib.Cli.__Stdin.__secretLoop(chunks)
         else
-            let text = if k.repeat > 1 then Stdlib.String.__repeatInt k.keyChar k.repeat else k.keyChar in
-            match Stdlib.String.split text "\n" with
-            | [whole] -> Stdlib.Cli.__Stdin.__secretLoop (Stdlib.List.push chunks whole)
+            let text = if k.repeat > 1z then Stdlib.String.__repeatInt(k.keyChar, k.repeat) else k.keyChar in
+            match Stdlib.String.split(text, "\n") with
+            | [whole] -> Stdlib.Cli.__Stdin.__secretLoop(Stdlib.List.push(chunks, whole))
             | beforeNewline :: _ ->
-                let _ = Stdlib.printLine "" in
-                Stdlib.String.join (Stdlib.List.reverse (Stdlib.List.push chunks beforeNewline)) ""
-            | [] -> Stdlib.Cli.__Stdin.__secretLoop chunks
+                let _ = Stdlib.printLine("") in
+                Stdlib.String.join(Stdlib.List.reverse(Stdlib.List.push(chunks, beforeNewline)), "")
+            | [] -> Stdlib.Cli.__Stdin.__secretLoop(chunks)

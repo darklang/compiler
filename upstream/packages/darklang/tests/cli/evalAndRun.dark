@@ -8,7 +8,6 @@
 module Darklang.Cli.Tests.EvalAndRun
 
 /// What a command printed on stdout, trimmed, against what it should have printed.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.EvalAndRun.prints: Unknown function or value 'Instance.output'"
 let prints(
   i: Instance.T,
   args: List<String>,
@@ -33,7 +32,6 @@ let script(i: Instance.T, name: String, source: String): String =
 /// `--local`, so this does not depend on reaching GitHub: bare `version` checks for
 /// a newer release, and against a firewall that drops rather than refuses it waits
 /// ~11s.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test versionAnswersFromTheBinary = Instance.withInstance(fun i ->
   let out = Instance.said(i, [ "version", "--local" ])
   // A near miss must not silently fall through to the network check, which is the
@@ -57,7 +55,6 @@ test versionAnswersFromTheBinary = Instance.withInstance(fun i ->
 
 /// `status` names the branch ALWAYS, main included: "where am I" is the question it
 /// is for.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test statusSaysWhereYouAre = Instance.withInstance(fun i ->
   let out = Instance.said(i, [ "status" ])
   Stdlib.Test.all(
@@ -72,7 +69,6 @@ test statusSaysWhereYouAre = Instance.withInstance(fun i ->
         "status names the branch, main included") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test evalAnswers =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
@@ -87,7 +83,6 @@ test evalAnswers =
 /// A script's own declarations are keyed by content hash, so two that hash the same
 /// collapse into one. Right when they really are identical; wrong when they only
 /// look identical because they were hashed before their references resolved.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test scriptDeclarationsKeepTheirIdentity = Instance.withInstance(fun i ->
   Stdlib.Test.all(
     [ // Byte-identical apart from a parameter type still unresolved when the first pass
@@ -122,7 +117,6 @@ test scriptDeclarationsKeepTheirIdentity = Instance.withInstance(fun i ->
 
 
 /// Script arguments, runner options and exit codes.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test scriptArgumentsAndExitCodes = Instance.withInstance(fun i ->
   // (label, source, runner options, script arguments, exit code, something it
   // prints)
@@ -294,7 +288,6 @@ test splitArgumentsLikeTheHost =
       |> Stdlib.Test.equal(([], [ "–v", "s.dark" ])) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runStatsReportsTheCost = Instance.withInstance(fun i ->
   let path =
     script(
@@ -323,7 +316,6 @@ test runStatsReportsTheCost = Instance.withInstance(fun i ->
 /// work, and grants only this script version access on later runs.
 ///
 /// The approval needs a terminal, so `expect` plays the person.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test rememberedApprovalContinuesOnceAndStaysWithTheScript =
   Instance.withInstance(fun i ->
     let path =
@@ -392,7 +384,6 @@ test rememberedApprovalContinuesOnceAndStaysWithTheScript =
 /// anything runs: the `printLine` ahead of the error must not print. A dropped value counts,
 /// whether it is on the top level, in a branch that would not be taken, in a lambda, or in a
 /// script's own function, and an error in a function gives its line and the call it is in.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runAndEvalRefuseADefiniteTypeErrorBeforeRunning =
   Instance.withInstance(fun i ->
     let first = "Stdlib.printLine(\"SCRIPT_RAN\")\n"
@@ -445,7 +436,6 @@ test runAndEvalRefuseADefiniteTypeErrorBeforeRunning =
 
 /// A missing trait implementation names the trait, not its hash, and points at the type's own
 /// `toString` when its module has one.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runNamesTheTraitAMissingImplementationIsOf = Instance.withInstance(fun i ->
   let source =
     "let show (e: Stdlib.Json.ParseError.JsonPath.Part.Part): String =\n  Stdlib.display(e)\n"
@@ -470,7 +460,6 @@ test runNamesTheTraitAMissingImplementationIsOf = Instance.withInstance(fun i ->
 
 
 /// `Stdlib.display` on a type with no Display, and no `toString` of its own, points at `inspect`.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runPointsAtInspectForATypeWithoutDisplay = Instance.withInstance(fun i ->
   let source =
     "let shown = Stdlib.display([ 1 ])\nStdlib.printLine(\"SCRIPT_RAN\")\n0"
@@ -489,7 +478,6 @@ test runPointsAtInspectForATypeWithoutDisplay = Instance.withInstance(fun i ->
 
 /// What the check cannot prove wrong still runs: a value discarded with `let _ =`, and a
 /// final expression of any type.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runAndEvalRunWhatTheCheckAccepts = Instance.withInstance(fun i ->
   let source =
     "Stdlib.printLine(\"SCRIPT_RAN\")\nlet _ = 5\nif false then\n  let _ = 6\n  ()\nelse\n  ()\n0"
@@ -505,7 +493,6 @@ test runAndEvalRunWhatTheCheckAccepts = Instance.withInstance(fun i ->
   |> Stdlib.Test.all)
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runtimeChecksUseTheSelectedBranch = Instance.withInstance(fun i ->
   let ok = fun args ->
     Instance.exitedWith(
@@ -545,7 +532,6 @@ test runtimeChecksUseTheSelectedBranch = Instance.withInstance(fun i ->
 
 
 /// Runtime argument checking still rejects a call with the wrong type.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runtimeErrorsDescribePackageArguments = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(i, [ "eval", "Stdlib.List.length(\"not a list\")" ])
@@ -560,7 +546,6 @@ test runtimeErrorsDescribePackageArguments = Instance.withInstance(fun i ->
 /// Runtime diagnostics name a script's own types too. They are never in the store,
 /// and the error is rendered after the executor holding them is gone, so without the
 /// script's names carried along it prints 64-character hashes.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test runtimeErrorsNameScriptTypes = Instance.withInstance(fun i ->
   let out =
     Instance.said(
@@ -577,7 +562,6 @@ test runtimeErrorsNameScriptTypes = Instance.withInstance(fun i ->
       Instance.doesNotSay(out, "CliScript.", "no scaffolding owner") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test lsViewAndHelpAnswer = Instance.withInstance(fun i ->
   let lsList = Instance.said(i, [ "ls", "Stdlib.List" ])
   let view = Instance.said(i, [ "view", "Stdlib.List.head" ])
@@ -607,7 +591,6 @@ test lsViewAndHelpAnswer = Instance.withInstance(fun i ->
 
 /// A `__` name is an internal helper: listings and search leave it out unless asked, and naming it
 /// still reaches it.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test internalNamesHiddenUntilAsked = Instance.withInstance(fun i ->
   let ls = Instance.said(i, [ "ls", "Stdlib.DateTime" ])
 
@@ -650,7 +633,6 @@ test internalNamesHiddenUntilAsked = Instance.withInstance(fun i ->
 /// The settings that open HTTP's network guard or decide what traces record are the
 /// person's: code holding package-write still cannot change them, and is told how
 /// the person can. `config set` itself goes on working.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test codeCannotChangeTheNetworkGuard = Instance.withInstance(fun i ->
   let allowed = Instance.ran(i, [ "permissions", "allow", "package-write" ])
   let tries =
@@ -695,7 +677,6 @@ test codeCannotChangeTheNetworkGuard = Instance.withInstance(fun i ->
 
 
 /// The `--allow` note is only for a failed run; a run that succeeds got what it asked for.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test misplacedAllowNoteOnlyOnFailure = Instance.withInstance(fun i ->
   let path = $"{Instance.home(i)}/ok.dark"
   let _ = Stdlib.Cli.File.writeText(path, "0\n")
@@ -707,7 +688,6 @@ test misplacedAllowNoteOnlyOnFailure = Instance.withInstance(fun i ->
 
 /// The `dark run --allow` rules a function's process denial offers, pasted into a
 /// shell, allow what they say: the exact one that argv and no other, the wider one any.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test processDenialHintsPasteIntoRun = Instance.withInstance(fun i ->
   let source =
     script(
@@ -772,7 +752,6 @@ test processDenialHintsPasteIntoRun = Instance.withInstance(fun i ->
 
 
 /// Two nested lambdas in a script stay two frames, each named by the line it starts on.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test scriptLambdaFramesGiveTheirLines = Instance.withInstance(fun i ->
   let path = $"{Instance.home(i)}/lambdas.dark"
   let source =
@@ -789,7 +768,6 @@ test scriptLambdaFramesGiveTheirLines = Instance.withInstance(fun i ->
 
 
 /// `eval --allow` grants access for that one evaluation, as `run --allow` does.
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test evalAllowGrantsForOneEvaluation = Instance.withInstance(fun i ->
   let dir = $"{Instance.home(i)}/elsewhere"
   let target = $"{dir}/data.txt"

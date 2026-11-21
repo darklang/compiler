@@ -427,7 +427,6 @@ test checkedAbsoluteValue =
 
 
 /// `checkedPower` returns what `**` computes, and the reason where it raises or wraps.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.UInt128.checkedPower'" class=missing-support reason=upstream-dependency
 test checkedPower =
   Stdlib.Test.all(
     [ Stdlib.UInt128.checkedPower(2u128, 127u128)

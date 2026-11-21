@@ -18,7 +18,6 @@ type ParseError =
 
 /// Split <param d> into {{(unscaled, scale)}}, where <param d> is
 /// {{unscaled / 10 ** scale}}: {{Decimal.toParts(1.10dec) == (110z, 2)}}
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.toParts: Unknown function or value 'Builtin.decimalToParts'"
 let toParts(d: Decimal): (BigInt * Int64) =
   Builtin.decimalToParts(d)
 
@@ -26,33 +25,28 @@ let toParts(d: Decimal): (BigInt * Int64) =
 /// The decimal {{unscaled / 10 ** scale}}, keeping <param scale>:
 /// {{Decimal.fromParts(110z, 2) == Some(1.10dec)}}. {{None}} when <param scale> is outside
 /// 0 to 28 or <param unscaled> needs more than 96 bits.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.fromParts: Unknown function or value 'Builtin.decimalFromParts'"
 let fromParts(unscaled: BigInt, scale: Int64): Option<Decimal> =
   Builtin.decimalFromParts(unscaled, scale)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Add for Decimal =
   /// Add <param a> and <param b>; the result has the larger of their scales
   let add(a: Decimal, b: Decimal): Decimal =
     Builtin.add(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Subtract for Decimal =
   /// Subtract <param b> from <param a>
   let subtract(a: Decimal, b: Decimal): Decimal =
     Builtin.subtract(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Multiply for Decimal =
   /// Multiply <param a> by <param b>; the scales add, up to 28 places
   let multiply(a: Decimal, b: Decimal): Decimal =
     Builtin.multiply(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Divide for Decimal =
   /// Divide <param a> by <param b>, to as many places as fit (28 at most).
   /// {{1dec / 3dec}} is {{0.3333333333333333333333333333dec}}. Raises on division by zero;
@@ -62,7 +56,6 @@ impl Divide for Decimal =
     Builtin.divide(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Negate for Decimal =
   /// Returns the negation of <param a>, {{-a}}
   // Not `Builtin.negate(a)`: that is how `-a` is stored, so it would be saved as a call to
@@ -70,7 +63,6 @@ impl Negate for Decimal =
   let negate(a: Decimal): Decimal = Builtin.multiply(a, -1dec)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Compare for Decimal =
   /// Returns true if <param a> is less than <param b>. Scale does not matter.
   let lessThan(a: Decimal, b: Decimal): Bool =
@@ -89,23 +81,19 @@ impl Compare for Decimal =
     Builtin.greaterThanOrEqualTo(a, b)
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Zero for Decimal =
   let zero(): Decimal =
     0dec
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl One for Decimal =
   let one(): Decimal =
     1dec
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Display for Decimal =
   /// Stringify <param d> at its scale, without exponent:
   /// {{Stdlib.display(1.10dec) == "1.10"}}, {{Stdlib.display(-0.05dec) == "-0.05"}}
-  // @compiler blocked: container-adaptation diagnostic="Containing implementation Darklang.Stdlib.Decimal.impl Display for Decimal: An implementation new at this pin; not yet checked against the compiler trait implementations"
   let display(d: Decimal): String =
     let (unscaled, scale) = toParts(d)
     let sign = if unscaled < 0z then "-" else ""
@@ -265,7 +253,6 @@ let __powerOf(b: Decimal, n: BigInt): Decimal =
     if n % 2z == 0z then square else square * b
 
 
-// @compiler blocked: container-adaptation diagnostic="An implementation new at this pin; not yet checked against the compiler trait implementations"
 impl Modulo for Decimal =
   /// <param a> wrapped around so that {{0 <= result < b}}, exactly:
   /// {{-0.5dec % 2dec == 1.5dec}}. The modulus <param b> must be greater than 0.
@@ -275,33 +262,28 @@ impl Modulo for Decimal =
 
 
 /// Adds <param a> and <param b>, or {{Error Overflow}} where `+` raises past the range
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedAdd: Unknown function or value 'Builtin.decimalCheckedAdd'"
 let checkedAdd(a: Decimal, b: Decimal): Result<Decimal, Math.Overflow> =
   Builtin.decimalCheckedAdd(a, b)
 
 
 /// Subtracts <param b> from <param a>, or {{Error Overflow}} where `-` raises past the range
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedSubtract: Unknown function or value 'Builtin.decimalCheckedSubtract'"
 let checkedSubtract(a: Decimal, b: Decimal): Result<Decimal, Math.Overflow> =
   Builtin.decimalCheckedSubtract(a, b)
 
 
 /// Multiplies <param a> by <param b>, or {{Error Overflow}} where `*` raises past the range
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedMultiply: Unknown function or value 'Builtin.decimalCheckedMultiply'"
 let checkedMultiply(a: Decimal, b: Decimal): Result<Decimal, Math.Overflow> =
   Builtin.decimalCheckedMultiply(a, b)
 
 
 /// Divides <param a> by <param b> as `/` does, or where `/` raises, {{Error DivisionByZero}},
 /// or {{Error Overflow}} for a quotient past the range
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedDivide: Unknown function or value 'Builtin.decimalCheckedDivide'"
 let checkedDivide(a: Decimal, b: Decimal): Result<Decimal, Math.DivisionError> =
   Builtin.decimalCheckedDivide(a, b)
 
 
 /// <fn Decimal.power>, or where it raises, {{Error DivisionByZero}} for zero to a negative
 /// power, or {{Error Overflow}} when a power on the way is past the range
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedPower: Unknown function or value 'checkedDivide'"
 let checkedPower(base: Decimal, exponent: Int64): Result<Decimal, Math.DivisionError> =
   let n = BigInt.fromInt64(exponent)
   match __checkedPowerOf(base, abs(n)) with
@@ -309,7 +291,6 @@ let checkedPower(base: Decimal, exponent: Int64): Result<Decimal, Math.DivisionE
   | Ok(d) -> if n < 0z then checkedDivide(1dec, d) else Result.Ok(d)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.__checkedPowerOf: Unknown function or value 'checkedMultiply'"
 let __checkedPowerOf(b: Decimal, n: BigInt): Result<Decimal, Math.Overflow> =
   if n == 0z then
     Result.Ok(1dec)
@@ -338,7 +319,6 @@ let checkedMod(a: Decimal, b: Decimal): Result<Decimal, Math.ModulusError> =
 /// exactly, with <param value>'s sign:
 /// {{Decimal.checkedRemainder(-5.5dec, 2dec) == Ok(-1.5dec)}}. The sign of <param divisor>
 /// does not matter. {{Error DivisionByZero}} when <param divisor> is zero.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Decimal.checkedRemainder: Unknown function or value 'Builtin.modulo'"
 let checkedRemainder(value: Decimal, divisor: Decimal): Result<Decimal, Math.DivisionError> =
   if divisor == 0dec then
     Result.Error(Math.DivisionError.DivisionByZero)

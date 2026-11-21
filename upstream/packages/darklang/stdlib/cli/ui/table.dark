@@ -3,7 +3,6 @@ module Darklang.Stdlib.Cli.UI.Table
 /// Print a formatted table with headers and rows.
 /// columns: list of column header strings
 /// rows: list of rows, each row is a list of cell strings
-// @compiler replace: packages/darklang/stdlib/cli/ui/table.dark#Darklang.Stdlib.Cli.UI.Table.print reason=compiler-implementation
 let print(columns: List<String>, rows: List<List<String>>): Unit =
   let colWidths =
     columns

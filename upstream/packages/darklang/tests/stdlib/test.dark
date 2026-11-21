@@ -3,7 +3,6 @@ module Darklang.Stdlib.Test.Tests
 
 // Compare results with plain `==` so a broken Stdlib.Test.equal cannot pass
 // its own tests.
-// @compiler replace: packages/darklang/stdlib/__testAssertions.dark#Darklang.Stdlib.Test.Tests.is reason=test-diagnostics
 let is(
   actual: Stdlib.Test.Result,
   expected: Stdlib.Test.Result)
@@ -80,7 +79,6 @@ test emptyFailureIsPreserved =
             (3, Stdlib.Test.Result.Fail([ "another failure" ])) ])) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test table =
   Stdlib.Test.all(
     [ // Every row is kept, named by its arguments, passing or not.
@@ -107,7 +105,6 @@ test table =
 
 /// A package test runs on a virtual clock: an hour's sleep finishes at once, and
 /// the clock moves by exactly the hour.
-// @compiler blocked: compiler-timeout diagnostic="compiled code has no virtual clock, so the hour's sleep is real"
 test sleepTakesNoRealTime =
   let before = Stdlib.DateTime.now()
   let _ = Stdlib.Cli.Posix.sleep(3600000.0)
@@ -116,7 +113,6 @@ test sleepTakesNoRealTime =
 
 
 /// `onRealClock` sleeps for real, which always takes a little longer than asked.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.onRealClock'" class=missing-support reason=upstream-dependency
 test onRealClockTakesRealTime =
   let elapsed = Stdlib.Test.onRealClock(fun () ->
     let before = Stdlib.DateTime.__ticks(Stdlib.DateTime.now())
@@ -141,13 +137,11 @@ test groupedFixture =
     Stdlib.Test.all([ Stdlib.Test.pass(), Stdlib.String.length("ab") |> Stdlib.Test.equal(2) ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test tableFixture =
   [ ("a", 1), ("abc", 3) ]
   |> Stdlib.Test.table(fun((s, n)) -> Stdlib.String.length(s) |> Stdlib.Test.equal(n))
 
 
-// @compiler blocked: upstream-dependency diagnostic="fixtureBody: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 let fixtureBody(name: String): Option<LanguageTools.ProgramTypes.Expr> =
   LanguageTools.PackageManager.Test.find(
     SCM.Branch.mainBranchId,
@@ -157,7 +151,6 @@ let fixtureBody(name: String): Option<LanguageTools.ProgramTypes.Expr> =
   |> Stdlib.Option.map(fun test -> test.body)
 
 
-// @compiler blocked: upstream-dependency diagnostic="failureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 test failureLines =
   match fixtureBody("shownFixture") with
   | None -> Stdlib.Test.fail("shownFixture is not stored")
@@ -195,7 +188,6 @@ test failureLines =
 
 
 
-// @compiler xfail compile: "Unknown function or value 'fixtureBody'" class=missing-support reason=upstream-dependency
 test group =
   Stdlib.Test.all(
     [ Stdlib.Test.group("parsing", Stdlib.Test.fail("a"))
@@ -210,7 +202,6 @@ test group =
       |> Stdlib.Test.equal(Stdlib.Option.Option.None) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="groupedFailureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 test groupedFailureLines =
   match fixtureBody("groupedFixture") with
   | None -> Stdlib.Test.fail("groupedFixture is not stored")
@@ -229,7 +220,6 @@ test groupedFailureLines =
       [ "2: Stdlib.String.length(\"ab\") |> Stdlib.Test.equal(2)", "   no" ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="rowFailureLines: Unknown type 'PrettyPrinter.ProgramTypes.Context'"
 test rowFailureLines =
   match fixtureBody("tableFixture") with
   | None -> Stdlib.Test.fail("tableFixture is not stored")

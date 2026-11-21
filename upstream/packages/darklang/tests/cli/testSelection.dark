@@ -2,13 +2,11 @@
 /// reading every test, and pick the same tests as filtering all of them would.
 module Darklang.Cli.Tests.TestSelection
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TestSelection.everyPath: Unknown function or value 'Cli.Packages.Test.liveTests'"
 let everyPath(): List<String> =
   Cli.Packages.Test.liveTests(SCM.Branch.mainBranchId, [], "")
   |> Stdlib.List.map(Cli.Packages.Test.groupedPath)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.TestSelection.selectedPaths: Unknown function or value 'Cli.Packages.Test.selectedTests'"
 let selectedPaths(filters: List<String>): List<String> =
   Cli.Packages.Test.selectedTests(SCM.Branch.mainBranchId, filters)
   |> Stdlib.List.map(Cli.Packages.Test.groupedPath)
@@ -17,7 +15,6 @@ let selectedPaths(filters: List<String>): List<String> =
 let segments(path: String): List<String> = Stdlib.String.split(path, ".")
 
 
-// @compiler xfail compile: "Unknown function or value 'everyPath'" class=missing-support reason=upstream-dependency
 test runSelectsWhatFilteringEveryTestWould =
   let all = everyPath()
   let expected = fun filters ->
@@ -51,7 +48,6 @@ test runSelectsWhatFilteringEveryTestWould =
       [] |> selectedPaths |> Stdlib.Test.equal(expected([])) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'everyPath'" class=missing-support reason=upstream-dependency
 test countFindsWhatFilteringEveryTestWould =
   let all = everyPath() |> Stdlib.List.map(segments)
   let under = fun prefix ->

@@ -36,7 +36,8 @@ def main():
         manifest = directory / 'manifest.json'
         manifest.write_text(json.dumps(paths))
         subprocess.run([str(executable), str(directory), str(manifest),
-                        str(root / 'porting/compiler-reasons.json'), str(report)],
+                        str(root / 'porting/compiler-reasons.json'),
+                        str(root / 'porting/upstream-annotations.tsv'), str(report)],
                        cwd=root, check=True)
     result = json.loads(report.read_text())
     if [row['source'] for row in result['sources']] != paths:

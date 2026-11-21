@@ -18,7 +18,6 @@ test arithmetic =
 
 // `-x` keeps the places, and the impl it runs is not saved as a call to `Negate.negate`,
 // which would be itself.
-// @compiler xfail compile: "Unknown function or value 'LanguageTools.PackageManager.Function.find'" class=missing-support reason=upstream-dependency
 test negate =
   let x = 1.50dec
   let loc =
@@ -105,7 +104,6 @@ test oneDictKeyAcrossScales =
   |> Stdlib.Test.equal(Stdlib.Option.Option.Some("a"))
 
 
-// @compiler xfail compile: "can't compile: uses a Decimal literal pattern, which this compiler does not support" class=missing-support reason=compiler-gap
 test matchIgnoresScale =
   (match 1.10dec with
    | 1.1dec -> "matched"
@@ -479,7 +477,6 @@ test moduloByNegativeRaises =
   => raises "Cannot evaluate modulus against a negative number"
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Decimal.checkedRemainder'" class=missing-support reason=upstream-dependency
 test remainder =
   Stdlib.Test.all(
     [ Stdlib.Decimal.checkedRemainder(5.5dec, 2dec)
@@ -498,7 +495,6 @@ test remainder =
 
 /// `checkedDivide` and `checkedMod` return what `/` and `%` compute, and the reason where
 /// they raise.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Decimal.checkedDivide'" class=missing-support reason=upstream-dependency
 test divisionResults =
   Stdlib.Test.all(
     [ Stdlib.Decimal.checkedDivide(1dec, 4dec)
@@ -522,7 +518,6 @@ test divisionResults =
 
 /// The checked operators return what the operator computes, and {{Error}} where it raises past
 /// the range.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Decimal.checkedAdd'" class=missing-support reason=upstream-dependency
 test checkedArithmetic =
   let max = 79228162514264337593543950335dec
   Stdlib.Test.all(
@@ -552,7 +547,6 @@ test checkedArithmetic =
         Stdlib.Result.Result.Error(Stdlib.Math.DivisionError.Overflow)) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Decimal.checkedPower'" class=missing-support reason=upstream-dependency
 test checkedPower =
   Stdlib.Test.all(
     [ Stdlib.Decimal.checkedPower(1.1dec, 2)

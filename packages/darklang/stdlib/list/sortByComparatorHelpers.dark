@@ -4,61 +4,50 @@ module Darklang.Stdlib.List
 
 module SortByComparatorHelpers =
 
-  let validate
-    (x: 'a)
-    (y: 'a)
-    (comparator: 'a -> 'a -> Int)
-    : Result.Result<Int, String> =
-    let result = comparator x y
+  let validate(x: 'a, y: 'a, comparator: 'a -> 'a -> Int): Result.Result<Int, String> =
+    let result = comparator(x, y)
 
-    if result == -1 || result == 0 || result == 1 then
-      Result.Result.Ok result
+    if result == -1z || result == 0z || result == 1z then
+      Result.Result.Ok(result)
     else
-      Result.Result.Error
-        $"Expected comparator function to return -1, 0, or 1, but it returned {Stdlib.display result}"
+      Result.Result.Error(
+        $"Expected comparator function to return -1, 0, or 1, but it returned {Stdlib.display result}")
 
-  let merge
-    (left: List<'a>)
-    (right: List<'a>)
-    (comparator: 'a -> 'a -> Int)
-    : Result.Result<List<'a>, String> =
+  let merge(left: List<'a>, right: List<'a>, comparator: 'a -> 'a -> Int): Result.Result<List<'a>, String> =
     match (left, right) with
-    | ([], _) -> Result.Result.Ok right
-    | (_, []) -> Result.Result.Ok left
+    | ([], _) -> Result.Result.Ok(right)
+    | (_, []) -> Result.Result.Ok(left)
     | (x :: xs, y :: ys) ->
-      match validate x y comparator with
-      | Error msg -> Result.Result.Error msg
-      | Ok result ->
-        if result <= 0 then
-          match merge xs right comparator with
-          | Error msg -> Result.Result.Error msg
-          | Ok merged -> Result.Result.Ok(push merged x)
+      match validate(x, y, comparator) with
+      | Error(msg) -> Result.Result.Error(msg)
+      | Ok(result) ->
+        if result <= 0z then
+          match merge(xs, right, comparator) with
+          | Error(msg) -> Result.Result.Error(msg)
+          | Ok(merged) -> Result.Result.Ok(push(merged, x))
         else
-          match merge left ys comparator with
-          | Error msg -> Result.Result.Error msg
-          | Ok merged -> Result.Result.Ok(push merged y)
+          match merge(left, ys, comparator) with
+          | Error(msg) -> Result.Result.Error(msg)
+          | Ok(merged) -> Result.Result.Ok(push(merged, y))
 
-  let splitList (lst: List<'a>) : (List<'a> * List<'a>) =
+  let splitList(lst: List<'a>): (List<'a> * List<'a>) =
     match lst with
     | [] -> ([], [])
     | [ x ] -> ([ x ], [])
     | x :: y :: xs ->
-      let (left, right) = splitList xs
-      (push left x, push right y)
+      let (left, right) = splitList(xs)
+      (push(left, x), push(right, y))
 
-  let mergeSort
-    (lst: List<'a>)
-    (comparator: 'a -> 'a -> Int)
-    : Result.Result<List<'a>, String> =
+  let mergeSort(lst: List<'a>, comparator: 'a -> 'a -> Int): Result.Result<List<'a>, String> =
     match lst with
-    | [] -> Result.Result.Ok []
-    | [ x ] -> Result.Result.Ok [ x ]
+    | [] -> Result.Result.Ok([])
+    | [ x ] -> Result.Result.Ok([ x ])
     | lst ->
-      let (left, right) = splitList lst
+      let (left, right) = splitList(lst)
 
-      match mergeSort left comparator with
-      | Error msg -> Result.Result.Error msg
-      | Ok sortedLeft ->
-        match mergeSort right comparator with
-        | Error msg -> Result.Result.Error msg
-        | Ok sortedRight -> merge sortedLeft sortedRight comparator
+      match mergeSort(left, comparator) with
+      | Error(msg) -> Result.Result.Error(msg)
+      | Ok(sortedLeft) ->
+        match mergeSort(right, comparator) with
+        | Error(msg) -> Result.Result.Error(msg)
+        | Ok(sortedRight) -> merge(sortedLeft, sortedRight, comparator)

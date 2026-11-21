@@ -37,7 +37,6 @@ test shellQuote =
 
 
 // A child on this process's own terminal still hands back its exit code.
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test inheritedChildExitCode =
   Stdlib.Cli.Process.__childInteractive("/bin/sh", [ "-c", "exit 5" ])
   |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(5))
@@ -53,7 +52,6 @@ test capturesOutputAndExit =
 
 
 // \377 isn't valid UTF-8 on its own, so it only survives as bytes.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
 test runBytesKeepsRawOutput =
   (match Stdlib.Cli.Process.runBytes(
            "/bin/sh",
@@ -67,7 +65,6 @@ test runBytesKeepsRawOutput =
   |> Stdlib.Test.equal((3, "FF61", "FE"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
 test outputTextReplacesInvalidUtf8 =
   (match Stdlib.Cli.Process.runBytes(
            "/bin/sh",
@@ -77,7 +74,6 @@ test outputTextReplacesInvalidUtf8 =
   |> Stdlib.Test.equal("\uFFFDa")
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.executeBytes'" class=missing-support reason=upstream-dependency
 test executeBytesKeepsRawOutput =
   let outcome =
     Stdlib.Cli.executeBytes("printf '\\377\\000'; printf '\\376' >&2")
@@ -89,14 +85,12 @@ test executeBytesKeepsRawOutput =
   |> Stdlib.Test.equal((0, "FF00", "FE"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.executionText'" class=missing-support reason=upstream-dependency
 test executionTextMatchesExecute =
   Stdlib.Cli.executionText(
     Stdlib.Cli.executeBytes("printf out; printf err >&2; exit 2"))
   |> Stdlib.Test.equal(Stdlib.Cli.execute("printf out; printf err >&2; exit 2"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Cli.Unix.executeInDirectoryWithBytes'" class=missing-support reason=upstream-dependency
 test executeInDirectoryWithBytes =
   let outcome = Stdlib.Cli.Unix.executeInDirectoryWithBytes("/", "pwd")
   (outcome.exitCode, Stdlib.Utf8.decodeWithReplacement(outcome.stdout))
@@ -118,7 +112,6 @@ test missingExecutable =
 
 
 // A name PATH does not hold, a relative path, or no name at all is an Error, not a raise.
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test missingProgramsAreErrors =
   Stdlib.Test.all(
     [ (match Stdlib.Cli.Process.run("dark-no-such-program-xyz", []) with
@@ -152,7 +145,6 @@ test rejectsInvalidTimeout =
   |> Stdlib.Test.equal(Stdlib.Result.Result.Error("timeoutMs must be positive"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.onRealClock'" class=missing-support reason=upstream-dependency
 test timesOut =
   Stdlib.Test.onRealClock(fun () ->
     Stdlib.Cli.Process.runWithTimeout(5, "/bin/sh", [ "-c", "sleep 1" ]))
@@ -188,19 +180,16 @@ test emptyInputDoesNotBlock =
   (result.stdout, result.stderr) |> Stdlib.Test.equal(("", ""))
 
 
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildPoll =
   Builtin.runtimeChildPoll(-1z)
   |> Stdlib.Test.equal(Stdlib.Result.Result.Error(9))
 
 
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildDescriptors =
   Builtin.runtimeChildDescriptors(-1z)
   |> Stdlib.Test.equal(Stdlib.Result.Result.Error(9))
 
 
-// @compiler xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 test invalidChildClose =
   Builtin.runtimeChildClose(-1z)
   |> Stdlib.Test.equal(Stdlib.Result.Result.Error(9))

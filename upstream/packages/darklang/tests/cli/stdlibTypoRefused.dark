@@ -1,7 +1,6 @@
 /// A missing name under `Stdlib` is a typo, not a dependency still to come, so the save is refused.
 module Darklang.Cli.Tests.StdlibTypoRefused
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aMissingStdlibNameRefusesTheSave = Instance.withInstance(fun i ->
   let (code, out) =
     Instance.ran(
@@ -25,7 +24,6 @@ test aMissingStdlibNameRefusesTheSave = Instance.withInstance(fun i ->
         "and nothing stored") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test aMissingNameOfYourOwnIsStillSaved = Instance.withInstance(fun i ->
   let (_, out) =
     Instance.ran(

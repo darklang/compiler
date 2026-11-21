@@ -138,7 +138,6 @@ let sortGroups(
 
 
 /// The builtin values whose name contains <param filter>, or all of them without one.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Builtins.matchingValues: Unknown function or value 'LanguageTools.allBuiltinValues'"
 let matchingValues(filter: Option<String>): List<LanguageTools.BuiltinValue> =
   let all = LanguageTools.allBuiltinValues()
   match filter with
@@ -147,7 +146,6 @@ let matchingValues(filter: Option<String>): List<LanguageTools.BuiltinValue> =
     all |> Stdlib.List.filter(fun v -> Stdlib.String.contains(v.name.name, pattern))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let allBuiltins = LanguageTools.allBuiltinFns()
   let withSigs = Stdlib.List.any(args, fun arg -> arg == "--with-sigs")
@@ -277,7 +275,6 @@ let execute(state: AppState, args: List<String>): AppState =
   state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ "Usage: builtins [--with-sigs] [--with-purity] [filter]"
     ""
@@ -299,6 +296,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   []

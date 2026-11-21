@@ -7,7 +7,6 @@ module Darklang.Cli.Commits
 // committed, an op id prints that one op.
 
 /// One display row: [short hash, ops committed, message].
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commits.commitRow: Unknown function or value 'SCM.PackageOps.opCountIn'"
 let commitRow(c: SCM.Commits.Commit): List<String> =
   let ops = Stdlib.display(SCM.PackageOps.opCountIn(c.hash))
   [ SCM.Conflicts.shortHash(c.hash), ops, c.message ]
@@ -26,7 +25,6 @@ module Housekeeping =
     if asked then Housekeeping.Show else Housekeeping.Hide
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeList(state: AppState, limit: Int64, housekeeping: Housekeeping): AppState =
   // This branch's commits, not the store's: on a branch, main's commits are not "mine", and the workbench
   // lists the same set for the same branch.
@@ -73,7 +71,6 @@ let executeList(state: AppState, limit: Int64, housekeeping: Housekeeping): AppS
 /// The table answers "what have I committed"; this answers "and what was in them", without running
 /// `dark show` once per row. Same op printer `show` uses, and the same per-commit cap, because the
 /// seed commit alone holds ~17k ops.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeDetailed(state: AppState, limit: Int64, housekeeping: Housekeeping): AppState =
   let commits =
     if housekeeping == Housekeeping.Show then
@@ -105,7 +102,6 @@ let executeDetailed(state: AppState, limit: Int64, housekeeping: Housekeeping): 
     state
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let help(_state: AppState): String =
   [ ""
     "  dark commits           the 20 most recent"
@@ -120,7 +116,6 @@ let help(_state: AppState): String =
 
 
 /// Every commit, as the machine-readable shape. Same data the table renders.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Commits.commitRows: Unknown function or value 'SCM.PackageOps.commitsOnBranch'"
 let commitRows(limit: Int64): List<ScmJson.CommitRowJson> =
   SCM.PackageOps.commitsOnBranch(SCM.PackageOps.currentBranch(), limit)
   |> Stdlib.List.map(fun c ->
@@ -128,7 +123,6 @@ let commitRows(limit: Int64): List<ScmJson.CommitRowJson> =
       { hash = c.hash, message = c.message, ops = SCM.PackageOps.opCountIn(c.hash) })
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   let wantsJson = ScmJson.wantsJson(args)
   let args = ScmJson.stripJson(args)
@@ -173,7 +167,6 @@ let execute(state: AppState, args: List<String>): AppState =
 
 
 /// Print a commit: its metadata, then the ops it committed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let showCommit(state: AppState, c: SCM.Commits.Commit): Unit =
   let n = SCM.PackageOps.opCountIn(c.hash)
   let msg = if c.message == "" then "(no message)" else c.message
@@ -207,7 +200,6 @@ let showCommit(state: AppState, c: SCM.Commits.Commit): Unit =
     printHint($"  showing the first 50 of {Stdlib.display(n)} -- `dark ops` walks the log in full.")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let helpShow(_state: AppState): String =
   [ ""
     "  dark show <commit>     the commit's message, author, and the ops in it"
@@ -221,7 +213,6 @@ let helpShow(_state: AppState): String =
 /// `dark show <id>`: a commit hash or an op id, whichever the prefix matches. Commits are checked first
 /// because their hashes are short and hand-typed, and an op id that also prefixes a commit is a collision
 /// you'd resolve by typing more of it.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let executeShow(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -259,6 +250,5 @@ let executeShow(state: AppState, args: List<String>): AppState =
 
 /// Shared by `commits` and `show`, whose arguments are a count and a hash. Neither is worth offering:
 /// a count has no candidates, and a hash prefix is what `dark commits` just printed.
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

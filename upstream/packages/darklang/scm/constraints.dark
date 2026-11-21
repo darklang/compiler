@@ -142,7 +142,6 @@ let fqnOf(loc: LanguageTools.ProgramTypes.PackageLocation): String =
 /// <param discriminator> is whatever makes this finding a DIFFERENT one from the next: the version a
 /// usage is on, or another kind-specific discriminator. Kept as text so a kind with no hashes can key on
 /// something else and still get a stable id.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.findingId: Unknown function or value 'Stdlib.Base16.encode'"
 let findingId(
   usage: LanguageTools.ProgramTypes.PackageLocation,
   dependency: LanguageTools.ProgramTypes.PackageLocation,
@@ -155,7 +154,6 @@ let findingId(
 
 /// Find callers that still use an older version of a dependency.
 /// Check each caller's reference names, since callers can follow different aliases.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.outdatedFindings: Unknown function or value 'findingId'"
 let outdatedFindings(edges: List<Deps.StaleReference>): List<Finding> =
   edges
   |> Stdlib.List.map(fun((usage, caller, target, dependency, current)) ->
@@ -178,7 +176,6 @@ let outdatedFindings(edges: List<Deps.StaleReference>): List<Finding> =
   |> Stdlib.List.sortBy(fun f -> fqnOf(f.usage) + ":" + fqnOf(f.dependency))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.outdatedUsagesOn: Unknown function or value 'Deps.review'"
 let outdatedUsagesOn(branchId: Uuid): Result<List<Finding>, String> =
   Deps.review(branchId, []) |> Stdlib.Result.map(fun((stale, _)) -> outdatedFindings(stale))
 
@@ -194,7 +191,6 @@ let outdatedUsagesOn(branchId: Uuid): Result<List<Finding>, String> =
 ///
 /// Deliberately NOT scoped to a branch: a constraint is a property of the STORE, so a branch filter would
 /// make an ack given on main stop counting the moment you switched.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.ackedIds: Unknown function or value 'SCM.Conflicts.query'"
 let ackedIds(): List<String> =
   Conflicts.query(Conflicts.ConflictFilter.AckedConstraints) |> Stdlib.List.map(fun row -> row.id)
 
@@ -208,7 +204,6 @@ let ackedIds(): List<String> =
 /// The `Finding` fields are the stale-usage ones reused: `dependency` is the location ITSELF, because the
 /// thing whose version moved is this name rather than something it calls. That is the one field here that
 /// reads oddly, and it is why `line` in the CLI prints this kind separately.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.detectSupersededDecisions: Unknown function or value 'SCM.PackageOps.supersededOverrides'"
 let detectSupersededDecisions(): Result<List<Finding>, String> =
   PackageOps.supersededOverrides()
   |> Stdlib.Result.map(fun entries ->
@@ -286,7 +281,6 @@ let rivalPairs(candidates: List<(String * 'a)>): List<('a * 'a)> =
   pairs
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.detectRivalImplementations: Unknown function or value 'LanguageTools.PackageManager.Search.search'"
 let detectRivalImplementations(branchId: Uuid): List<Finding> =
   let query =
     LanguageTools.ProgramTypes.Search.SearchQuery
@@ -346,7 +340,6 @@ let detectRivalImplementations(branchId: Uuid): List<Finding> =
 
 
 /// Find outdated references on a non-main branch, including inherited callers.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.detectOutdatedUsagesOn: Unknown function or value 'outdatedUsagesOn'"
 let detectOutdatedUsagesOn(branchId: Uuid): Result<List<Finding>, String> =
   if Branch.isMain(branchId) then Result.Ok([]) else outdatedUsagesOn(branchId)
 
@@ -361,7 +354,6 @@ type Detection =
     blocked: List<String> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.detectWithOutdated: Unknown function or value 'detectSupersededDecisions'"
 let detectWithOutdated(outdated: Result<List<Finding>, String>): Detection =
   let (outdated, outdatedBlocked) =
     match outdated with
@@ -382,7 +374,6 @@ let detectWithOutdated(outdated: Result<List<Finding>, String>): Detection =
 
 
 /// Findings that have not been acknowledged.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.pendingWithOutdated: Unknown function or value 'Stdlib.Dict.fromEntries'"
 let pendingWithOutdated(outdated: Result<List<Finding>, String>): Detection =
   let ackedSet =
     ackedIds()
@@ -405,12 +396,10 @@ let pendingWithOutdated(outdated: Result<List<Finding>, String>): Detection =
       blocked = detected.blocked }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.detectAll: Unknown function or value 'detectWithOutdated'"
 let detectAll(): Detection =
   detectWithOutdated(outdatedUsagesOn(PackageOps.currentBranch()))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.pending: Unknown function or value 'pendingWithOutdated'"
 let pending(): Detection =
   pendingWithOutdated(outdatedUsagesOn(PackageOps.currentBranch()))
 
@@ -419,7 +408,6 @@ let pending(): Detection =
 /// machine you typed it on re-reports forever everywhere else, and differently on each of them.
 ///
 /// The fold writes the `conflicts` row, so that table is derived rather than a second source of truth.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Constraints.ack: Unknown type 'LanguageTools.ProgramTypes.PackageOp'"
 let ack(branchId: Uuid, s: Finding, note: String): Result<Unit, String> =
   // The default has to name the finding it answers. Only StaleUsage is a use of something else; for
   // the other two `dependency` IS the name itself, and "stale use of X" describes nothing that happened.

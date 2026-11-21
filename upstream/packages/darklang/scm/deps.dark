@@ -29,7 +29,6 @@ type DepEdge =
 
 
 /// The recorded dependency edges <param q> asks for.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.query: Unknown function or value 'Builtin.scmDeps'"
 let query(q: DepQuery): List<DepEdge> =
   Builtin.scmDeps(q)
 
@@ -54,7 +53,6 @@ let locationOf(
 
 
 /// Everything <param source> references (forward dependencies), as (hash, kind).
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependenciesOf: Unknown function or value 'query'"
 let dependenciesOf(
   source: LanguageTools.ProgramTypes.Hash)
   : List<(LanguageTools.ProgramTypes.Hash * String)> =
@@ -76,7 +74,6 @@ let readErrorToString(e: ReadError): String =
 
 /// Find callers of these names using this branch's saved reference names.
 /// A rename updates these names without changing the caller's content hash.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependents: Unknown function or value 'Builtin.pmDependents'"
 let dependents(
   branch: Uuid,
   targets: List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)>)
@@ -90,7 +87,6 @@ let dependents(
 
 
 /// <fn dependents>, for callers with no way to report a failed read yet.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependentsFor: Unknown function or value 'Builtin.pmDependents'"
 let dependentsFor(
   branch: Uuid,
   targets: List<(LanguageTools.ProgramTypes.PackageLocation * LanguageTools.ProgramTypes.ItemKind)>)
@@ -102,7 +98,6 @@ let dependentsFor(
 
 
 /// The name MAIN gives this hash, if any.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.mainLocationOf: Unknown function or value 'SCM.Bindings.query'"
 let mainLocationOf(h: String): Option<LanguageTools.ProgramTypes.PackageLocation> =
   Bindings.query(Bindings.BindingFilter.LocationOf(Branch.mainBranchId, h))
   |> Stdlib.List.head
@@ -113,7 +108,6 @@ let mainLocationOf(h: String): Option<LanguageTools.ProgramTypes.PackageLocation
 /// names; this takes one, main's first, since the callers are rendering a label rather than driving a
 /// cascade: identical content is one item, and preferring a branch's name would relabel a main item
 /// whose body you happened to duplicate on a branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.resolveLocations: Unknown function or value 'SCM.PackageOps.currentBranch'"
 let resolveLocations(
   hashes: List<LanguageTools.ProgramTypes.Hash>)
   : List<(LanguageTools.ProgramTypes.Hash * LanguageTools.ProgramTypes.PackageLocation)> =
@@ -135,13 +129,11 @@ type NamedReference =
 
 
 /// Read the reference names used by each caller at its current location and version.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.namedReferences: Unknown function or value 'namedReferencesFor'"
 let namedReferences(branchId: Uuid): Result<List<NamedReference>, String> =
   namedReferencesFor(branchId, [])
 
 
 /// Read what this caller references, using the names it follows on this branch.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Deps.dependencyEdges: Unknown function or value 'namedReferencesFor'"
 let dependencyEdges(
   branchId: Uuid,
   location: LanguageTools.ProgramTypes.PackageLocation,

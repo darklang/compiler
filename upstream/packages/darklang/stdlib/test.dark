@@ -21,14 +21,12 @@ let fail(message: String): Result =
 
 /// Inject an uncaught runtime exception to test propagation and rendering.
 /// Available only inside a running package test; never returns a value.
-// @compiler replace: packages/darklang/stdlib/test.dark#Darklang.Stdlib.Test.raiseRuntimeError reason=interpreter-intrinsic
 let raiseRuntimeError(message: String): Int64 =
   Builtin.pmTestRaiseRuntimeError(message)
 
 
 /// This test's counter, after adding one to it if <param increment>. Callers
 /// use `incrementCounter` and `counterValue`.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.counter: Unknown function or value 'Builtin.testCounter'"
 let counter(increment: Bool): Int64 =
   Builtin.testCounter(increment)
 
@@ -36,7 +34,6 @@ let counter(increment: Bool): Int64 =
 /// Increment this test's counter and return the value unchanged. Use to check
 /// how often a callback or expression runs. The counter starts at zero for each
 /// test run and is shared with its helper calls. Only available in package tests.
-// @compiler blocked: test-counter diagnostic="Darklang.Stdlib.Test.incrementCounter: Unknown function or value 'Builtin.testIncrementCounter'"
 let incrementCounter(value: 'a): 'a =
   let _ = counter(true)
   value
@@ -45,7 +42,6 @@ let incrementCounter(value: 'a): 'a =
 /// Return this test's counter, which starts at zero for each test run.
 /// Tests using the counter rerun rather than reuse a cached pass.
 /// Only available in package tests; no database or host permissions needed.
-// @compiler blocked: test-counter diagnostic="Darklang.Stdlib.Test.counterValue: Unknown function or value 'Builtin.testCounterValue'"
 let counterValue(): Int64 =
   counter(false)
 
@@ -53,7 +49,6 @@ let counterValue(): Int64 =
 /// Run <param f> on the real clock. A package test runs on a virtual one, where
 /// sleeps and timers finish at once; wrap a test whose waits must take real time,
 /// such as one racing a timeout against real I/O. Only available in package tests.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.onRealClock: Unknown function or value 'Builtin.testOnRealClock'"
 let onRealClock(f: Unit -> 'a): 'a =
   Builtin.testOnRealClock(f)
 
@@ -64,7 +59,6 @@ let expect(condition: Bool, message: String): Result =
 
 /// Compare two Dark values. Written value-first so pipeline style reads:
 /// `actual |> Stdlib.Test.equal expected`.
-// @compiler replace: packages/darklang/stdlib/test.dark#Darklang.Stdlib.Test.equal reason=test-diagnostics
 let equal(actual: 'a, expected: 'a): Result =
   if actual == expected then
     Result.Pass
@@ -72,7 +66,6 @@ let equal(actual: 'a, expected: 'a): Result =
     Result.Fail([ $"expected {inspect(expected)}, got {inspect(actual)}" ])
 
 
-// @compiler replace: packages/darklang/stdlib/test.dark#Darklang.Stdlib.Test.notEqual reason=test-diagnostics
 let notEqual(actual: 'a, unexpected: 'a): Result =
   if actual != unexpected then
     Result.Pass
@@ -108,7 +101,6 @@ let group(name: String, check: Result): Result =
 /// <param check> on each of <param rows>. Each row is its own test, named by its
 /// arguments: `[ ("a", 1), ("", 0) ] |> Stdlib.Test.table(fun((s, n)) -> ...)`
 /// gives the tests `("a", 1)` and `("", 0)`. A row that raises fails only itself.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Test.table: Unknown function or value 'LanguageTools.Live.apply'"
 let table(rows: List<'a>, check: 'a -> Result): Result =
   rows
   |> List.map(fun row ->

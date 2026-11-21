@@ -54,7 +54,6 @@ let centred(region: Layout.Region, rows: Int64, cols: Int64): Layout.Region =
       cols = w }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.UI.Confirm.view: Unknown function or value 'Box.panel'"
 let view(state: State, region: Layout.Region): List<Layout.Span> =
   let hasDetail = state.detail != ""
   let width =

@@ -1,6 +1,5 @@
 module Darklang.Internal.Test
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Internal.Test.WTTest: Unknown type 'LanguageTools.WrittenTypes.Expr'"
 type WTTest =
   { name: String
     lineNumber: Int64
@@ -8,7 +7,6 @@ type WTTest =
     expected: LanguageTools.WrittenTypes.Expr }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Internal.Test.PTTest: Unknown type 'LanguageTools.ProgramTypes.Expr'"
 type PTTest =
   { name: String
     lineNumber: Int64
@@ -16,7 +14,6 @@ type PTTest =
     expected: LanguageTools.ProgramTypes.Expr }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'LanguageTools.WrittenTypes.ParsedFile'"
 let parseTest(pf: LanguageTools.WrittenTypes.ParsedFile): Result<WTTest, String> =
   let exprsToEval =
     match pf with
@@ -34,7 +31,6 @@ let parseTest(pf: LanguageTools.WrittenTypes.ParsedFile): Result<WTTest, String>
     | _ -> Result.Error("expected x = y format")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'PTTest'"
 let parseSingleTestFromFile(filename: String, testSource: String): Result<PTTest, String> =
   match testSource |> LanguageTools.Parser.Parse.initialParse with
   | Error(e) -> Result.Error(LanguageTools.Parser.Parse.ParseError.toString(e))

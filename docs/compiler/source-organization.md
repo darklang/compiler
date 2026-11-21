@@ -39,9 +39,9 @@ runs through `./run-tests --ai` after `./build --ai`.
 ## Standard-library layout
 
 Original imported package sources live under `upstream/packages/`; the complete
-manifest is `upstream/sources.list`. Imported execution tests live under
+manifest is `porting/upstream-sources.list`. Imported execution tests live under
 `upstream/backend/testfiles/execution/`. Original declarations are selected or
-replaced by their own annotations, and named tests and assertion tests are
+replaced by their rows in `porting/upstream-annotations.tsv`, and named tests and assertion tests are
 discovered directly from the parsed syntax tree.
 
 Compiler replacement and supplemental sources live under `packages/`, matching the interpreter's

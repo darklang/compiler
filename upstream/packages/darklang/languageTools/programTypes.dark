@@ -1,7 +1,6 @@
 module Darklang.LanguageTools.ProgramTypes
 
 /// Used to name where type/function/etc lives, eg a User module, or a Package module.
-// @compiler replace: packages/darklang/languageTools/programTypes.dark#Darklang.LanguageTools.ProgramTypes.PackageLocation reason=compiler-implementation
 type PackageLocation =
   { owner: String
     modules: List<String>
@@ -48,7 +47,6 @@ module FQValueName =
   type Package = Hash
 
 
-  // @compiler blocked: constructor-identity diagnostic="Constructor identity collision 698: Darklang.LanguageTools.ProgramTypes.FQValueName.FQValueName.Builtin, Darklang.Stdlib.Json.ParseError.ParseError.NotJson"
   type FQValueName =
     | Builtin(Builtin)
     | Package(Package)
@@ -95,7 +93,6 @@ module FQFnName =
       implFn: ImplChoice }
 
 
-  // @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1577: Darklang.Language.Tests.Equality.EEnumInt16.E2, Darklang.LanguageTools.ProgramTypes.FQFnName.FQFnName.Package"
   type FQFnName =
     | Builtin(Builtin)
     | Package(Package)
@@ -117,7 +114,6 @@ type NameResolution<'a> =
 
 
 /// Darklang's available types (int, List<T>, user-defined types, etc.)
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 1324: Darklang.LanguageTools.RuntimeTypes.TypeReference.TFloat, Darklang.LanguageTools.RuntimeTypes.TypeReference.TStream"
 type TypeReference =
   // A named variable, eg `a` in `List<a>`, matches anything
   | TVariable(String)
@@ -165,7 +161,6 @@ type LetPattern =
 
 
 /// Used for pattern matching in a match statement
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 610: Darklang.Language.Tests.Equality.EEnumUIn64.E3, Darklang.LanguageTools.ProgramTypes.MatchPattern.MPUInt16"
 type MatchPattern =
   | MPVariable(ID, String)
   | MPUnit(ID)
@@ -236,13 +231,11 @@ type Operator =
   | OpBitwiseNot
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.StringSegment: Unknown type 'Expr'"
 type StringSegment =
   | StringText(String)
   | StringInterpolation(Expr)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PipeExpr: Unknown type 'Expr'"
 type PipeExpr =
   | EPipeVariable(ID, String, List<Expr>)
 
@@ -265,7 +258,6 @@ type PipeExpr =
     fields: List<Expr>)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.MatchCase: Unknown type 'MatchPattern'"
 type MatchCase =
   { pat: MatchPattern
     whenCondition: Option<Expr>
@@ -273,7 +265,6 @@ type MatchCase =
 
 
 /// Expressions - the main part of the language.
-// @compiler blocked: constructor-identity diagnostic="Constructor identity collision 350: Darklang.LanguageTools.ProgramTypes.Expr.ERecordFieldAccess, Darklang.LanguageTools.WrittenTypes.PipeExpr.EPipeInfix"
 type Expr =
   | EUnit(ID)
 
@@ -383,7 +374,6 @@ type Expr =
 
 
 module Expr =
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'Expr'"
   let toID(expr: Expr): ID =
     match expr with
     | EUnit(id)
@@ -462,12 +452,10 @@ type BranchID = Uuid
 
 
 /// Content-addressed hash for package items (hex-encoded SHA-256)
-// @compiler replace: packages/darklang/languageTools/programTypes.dark#Darklang.LanguageTools.ProgramTypes.Hash reason=compiler-implementation
 type Hash =
   | Hash(String)
 
 
-// @compiler replace: packages/darklang/languageTools/programTypes.dark#Darklang.LanguageTools.ProgramTypes.hashToString reason=compiler-implementation
 let hashToString(hash: Hash): String =
   match hash with
   | Hash(h) -> h
@@ -486,7 +474,6 @@ let hashToShort(hash: Hash): String =
 /// indistinguishable in a column, and deliberately not the same function: an item hash is over a
 /// canonical serialization and this is over the bytes of a string. Must agree with
 /// `LibExecution.ProgramTypes.Hash.ofText`, which is what reads it back.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.hashOfText: Unknown function or value 'Stdlib.Base16.encode'"
 let hashOfText(text: String): Hash =
   Stdlib.Base16.encode(Stdlib.Crypto.sha256(Stdlib.Utf8.encode(text)))
   |> Stdlib.String.toLowercase
@@ -500,14 +487,12 @@ type LocatedItem<'entity> =
 
 
 /// A trait named from a bound or an impl, plus type args for any non-self params.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TraitRef: Unknown type 'TypeReference'"
 type TraitRef =
   { trait_: NameResolution<FQTraitName.FQTraitName>
     typeArgs: List<TypeReference> }
 
 
 /// `'a: Show` on a fn or type declaration
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.Bound: Unknown type 'TraitRef'"
 type Bound =
   { param: String
     trait_: TraitRef }
@@ -515,35 +500,30 @@ type Bound =
 
 /// A stdlib-, user-, or package- defined type (an alias, record, or enum)
 module TypeDeclaration =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TypeDeclaration.RecordField: Unknown type 'TypeReference'"
   type RecordField =
     { name: String
       typ: TypeReference
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TypeDeclaration.EnumField: Unknown type 'TypeReference'"
   type EnumField =
     { typ: TypeReference
       label: Option<String>
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TypeDeclaration.EnumCase: Unknown type 'EnumField'"
   type EnumCase =
     { name: String
       fields: List<EnumField>
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TypeDeclaration.Definition: Unknown type 'TypeReference'"
   type Definition =
     | Alias(TypeReference)
     | Record(List<RecordField>)
     | Enum(List<EnumCase>)
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TypeDeclaration.TypeDeclaration: Unknown type 'Bound'"
   type TypeDeclaration =
     { typeParams: List<String>
       /// `type Set<'a: Compare> = ...`
@@ -553,7 +533,6 @@ module TypeDeclaration =
 
 // Package space
 module PackageType =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageType.PackageType: Unknown type 'TypeDeclaration.TypeDeclaration'"
   type PackageType =
     { hash: FQTypeName.Package
       declaration: TypeDeclaration.TypeDeclaration
@@ -561,7 +540,6 @@ module PackageType =
 
 
 module PackageValue =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageValue.PackageValue: Unknown type 'Expr'"
   type PackageValue =
     { hash: FQValueName.Package
       body: Expr
@@ -570,14 +548,12 @@ module PackageValue =
 
 
 module PackageFn =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageFn.Parameter: Unknown type 'TypeReference'"
   type Parameter =
     { name: String
       typ: TypeReference
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageFn.PackageFn: Unknown type 'Expr'"
   type PackageFn =
     { hash: FQFnName.Package
       body: Expr
@@ -593,7 +569,6 @@ module PackageFn =
 /// A trait: a set of fn signatures over one open type. Its own item kind.
 module Trait =
   /// One method's signature; no body (the impls have those).
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.Trait.Method: Unknown type 'Bound'"
   type Method =
     { name: String
       typeParams: List<String>
@@ -605,7 +580,6 @@ module Trait =
       description: String }
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.Trait.Trait: Unknown type 'Bound'"
   type Trait =
     { hash: FQTraitName.Package
       /// The first is the self type
@@ -619,7 +593,6 @@ module Trait =
 /// An impl: how one type does a trait. Its own item kind, named at
 /// `<module>[.<Type>].<Trait>`, with its method fns as ordinary fns beneath it.
 module TraitImpl =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.TraitImpl.TraitImpl: Unknown type 'TypeReference'"
   type TraitImpl =
     { hash: Hash
       trait_: NameResolution<FQTraitName.FQTraitName>
@@ -642,7 +615,6 @@ module PackageTest =
 
   /// Named executable package content. It is deliberately not callable from
   /// production expressions; the test runner evaluates its body directly.
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageTest.PackageTest: Unknown type 'Expr'"
   type PackageTest =
     { hash: Hash
       body: Expr
@@ -822,7 +794,6 @@ type ReferenceNamesSnapshot =
     restating: Option<String> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageOp: Unknown type 'PackageType.PackageType'"
 type PackageOp =
   | AddType(PackageType.PackageType)
   | AddValue(PackageValue.PackageValue)
@@ -904,7 +875,6 @@ module PackageOp =
   /// Other operations stay as they are.
   /// LibDB.ReferenceNames reads the original operation to update reference names.
   /// If two renames change different calls in the same declaration, it keeps both changes.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageOp'"
   let bindingOps(op: PackageOp): List<PackageOp> =
     match op with
     | Rename(oldLocation, newLocation, target, _, _) ->
@@ -918,7 +888,6 @@ module PackageOp =
   /// A caller can switch from `double` to `twice` without changing its content hash.
   /// Return a `SetName` so draft listings and partial commits can see that edit.
   /// The stored operation stays `SetReferenceNames`.
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageOp'"
   let draftOps(op: PackageOp): List<PackageOp> =
     match op with
     | SetReferenceNames(location, target, _, _) ->
@@ -964,7 +933,6 @@ module Search =
 
 
   /// Results from a package search
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.Search.SearchResults: Unknown type 'ProgramTypes.PackageType.PackageType'"
   type SearchResults =
     { submodules: List<List<String>> // [ [ "List"], ["String", "List"] ]
       types : List<LocatedItem<ProgramTypes.PackageType.PackageType>>
@@ -984,7 +952,6 @@ module Search =
 /// Visibility rules:
 /// - Approved items are visible to everyone
 module PackageManager =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.PackageManager.PackageManager: Unknown type 'PackageType.PackageType'"
   type PackageManager =
     { findType: (BranchID * PackageLocation) -> Option<FQTypeName.Package>
       findValue: (BranchID * PackageLocation) -> Option<FQValueName.Package>
@@ -999,7 +966,6 @@ module PackageManager =
 
   /// Allows you to side-load a few 'extras' in-memory, along
   /// the normal fetching functionality. (Mostly helpful for tests)
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageManager.PackageManager'"
   let withExtras(
     pm: PackageManager,
     types: List<LocatedItem<PackageType.PackageType>>,
@@ -1043,7 +1009,6 @@ module PackageManager =
 
 
   /// Create a PackageManager from PackageOps, combining with an existing PM
-  // @compiler blocked: upstream-dependency diagnostic="Unknown type 'PackageManager.PackageManager'"
   let withExtraOps(basePM: PackageManager, ops: List<PackageOp>): PackageManager =
     let typesByID =
       ops
@@ -1186,7 +1151,6 @@ module PackageManager =
         search = basePM.search }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.Definitions: Unknown type 'PackageType.PackageType'"
 type Definitions =
   { types: List<PackageType.PackageType>
     values: List<PackageValue.PackageValue>
@@ -1198,7 +1162,6 @@ type Definitions =
 
 
 module SourceFile =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.SourceFile.Declaration: Unknown type 'PackageType.PackageType'"
   type Declaration =
     | Type(PackageType.PackageType)
     | Value(PackageValue.PackageValue)
@@ -1211,7 +1174,6 @@ module SourceFile =
     | Module(Definitions) // re-evaluate if this makes sense to be here
 
 
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.LanguageTools.ProgramTypes.SourceFile.SourceFile: Unknown type 'Declaration'"
   type SourceFile =
     { declarations: List<Declaration>
       exprsToEval: List<Expr> }

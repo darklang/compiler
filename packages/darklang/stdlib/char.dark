@@ -2,110 +2,110 @@
 
 module Darklang.Stdlib.Char
 
-let toString (char: Char) : String = __char_to_string char
+let toString(char: Char): String = __char_to_string(char)
 
-let __asChar (value: String) : Char = __string_to_char_unchecked value
+let __asChar(value: String): Char = __string_to_char_unchecked(value)
 
-let toUppercase (char: Char) : Char =
-    Stdlib.Char.__asChar (Stdlib.String.__Unicode.uppercase (Stdlib.Char.toString char))
+let toUppercase(char: Char): Char =
+    Stdlib.Char.__asChar(Stdlib.String.__Unicode.uppercase(Stdlib.Char.toString(char)))
 
-let toLowercase (char: Char) : Char =
-    Stdlib.Char.__asChar (Stdlib.String.__Unicode.lowercase (Stdlib.Char.toString char))
+let toLowercase(char: Char): Char =
+    Stdlib.Char.__asChar(Stdlib.String.__Unicode.lowercase(Stdlib.Char.toString(char)))
 
-let isLowercase (c: Char) : Bool =
-  Stdlib.Char.toLowercase c == c && Stdlib.Char.toUppercase c != c
+let isLowercase(c: Char): Bool =
+  Stdlib.Char.toLowercase(c) == c && Stdlib.Char.toUppercase(c) != c
 
-let isUppercase (c: Char) : Bool =
-  Stdlib.Char.toLowercase c != c && Stdlib.Char.toUppercase c == c
+let isUppercase(c: Char): Bool =
+  Stdlib.Char.toLowercase(c) != c && Stdlib.Char.toUppercase(c) == c
 
-let __firstCodepoint (char: Char) : Stdlib.Option.Option<Int64> =
-    Stdlib.List.head (Stdlib.String.__toCodepoints (Stdlib.Char.toString char))
+let __firstCodepoint(char: Char): Stdlib.Option.Option<Int64> =
+    Stdlib.List.head(Stdlib.String.__toCodepoints(Stdlib.Char.toString(char)))
 
-let isDigit (c: Char) : Bool =
-  (Stdlib.Char.isGreaterThanOrEqualTo c '0')
-  && (Stdlib.Char.isLessThanOrEqualTo c '9')
+let isDigit(c: Char): Bool =
+  (Stdlib.Char.isGreaterThanOrEqualTo(c, '0'))
+  && (Stdlib.Char.isLessThanOrEqualTo(c, '9'))
 
-let isASCIILetter (c: Char) : Bool =
-  (Stdlib.Char.isGreaterThanOrEqualTo c 'a')
-  && (Stdlib.Char.isLessThanOrEqualTo c 'z')
-  || (Stdlib.Char.isGreaterThanOrEqualTo c 'A')
-      && (Stdlib.Char.isLessThanOrEqualTo c 'Z')
+let isASCIILetter(c: Char): Bool =
+  (Stdlib.Char.isGreaterThanOrEqualTo(c, 'a'))
+  && (Stdlib.Char.isLessThanOrEqualTo(c, 'z'))
+  || (Stdlib.Char.isGreaterThanOrEqualTo(c, 'A'))
+      && (Stdlib.Char.isLessThanOrEqualTo(c, 'Z'))
 
-let isLetter (char: Char) : Bool =
-    match Stdlib.Char.__firstCodepoint char with
-    | Some codepoint -> Stdlib.String.__Unicode.isLetter codepoint
+let isLetter(char: Char): Bool =
+    match Stdlib.Char.__firstCodepoint(char) with
+    | Some(codepoint) -> Stdlib.String.__Unicode.isLetter(codepoint)
     | None -> false
 
-let isAlphanumeric (char: Char) : Bool =
-    match Stdlib.Char.__firstCodepoint char with
-    | Some codepoint -> Stdlib.String.__Unicode.isLetter codepoint || Stdlib.String.__Unicode.generalCategory codepoint == Stdlib.String.__Unicode.__Data.GeneralCategory.Nd
+let isAlphanumeric(char: Char): Bool =
+    match Stdlib.Char.__firstCodepoint(char) with
+    | Some(codepoint) -> Stdlib.String.__Unicode.isLetter(codepoint) || Stdlib.String.__Unicode.generalCategory(codepoint) == Stdlib.String.__Unicode.__Data.GeneralCategory.Nd
     | None -> false
 
-let isWhitespace (char: Char) : Bool =
-    match Stdlib.Char.__firstCodepoint char with
-    | Some codepoint -> Stdlib.String.__Unicode.isWhitespace codepoint
+let isWhitespace(char: Char): Bool =
+    match Stdlib.Char.__firstCodepoint(char) with
+    | Some(codepoint) -> Stdlib.String.__Unicode.isWhitespace(codepoint)
     | None -> false
 
-let __toCodepointInt (char: Char) : Stdlib.Option.Option<Int> =
-    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
-    | [codepoint] -> Some (Stdlib.Int.fromInt64 codepoint)
+let __toCodepointInt(char: Char): Stdlib.Option.Option<Int> =
+    match Stdlib.String.__toCodepoints(Stdlib.Char.toString(char)) with
+    | [codepoint] -> Some(Stdlib.Int.fromInt64(codepoint))
     | _ -> None
 
-let __toAsciiCodeInt (char: Char) : Stdlib.Option.Option<Int> =
-    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
+let __toAsciiCodeInt(char: Char): Stdlib.Option.Option<Int> =
+    match Stdlib.String.__toCodepoints(Stdlib.Char.toString(char)) with
     | [codepoint] ->
-        if codepoint >= 0L && codepoint < 128L then Some (Stdlib.Int.fromInt64 codepoint) else None
+        if codepoint >= 0 && codepoint < 128 then Some(Stdlib.Int.fromInt64(codepoint)) else None
     | _ -> None
 
-let isASCII (c: Char) : Bool =
-  let asciiCode = Stdlib.Char.__toAsciiCodeInt c
+let isASCII(c: Char): Bool =
+  let asciiCode = Stdlib.Char.__toAsciiCodeInt(c)
 
   match asciiCode with
-  | Some ascii -> (ascii >= 0) && (ascii <= 127)
+  | Some(ascii) -> (ascii >= 0z) && (ascii <= 127z)
   | None -> false
 
-let __utf16Units (codepoints: List<Int64>) (acc: List<Int64>) : List<Int64> =
+let __utf16Units(codepoints: List<Int64>, acc: List<Int64>): List<Int64> =
     match codepoints with
-    | [] -> Stdlib.List.reverse acc
+    | [] -> Stdlib.List.reverse(acc)
     | codepoint :: rest ->
-        if codepoint <= 65535L then Stdlib.Char.__utf16Units rest (Stdlib.List.push acc codepoint)
+        if codepoint <= 65535 then Stdlib.Char.__utf16Units(rest, Stdlib.List.push(acc, codepoint))
         else
-            let adjusted = codepoint - 65536L in
-            let high = 55296L + Stdlib.Int64.shiftRight adjusted 10L in
-            let low = 56320L + Stdlib.Int64.bitwiseAnd adjusted 1023L in
-            Stdlib.Char.__utf16Units rest (Stdlib.List.push (Stdlib.List.push acc high) low)
+            let adjusted = codepoint - 65536 in
+            let high = 55296 + Stdlib.Int64.shiftRight(adjusted, 10) in
+            let low = 56320 + Stdlib.Int64.bitwiseAnd(adjusted, 1023) in
+            Stdlib.Char.__utf16Units(rest, Stdlib.List.push(Stdlib.List.push(acc, high), low))
 
-let __compareUnits (left: List<Int64>) (right: List<Int64>) : Int64 =
+let __compareUnits(left: List<Int64>, right: List<Int64>): Int64 =
     match (left, right) with
-    | ([], []) -> 0L
-    | ([], _) -> -1L
-    | (_, []) -> 1L
+    | ([], []) -> 0
+    | ([], _) -> -1
+    | (_, []) -> 1
     | (leftHead :: leftRest, rightHead :: rightRest) ->
-        if leftHead < rightHead then -1L
-        else if leftHead > rightHead then 1L
-        else Stdlib.Char.__compareUnits leftRest rightRest
+        if leftHead < rightHead then -1
+        else if leftHead > rightHead then 1
+        else Stdlib.Char.__compareUnits(leftRest, rightRest)
 
-let __compare (left: Char) (right: Char) : Int64 =
-    Stdlib.Char.__compareUnits (Stdlib.Char.__utf16Units (Stdlib.String.__toCodepoints (Stdlib.Char.toString left)) []) (Stdlib.Char.__utf16Units (Stdlib.String.__toCodepoints (Stdlib.Char.toString right)) [])
+let __compare(left: Char, right: Char): Int64 =
+    Stdlib.Char.__compareUnits(Stdlib.Char.__utf16Units(Stdlib.String.__toCodepoints(Stdlib.Char.toString(left)), []), Stdlib.Char.__utf16Units(Stdlib.String.__toCodepoints(Stdlib.Char.toString(right)), []))
 
-let isLessThan (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right < 0L
-let isLessThanOrEqualTo (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right <= 0L
-let isGreaterThan (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right > 0L
-let isGreaterThanOrEqualTo (left: Char) (right: Char) : Bool = Stdlib.Char.__compare left right >= 0L
+let isLessThan(left: Char, right: Char): Bool = Stdlib.Char.__compare(left, right) < 0
+let isLessThanOrEqualTo(left: Char, right: Char): Bool = Stdlib.Char.__compare(left, right) <= 0
+let isGreaterThan(left: Char, right: Char): Bool = Stdlib.Char.__compare(left, right) > 0
+let isGreaterThanOrEqualTo(left: Char, right: Char): Bool = Stdlib.Char.__compare(left, right) >= 0
 
-let fromCodepoint (codepoint: UInt32) : Stdlib.Option.Option<Char> =
-    let value = Builtin.unwrap (Stdlib.Int.toInt64 (Stdlib.Int.fromUInt32 codepoint)) in
-    if Stdlib.String.__Unicode.isScalar value then Some (Stdlib.Char.__asChar (Stdlib.String.__fromCodepoints ([value])))
+let fromCodepoint(codepoint: UInt32): Stdlib.Option.Option<Char> =
+    let value = Builtin.unwrap(Stdlib.Int.toInt64(Stdlib.Int.fromUInt32(codepoint))) in
+    if Stdlib.String.__Unicode.isScalar(value) then Some(Stdlib.Char.__asChar(Stdlib.String.__fromCodepoints([value])))
     else None
 
-let toCodepoint (char: Char) : Stdlib.Option.Option<UInt32> =
-    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
-    | [codepoint] -> Stdlib.UInt32.fromInt64 codepoint
+let toCodepoint(char: Char): Stdlib.Option.Option<UInt32> =
+    match Stdlib.String.__toCodepoints(Stdlib.Char.toString(char)) with
+    | [codepoint] -> Stdlib.UInt32.fromInt64(codepoint)
     | _ -> None
 
-let toAsciiCode (char: Char) : Stdlib.Option.Option<UInt8> =
-    match Stdlib.String.__toCodepoints (Stdlib.Char.toString char) with
-    | [codepoint] -> if codepoint < 128L then Stdlib.UInt8.fromInt64 codepoint else None
+let toAsciiCode(char: Char): Stdlib.Option.Option<UInt8> =
+    match Stdlib.String.__toCodepoints(Stdlib.Char.toString(char)) with
+    | [codepoint] -> if codepoint < 128 then Stdlib.UInt8.fromInt64(codepoint) else None
     | _ -> None
 
 impl Stdlib.Display for Char =

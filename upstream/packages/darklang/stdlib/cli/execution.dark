@@ -1,7 +1,6 @@
 module Darklang.Stdlib.Cli
 
 /// The result of running a command in the CLI, typically with `Cli.execute`
-// @compiler replace: packages/darklang/stdlib/cli/execution.dark#Darklang.Stdlib.Cli.ExecutionOutcome reason=compiler-implementation
 type ExecutionOutcome =
   { exitCode: Int64
     stdout: String
@@ -17,7 +16,6 @@ type ExecutionBytes =
 
 
 /// Decode both streams of <param outcome> as UTF-8, replacing invalid sequences
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.executionText: Expected TInt, got TInt64"
 let executionText(outcome: ExecutionBytes): ExecutionOutcome =
   ExecutionOutcome
     { exitCode = outcome.exitCode
@@ -27,13 +25,11 @@ let executionText(outcome: ExecutionBytes): ExecutionOutcome =
 
 /// Execute a command in the CLI and keep its output as bytes, for output that
 /// isn't UTF-8 text (i.e. `Cli.executeBytes "gzip -c file"`)
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.executeBytes: Unknown function or value 'Stdlib.Cli.Process.__executionBytes'"
 let executeBytes(command: String): ExecutionBytes =
   Process.__executionBytes(Process.__childRun("/bin/sh", [ "-c", command ], Option.None))
 
 
 /// Execute a command in the CLI (i.e. `Cli.execute "ls ."`)
-// @compiler replace: packages/darklang/stdlib/cli/execution.dark#Darklang.Stdlib.Cli.execute reason=compiler-implementation
 let execute(command: String): ExecutionOutcome =
   executionText(executeBytes(command))
 
@@ -41,7 +37,6 @@ let execute(command: String): ExecutionOutcome =
 /// Execute a command in the CLI,
 /// returning `Unit` if exit code 0
 /// , or a `String` of stderr if not
-// @compiler replace: packages/darklang/stdlib/cli/execution.dark#Darklang.Stdlib.Cli.executeWithUnitOrStdErr reason=compiler-implementation
 let executeWithUnitOrStdErr(command: String): Result<Unit, String> =
   let result = execute(command)
   if result.exitCode == 0 then Result.Ok() else Result.Error(result.stderr)
@@ -50,7 +45,6 @@ let executeWithUnitOrStdErr(command: String): Result<Unit, String> =
 /// Execute a command in the CLI,
 /// returning `String` of stdout if exit code 0
 /// or `String` of stderr if not
-// @compiler replace: packages/darklang/stdlib/cli/execution.dark#Darklang.Stdlib.Cli.executeWithStdOutOrStdErr reason=compiler-implementation
 let executeWithStdOutOrStdErr(command: String): Result<String, String> =
   let result = execute(command)
   if result.exitCode == 0 then

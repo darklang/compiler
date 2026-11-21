@@ -12,7 +12,6 @@ let expectFailure(
     Stdlib.Test.expect(Stdlib.String.contains(transcript, message), transcript)
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test missingMarkerTimesOut =
   Instance.withInstance(fun i ->
     Interactive.drive(
@@ -23,7 +22,6 @@ test missingMarkerTimesOut =
     |> expectFailure("TIMED OUT waiting for: never-rendered-test-marker"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test exitBeforeMarkerFails =
   Instance.withInstance(fun i ->
     Interactive.drive(
@@ -34,7 +32,6 @@ test exitBeforeMarkerFails =
     |> expectFailure("EXITED BEFORE: never-rendered-test-marker"))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test literalTextAndArgumentsArePreserved =
   Instance.withInstance(fun i ->
     Interactive.expectSteps(
@@ -44,7 +41,6 @@ test literalTextAndArgumentsArePreserved =
       10))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test nonzeroExitFailsAfterMatching =
   Instance.withInstance(fun i ->
     Interactive.drive(

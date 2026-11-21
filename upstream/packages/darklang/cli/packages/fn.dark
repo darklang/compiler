@@ -1,6 +1,5 @@
 module Darklang.Cli.Packages.Fn
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -49,7 +48,6 @@ let fnSource(name: String, definition: String): String =
     $"let {name} {definition}"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Packages.PackageLocation'"
 let createFnInline(state: AppState, locationStr: String, definition: String): AppState =
   let hint =
     [ Stdlib.Cli.UI.Colors.error("Expected exactly one function declaration")
@@ -140,7 +138,6 @@ let createFnInline(state: AppState, locationStr: String, definition: String): Ap
       | _ -> Option.None)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Create or update a function"
     ""
@@ -174,6 +171,5 @@ let help(_state: AppState): String =
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(_state: AppState, _args: List<String>): List<Completion.CompletionItem> =
   []

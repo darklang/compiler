@@ -154,6 +154,14 @@ let parse reasons text =
     with Yojson.Json_error _ -> Error "Invalid quoted diagnostic"
   else Error ("Unknown compiler annotation: " ^ text)
 
+let check ~isTest disposition =
+  match disposition with
+  | (Xfail _ | ErrorMessage _) when not isTest ->
+      Error "Expected failures apply only to tests"
+  | Replace _ when isTest -> Error "Tests cannot have replacement implementations"
+  | Run | ErrorMessage _ | Blocked _ | Excluded _ | Replace _ | Xfail _ ->
+      Ok disposition
+
 let read ~reasons ~items source =
   let* tokens, _ = Lexer.tokenize source in
   let lines = Array.of_list (String.split_on_char '\n' source) in
@@ -210,17 +218,14 @@ let read ~reasons ~items source =
                       then
                         fail "Conflicting compiler annotations on the same item"
                       else
-                        let* disposition =
-                          parse reasons
-                            (String.sub text 13 (String.length text - 13))
-                        in
-                        match disposition with
-                        | (Xfail _ | ErrorMessage _) when not item.isTest ->
-                            fail "Expected failures apply only to tests"
-                        | Replace _ when item.isTest ->
-                            fail "Tests cannot have replacement implementations"
-                        | Run | ErrorMessage _ | Blocked _ | Excluded _
-                        | Replace _ | Xfail _ ->
+                        match
+                          Result.bind
+                            (parse reasons
+                               (String.sub text 13 (String.length text - 13)))
+                            (check ~isTest:item.isTest)
+                        with
+                        | Error message -> fail message
+                        | Ok disposition ->
                             comments
                               ({ position; disposition } :: annotations)
                               remaining))
@@ -265,3 +270,49 @@ let parseReasons source =
 let readReasons path =
   try In_channel.with_open_bin path In_channel.input_all |> parseReasons
   with Sys_error message -> Error message
+
+type sidecar = string StringOrder.Map.t StringOrder.Map.t
+
+(* One row per annotated item: path under upstream/, item name, annotation. *)
+let parseSidecar source =
+  String.split_on_char '\n' source
+  |> List.filter (fun line -> line <> "" && not (String.starts_with ~prefix:"#" line))
+  |> List.fold_left
+       (fun sidecar line ->
+         let* sidecar = sidecar in
+         match String.split_on_char '\t' line with
+         | [ path; name; text ] when path <> "" && name <> "" && text <> "" ->
+             let items =
+               Option.value ~default:StringOrder.Map.empty
+                 (StringOrder.Map.find_opt path sidecar)
+             in
+             if StringOrder.Map.mem name items then
+               Error ("Two compiler annotations for " ^ path ^ "#" ^ name)
+             else
+               Ok
+                 (StringOrder.Map.add path
+                    (StringOrder.Map.add name text items)
+                    sidecar)
+         | _ -> Error ("Expected path, item and annotation separated by tabs: " ^ line))
+       (Ok StringOrder.Map.empty)
+
+let readSidecar path =
+  try In_channel.with_open_bin path In_channel.input_all |> parseSidecar
+  with Sys_error message -> Error message
+
+let sidecarPaths sidecar = List.map fst (StringOrder.Map.bindings sidecar)
+
+(* Keys are paths below the last upstream/ directory of [filename]; files
+   outside upstream/ have no sidecar annotations. *)
+let forSource sidecar filename =
+  let rec below found = function
+    | "upstream" :: rest -> below (Some rest) rest
+    | _ :: rest -> below found rest
+    | [] -> found
+  in
+  match below None (String.split_on_char '/' filename) with
+  | None -> []
+  | Some parts -> (
+      match StringOrder.Map.find_opt (String.concat "/" parts) sidecar with
+      | Some items -> StringOrder.Map.bindings items
+      | None -> [])

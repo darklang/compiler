@@ -1,7 +1,6 @@
 /// A `fn` save shows one issue. It is the error that caused the others, not one they left behind.
 module Darklang.Cli.Tests.FnSaveIssues
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test theRootIssueComesFirst = Instance.withInstance(fun i ->
   let (_, out) =
     Instance.ran(

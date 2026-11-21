@@ -20,7 +20,6 @@ let foo(answer: String): String =
   $"let foo(x: Int64): Int64 = {answer} + 2"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.onBranch: Unknown function or value 'Authoring.authorOn'"
 let onBranch(
   b: Uuid,
   m: String,
@@ -29,13 +28,11 @@ let onBranch(
   Authoring.authorOn(b, "Tests", m, foo(answer))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.onMain: Unknown function or value 'Authoring.author'"
 let onMain(m: String, answer: String): Stdlib.Result.Result<Unit, String> =
   Authoring.author(m, foo(answer))
 
 
 /// Author on main and commit: a branch sees main's commits, never its draft.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.committedOnMain: Unknown function or value 'onMain'"
 let committedOnMain(
   m: String,
   answer: String)
@@ -46,14 +43,12 @@ let committedOnMain(
 
 
 /// The hash a binding read gives <param m>.foo on <param b>, or "none".
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.boundOn: Unknown function or value 'Darklang.SCM.PackageOps.liveBindingFor'"
 let boundOn(b: Uuid, m: String): String =
   match SCM.PackageOps.liveBindingFor(b, fooAt(m)) with
   | Some(binding) -> binding.hash
   | None -> "none"
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.hashOn: Unknown function or value 'Darklang.SCM.Propagation.hashOn'"
 let hashOn(b: Uuid, m: String): String =
   match SCM.Propagation.hashOn(
           b,
@@ -65,7 +60,6 @@ let hashOn(b: Uuid, m: String): String =
 
 /// A branch that authored <param m>.foo, then main committed it differently: a real
 /// conflict on that one name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Branches.conflicted: Unknown function or value 'Authoring.branchOff'"
 let conflicted(
   name: String,
   m: String)
@@ -77,7 +71,6 @@ let conflicted(
   (b, setup)
 
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test aConflictIsFlaggedAndRebaseClearsIt =
   let m = "RebaseGate"
   let b = Authoring.branchOff("rebase-gate", Authoring.main())
@@ -97,7 +90,6 @@ test aConflictIsFlaggedAndRebaseClearsIt =
 
 // take-theirs drops the branch's binding, so the name falls back to the parent's;
 // keep-mine keeps the branch's. Both clear the conflict.
-// @compiler xfail compile: "Unknown function or value 'conflicted'" class=missing-support reason=upstream-dependency
 test resolvingTakeTheirsOrKeepMineClearsTheConflict =
   let m = "ResolveTest"
   let (theirs, setupT) = conflicted("resolve-theirs", m)
@@ -122,7 +114,6 @@ test resolvingTakeTheirsOrKeepMineClearsTheConflict =
 
 // keep-mine authors an Override and take-theirs drops SetNames; both BIND the name, so
 // take-theirs after keep-mine has to drop the override too.
-// @compiler xfail compile: "Unknown function or value 'conflicted'" class=missing-support reason=upstream-dependency
 test takeTheirsAfterKeepMineDropsTheOverride =
   let m = "TheirsAfterMine"
   let fqn = "Tests.TheirsAfterMine.foo"
@@ -148,7 +139,6 @@ test takeTheirsAfterKeepMineDropsTheOverride =
 // An op's origin_ts is portable: last-writer-wins compares it on every machine holding
 // the op. So keep-mine records a NEW op and rewrites no existing stamp anywhere in the
 // store. Read from the whole op log, because no command shows a stamp.
-// @compiler xfail compile: "Unknown function or value 'conflicted'" class=missing-support reason=upstream-dependency
 test keepMineAddsAnOpAndRestampsNothing =
   let m = "RestampTest"
   let (b, setup) = conflicted("restamp", m)
@@ -174,7 +164,6 @@ test keepMineAddsAnOpAndRestampsNothing =
 
 // A merge reports how many ops it flipped into main, and leaves nothing to merge
 // behind: a second merge is refused as such, not reported as moving 0 ops.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test aMergeCountsWhatItFlipped =
   let b = Authoring.branchOff("flip-proof", Authoring.main())
   let setup = onBranch(b, "McX", "11")
@@ -201,7 +190,6 @@ test aMergeCountsWhatItFlipped =
 // A finished branch refuses an edit rather than being revived by it: a process still
 // holding the id after a merge elsewhere would otherwise author onto a branch nothing
 // merges again. An empty op list reaches the guard before anything else.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test authoringOnAMergedBranchIsRefused =
   let b = Authoring.branchOff("finished-proof", Authoring.main())
   let setup = onBranch(b, "FinishedProof", "1")
@@ -230,7 +218,6 @@ test authoringOnAMergedBranchIsRefused =
 
 // `liveBindingFor` is THE branch-aware binding read: the chain first, then main. A plain
 // read of main's projection answers about main from a branch, plausibly and wrongly.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test liveBindingForReadsTheBranchThenMain =
   let m = "LiveBind"
   let b = Authoring.branchOff("live-binding-proof", Authoring.main())
@@ -256,7 +243,6 @@ test liveBindingForReadsTheBranchThenMain =
 // `liveBindingsFor` answers each name as `liveBindingFor` does, from main and from a
 // branch: a name the branch binds, one only main binds, one the branch unbinds, one in
 // main's draft (which a branch must not see), one nobody binds, and a repeat.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test liveBindingsForAgreesWithTheOneNameRead =
   let b = Authoring.branchOff("live-bindings-proof", Authoring.main())
   let hidden = "LiveBindManyHidden"
@@ -338,7 +324,6 @@ test liveBindingsForAgreesWithTheOneNameRead =
 // edited twice on main then three more times on a branch (the branch's earlier versions
 // newest-first, ahead of main's), one only main edited, one only the branch has, and a
 // repeat.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test previousHashesOfAllAgreesWithTheOneNameRead =
   let b = Authoring.branchOff("prev-hashes-proof", Authoring.main())
   let mainBoth(n: String): String =
@@ -392,7 +377,6 @@ test previousHashesOfAllAgreesWithTheOneNameRead =
 // Merging a branch into a non-main parent retags its ops onto the parent, and its name
 // BASES go too. A name with no base can never conflict again, so a grandparent moving
 // one of the child's names would be invisible at the parent's merge.
-// @compiler xfail compile: "Unknown function or value 'Authoring.branchOff'" class=missing-support reason=upstream-dependency
 test retaggingOntoTheParentCarriesTheNameBases =
   let parent = Authoring.branchOff("bases-parent", Authoring.main())
   let child = Authoring.branchOff("bases-child", parent)

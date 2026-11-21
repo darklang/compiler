@@ -1,6 +1,5 @@
 module Darklang.Stdlib.Http
 
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.Request reason=compiler-implementation
 type Request =
   { method: String
     url: String
@@ -48,7 +47,6 @@ let requestTarget(url: String): Url.Url =
 /// Parses a URL's query string into a dictionary, keeping the last value for
 /// each key: <fn Stdlib.Url.queryParams> of <fn requestTarget>, through
 /// {{Dict.fromEntries}}.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.parseQueryString reason=compiler-implementation
 let parseQueryString(url: String): Dict<String, String> =
   url
   |> requestTarget
@@ -60,7 +58,6 @@ let parseQueryString(url: String): Dict<String, String> =
 /// LF separated) into a Dict. Duplicates resolve to the last-wins value.
 /// Header names are kept verbatim — case-insensitive lookup is the caller's
 /// responsibility (see `String.equalsCaseInsensitive`).
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.parseHeaders reason=compiler-implementation
 let parseHeaders(s: String): Dict<String, String> =
   s
   |> String.replaceAll("\r\n", "\n")
@@ -89,7 +86,6 @@ let parseHeaders(s: String): Dict<String, String> =
 ///
 /// A `%` that does not start two hex digits is passed through as itself rather
 /// than dropped. A search box is allowed to contain a percent sign.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.urlDecode reason=compiler-implementation
 let urlDecode(s: String): String =
   Url.formDecode(s)
 
@@ -97,7 +93,6 @@ let urlDecode(s: String): String =
 module Request =
   /// The query string, decoded: <fn Stdlib.Url.queryParams> of the request's
   /// target (<fn Stdlib.Http.requestTarget>), so a bad Host header cannot hide it.
-  // @compiler replace: packages/darklang/stdlib/http/request.dark#Darklang.Stdlib.Http.Request.queryParams reason=compiler-implementation
   let queryParams(req: Request): List<(String * String)> =
     req.url
     |> requestTarget
@@ -111,7 +106,6 @@ module Request =
   ///
   /// The first match wins. A repeated header is legal and means a list, which no caller
   /// here wants yet; taking the first is the same choice <fn queryParam> makes.
-  // @compiler replace: packages/darklang/stdlib/http/request.dark#Darklang.Stdlib.Http.Request.header reason=compiler-implementation
   let header(req: Request, key: String): Option<String> =
     let wanted = String.toLowercase(key)
     req.headers
@@ -121,7 +115,6 @@ module Request =
     |> List.head
 
 
-  // @compiler replace: packages/darklang/stdlib/http/request.dark#Darklang.Stdlib.Http.Request.queryParam reason=compiler-implementation
   let queryParam(req: Request, key: String): Option<String> =
     let found =
       queryParams(req)
@@ -312,7 +305,6 @@ impl Inspect for Status =
 
 /// What a handler answers. <param statusCode> is a plain number, so any helper below takes
 /// one; <fn Status.toInt64> of a <type Status> gives it for a named status.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.Response reason=compiler-implementation
 type Response =
   { statusCode: Int64
     headers: List<(String * String)>
@@ -321,14 +313,12 @@ type Response =
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status <param statusCode> and <param body>.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.response reason=compiler-implementation
 let response(statusCode: Int64, body: Bytes): Response =
   Response { statusCode = statusCode, headers = [], body = body }
 
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status <param statusCode>, <param headers> and <param body>.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.responseWithHeaders reason=compiler-implementation
 let responseWithHeaders(
   statusCode: Int64,
   headers: List<(String * String)>,
@@ -339,7 +329,6 @@ let responseWithHeaders(
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status 200 and <param body>.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.success reason=compiler-implementation
 let success(body: Bytes): Response =
   Response { statusCode = Status.toInt64(Status.ok), headers = [], body = body }
 
@@ -347,7 +336,6 @@ let success(body: Bytes): Response =
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status <param statusCode> and <param body>, with the
 /// Content-Type header set to "text/html; charset=utf-8".
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.responseWithHtml reason=compiler-implementation
 let responseWithHtml(statusCode: Int64, body: String): Response =
   Response
     { statusCode = statusCode
@@ -358,7 +346,6 @@ let responseWithHtml(statusCode: Int64, body: String): Response =
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status <param statusCode> and <param text>, with the
 /// Content-Type header set to "text/plain; charset=utf-8".
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.responseWithText reason=compiler-implementation
 let responseWithText(statusCode: Int64, text: String): Response =
   Response
     { statusCode = statusCode
@@ -369,7 +356,6 @@ let responseWithText(statusCode: Int64, text: String): Response =
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with HTTP status <param statusCode> and <param json>, with the
 /// Content-Type header set to "application/json".
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.responseWithJson reason=compiler-implementation
 let responseWithJson(statusCode: Int64, json: String): Response =
   Response
     { statusCode = statusCode
@@ -379,7 +365,6 @@ let responseWithJson(statusCode: Int64, json: String): Response =
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{302}} status code and redirect to <param url>.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.redirectTo reason=compiler-implementation
 let redirectTo(url: String): Response =
   Response
     { statusCode = Status.toInt64(Status.found)
@@ -389,7 +374,6 @@ let redirectTo(url: String): Response =
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{400}} status code and <param error> body.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.badRequest reason=compiler-implementation
 let badRequest(error: String): Response =
   Response
     { statusCode = Status.toInt64(Status.badRequest), headers = [], body = Utf8.encode(error) }
@@ -397,28 +381,24 @@ let badRequest(error: String): Response =
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{404}} status code.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.notFound reason=compiler-implementation
 let notFound(): Response =
   Response { statusCode = Status.toInt64(Status.notFound), headers = [], body = Bytes.empty }
 
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{401}} status code.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.unauthorized reason=compiler-implementation
 let unauthorized(): Response =
   Response { statusCode = Status.toInt64(Status.unauthorized), headers = [], body = Bytes.empty }
 
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{403}} status code.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.forbidden reason=compiler-implementation
 let forbidden(): Response =
   Response { statusCode = Status.toInt64(Status.forbidden), headers = [], body = Bytes.empty }
 
 
 /// Returns a <type Response> that can be returned from an HTTP handler to
 /// respond with {{500}} status code and <param error> body.
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.serverError reason=compiler-implementation
 let serverError(error: String): Response =
   Response
     { statusCode = Status.toInt64(Status.internalServerError)
@@ -426,7 +406,6 @@ let serverError(error: String): Response =
       body = Utf8.encode(error) }
 
 
-// @compiler replace: packages/darklang/stdlib/http.dark#Darklang.Stdlib.Http.Cookie reason=compiler-implementation
 type Cookie =
   { expires: DateTime
     maxAge: Int64

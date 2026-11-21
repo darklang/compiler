@@ -16,7 +16,6 @@ type Args =
     error: Option<String> }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Http.Serve.defaultArgs: Expected TInt64, got TInt"
 let defaultArgs(): Args =
   Args
     { address = "127.0.0.1"
@@ -98,7 +97,6 @@ let printUsage(): Unit =
   usageLines() |> Stderr.lines
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let execute(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -207,13 +205,11 @@ let execute(state: AppState, args: List<String>): AppState =
           { state with exitCode = 1 }
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let help(_state: AppState): String =
   [ "Start an HTTP server backed by a Darklang router.", "" ]
   |> Stdlib.List.concat(usageLines())
   |> Stdlib.String.join("\n")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Unknown type 'Cli.AppState'"
 let complete(state: AppState, args: List<String>): List<Completion.CompletionItem> =
   []

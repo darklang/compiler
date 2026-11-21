@@ -1,7 +1,6 @@
 /// A save that does not parse says everything wrong with it at once, so one edit fixes it.
 module Darklang.Cli.Tests.ModuleParseErrors
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test everyParseErrorIsShown = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/two.dark"
   let _ =
@@ -17,7 +16,6 @@ test everyParseErrorIsShown = Instance.withInstance(fun i ->
       Instance.says(out, "line 2, column 12", "the second error") ]))
 
 
-// @compiler xfail compile: "Unknown function or value 'Instance.withInstance'" class=missing-support reason=upstream-dependency
 test semicolonsSayCommas = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/semis.dark"
   let _ =

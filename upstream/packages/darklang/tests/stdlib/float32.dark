@@ -186,7 +186,6 @@ test bitsRoundTripAcrossTheRange =
   failures |> Stdlib.Test.equal([])
 
 
-// @compiler xfail runtime: "false" class=missing-support reason=compiler-gap
 test bits =
   Stdlib.Test.all(
     [ Stdlib.Float32.toBits(1.0f32) |> Stdlib.Test.equal(1065353216u32)
@@ -268,7 +267,6 @@ test parseRoundsOnceNotTwice =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(-1.0000001f32)) ])
 
 
-// @compiler xfail compile: "can't compile: uses a Float32 literal pattern, which this compiler does not support" class=missing-support reason=compiler-gap
 test patternMatch =
   let describe(x: Float32): String =
     match x with
@@ -372,19 +370,16 @@ test nanAndInfinities =
       |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test truncateRejectsNan =
   Stdlib.Float32.truncate(nan())
   => raises "Float64 has no integer value: NaN"
 
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test roundRejectsInfinity =
   Stdlib.Float32.round(infinity())
   => raises "Float64 has no integer value: Infinity"
 
 
-// @compiler xfail runtime: "Cannot unwrap None" class=missing-support reason=compiler-gap
 test roundRejectsPastInt64 =
   Stdlib.Float32.round(3.4028235e38f32)
   => raises "Float64 out of Int64 range (-9223372036854775808 to 9223372036854775807): 3.4028234663852886e+38"

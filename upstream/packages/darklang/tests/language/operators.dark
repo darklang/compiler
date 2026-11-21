@@ -26,7 +26,6 @@ test numericTypes =
       2s8 > 1s8 |> Stdlib.Test.equal(true) ])
 
 // Float64 has no Modulo implementation, deliberately; Decimal and the integers do
-// @compiler xfail compile: "Operator is unavailable for this type" class=aot-rejection reason=aot-type-error
 test floatModuloRaises =
   7.5 % 2.0
   => raises
@@ -34,32 +33,26 @@ test floatModuloRaises =
 
 // Mixed operand types are a type error (no implicit coercion), said before
 // dispatch so the message is the operator's, not the impl fn's
-// @compiler xfail compile: "Expected TInt64, got TBool" class=aot-rejection reason=aot-type-error
 test int64PlusBoolRaises =
   5 + true => raises "Cannot perform numeric operation on Int64 and Bool"
 
-// @compiler xfail compile: "Expected TInt64, got TFloat64" class=aot-rejection reason=aot-type-error
 test int64PlusFloatRaises =
   1 + 2.0
   => raises "Cannot perform numeric operation on Int64 and Float64. Both sides must be the same type. Write the number with a decimal point, as `5.0`, or convert with `Stdlib.Int64.toFloat64(n)`."
 
 // `/`, `%` and `**` say so as well, rather than failing inside the left side's implementation
-// @compiler xfail compile: "Expected TInt64, got TFloat64" class=aot-rejection reason=aot-type-error
 test int64DividedByFloatRaises =
   5 / 2.0
   => raises "Cannot perform numeric operation on Int64 and Float64. Both sides must be the same type. Write the number with a decimal point, as `5.0`, or convert with `Stdlib.Int64.toFloat64(n)`."
 
-// @compiler xfail compile: "Expected TFloat64, got TInt64" class=aot-rejection reason=aot-type-error
 test floatToThePowerOfInt64Raises =
   2.0 ** 3
   => raises "Cannot perform numeric operation on Float64 and Int64. Both sides must be the same type. Write the number with a decimal point, as `5.0`, or convert with `Stdlib.Int64.toFloat64(n)`."
 
-// @compiler xfail compile: "Expected TInt32, got TInt64" class=aot-rejection reason=aot-type-error
 test int32ModuloInt64Raises =
   7s32 % 2 => raises "Cannot perform numeric operation on Int32 and Int64"
 
 // #6024: joining a String and an Int is how a newcomer meets this, so it says how to convert
-// @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
 test stringPlusInt64SaysHowToJoin =
   "total: " + 5
   => raises "Cannot perform numeric operation on String and Int64. To join them, make the Int64 a String with `Stdlib.display`, or interpolate it: `$\"total: {n}\"`."
@@ -68,7 +61,6 @@ test stringPlusInt64SaysHowToJoin =
 test stringAdd =
   "a" + "b" |> Stdlib.Test.equal("ab")
 
-// @compiler xfail compile: "Operator is unavailable for this type" class=aot-rejection reason=aot-type-error
 test stringSubtractRaises =
   "a" - "b"
   => raises
@@ -162,11 +154,9 @@ test shifts =
       1u8 << 8u8 |> Stdlib.Test.equal(1u8) ])
 
 // `BigInt` has no width to mask a count against, so an unusable one raises
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test negativeLeftShiftRaises =
   1z << -1z => raises "Shift count out of range (0 to 2147483647): -1z"
 
-// @compiler xfail runtime: "Encountered an out-of-range integer value" class=missing-support reason=compiler-gap
 test negativeRightShiftRaises =
   1z >> -1z => raises "Shift count out of range (0 to 2147483647): -1z"
 
@@ -181,30 +171,25 @@ test bitwiseNot =
 
 // bitwise operators are traits like every other operator, so a Float64 says what
 // is missing
-// @compiler xfail compile: "Operator is unavailable for this type" class=aot-rejection reason=aot-type-error
 test floatBitwiseAndRaises =
   1.0 & 2.0
   => raises
     "Float64 has no implementation of Darklang.Stdlib.BitwiseAnd. Write `impl BitwiseAnd for Float64 = ...`, or run `dark impls BitwiseAnd` to see which types do"
 
-// @compiler xfail compile: "Operator is unavailable for this type" class=aot-rejection reason=aot-type-error
 test floatShiftLeftRaises =
   1.0 << 2.0
   => raises
     "Float64 has no implementation of Darklang.Stdlib.ShiftLeft. Write `impl ShiftLeft for Float64 = ...`, or run `dark impls ShiftLeft` to see which types do"
 
-// @compiler xfail compile: "Unary operator is unavailable for TFloat64" class=aot-rejection reason=aot-type-error
 test floatBitwiseNotRaises =
   ~1.0
   => raises
     "Float64 has no implementation of Darklang.Stdlib.BitwiseNot. Write `impl BitwiseNot for Float64 = ...`, or run `dark impls BitwiseNot` to see which types do"
 
 // mixed widths are a type error, exactly as for the arithmetic operators
-// @compiler xfail compile: "Expected TInt64, got TInt8" class=aot-rejection reason=aot-type-error
 test mixedBitwiseWidthsRaises =
   1 & 2s8 => raises "Cannot perform numeric operation on Int64 and Int8"
 
-// @compiler xfail compile: "Expected TInt64, got TInt" class=aot-rejection reason=aot-type-error
 test mixedShiftWidthsRaises =
   1 << 2z => raises "Cannot perform numeric operation on Int64 and BigInt"
 

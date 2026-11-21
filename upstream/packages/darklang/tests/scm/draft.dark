@@ -12,34 +12,28 @@ module Darklang.SCM.Tests.Draft
 // op blob, and the one that reads where committed ops sit in the log, which nothing in
 // the SCM reports.
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Draft.draftCount: Unknown function or value 'Darklang.SCM.PackageOps.draftOpCountFor'"
 let draftCount(): Int64 =
   SCM.PackageOps.draftOpCountFor(Authoring.main())
 
 
 /// Main's ops that are not its draft: the committed ones, and any a merge brought in. A discard
 /// must leave every one of them alone.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Draft.committedOpCount: Unknown function or value 'Darklang.SCM.PackageOps.countOf'"
 let committedOpCount(): Int64 =
   SCM.PackageOps.countOf(SCM.PackageOps.OpFilter.Main) - draftCount()
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Draft.commit: Unknown function or value 'Darklang.SCM.PackageOps.commitDraft'"
 let commit(message: String): Stdlib.Result.Result<String, String> =
   SCM.PackageOps.commitDraft(Authoring.main(), message)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Draft.discardAll: Unknown function or value 'Darklang.SCM.Draft.discardAll'"
 let discardAll(): Stdlib.Result.Result<Int64, String> =
   SCM.Draft.discardAll()
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.SCM.Tests.Draft.discardName: Unknown function or value 'Darklang.SCM.Draft.discardName'"
 let discardName(m: String, name: String): Stdlib.Result.Result<Int64, String> =
   SCM.Draft.discardName("Tests", [ m ], name)
 
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test discardDropsTheDraftAndLeavesCommittedOpsAlone =
   let m = "DraftTestOnly"
   let setup = Authoring.author(m, "let keep(): Int64 = 4001")
@@ -69,7 +63,6 @@ test discardDropsTheDraftAndLeavesCommittedOpsAlone =
 
 // The case a per-op undo cannot handle: the draft edit REPLACED a binding rather than
 // adding one, so dropping it is only right if the committed binding comes back.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test discardRestoresTheBindingAnEditOverwrote =
   let m = "DraftTestRestore"
   let setup = Authoring.author(m, "let v(): Int64 = 5001")
@@ -89,7 +82,6 @@ test discardRestoresTheBindingAnEditOverwrote =
 
 // The no-op path must not delete and re-insert: a rebuild with nothing to remove is pure
 // risk, and re-stamping ops poisons last-writer-wins.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test discardingAnEmptyDraftChangesNothing =
   let m = "DraftTestEmpty"
   let setup = Authoring.author(m, "let e(): Int64 = 6001")
@@ -107,7 +99,6 @@ test discardingAnEmptyDraftChangesNothing =
 // Collapsing drops namings of versions that stopped being what the name meant before
 // anyone saw them. What the name means now must not change, and only its last version
 // is left to step back from.
-// @compiler xfail compile: "Unknown function or value 'Authoring.authorAll'" class=missing-support reason=upstream-dependency
 test collapsingKeepsOneNamingPerName =
   let m = "DraftTestCollapse"
   let setup =
@@ -135,7 +126,6 @@ test collapsingKeepsOneNamingPerName =
       draftCount() < draftBefore |> Stdlib.Test.equal(true) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test discardingOneNameLeavesTheRestOfTheDraft =
   let m = "DraftTestOneName"
   let setup =
@@ -164,7 +154,6 @@ test discardingOneNameLeavesTheRestOfTheDraft =
 // content may be live with nothing naming it, and dropping the Add as well would leave a
 // projection no re-fold reproduces. Counted, because the content row survives either way:
 // 1 op is right, 2 is the bug.
-// @compiler xfail compile: "Unknown function or value 'Authoring.author'" class=missing-support reason=upstream-dependency
 test discardingANameDropsTheNamingNotTheContent =
   let m = "DraftTestNeededContent"
   let setup =

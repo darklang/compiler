@@ -4,238 +4,235 @@ module Darklang.Stdlib.__Qpack
 type Field = { name: String, value: String, next: Int64 }
 
 // RFC 9204 Appendix A. Indices are zero-based, unlike HPACK.
-let staticEntry (index: Int64) : Stdlib.Option.Option<(String * String)> =
+let staticEntry(index: Int64): Stdlib.Option.Option<(String * String)> =
   match index with
-  | 0L -> Some ((":authority", ""))
-  | 1L -> Some ((":path", "/"))
-  | 2L -> Some (("age", "0"))
-  | 3L -> Some (("content-disposition", ""))
-  | 4L -> Some (("content-length", "0"))
-  | 5L -> Some (("cookie", ""))
-  | 6L -> Some (("date", ""))
-  | 7L -> Some (("etag", ""))
-  | 8L -> Some (("if-modified-since", ""))
-  | 9L -> Some (("if-none-match", ""))
-  | 10L -> Some (("last-modified", ""))
-  | 11L -> Some (("link", ""))
-  | 12L -> Some (("location", ""))
-  | 13L -> Some (("referer", ""))
-  | 14L -> Some (("set-cookie", ""))
-  | 15L -> Some ((":method", "CONNECT"))
-  | 16L -> Some ((":method", "DELETE"))
-  | 17L -> Some ((":method", "GET"))
-  | 18L -> Some ((":method", "HEAD"))
-  | 19L -> Some ((":method", "OPTIONS"))
-  | 20L -> Some ((":method", "POST"))
-  | 21L -> Some ((":method", "PUT"))
-  | 22L -> Some ((":scheme", "http"))
-  | 23L -> Some ((":scheme", "https"))
-  | 24L -> Some ((":status", "103"))
-  | 25L -> Some ((":status", "200"))
-  | 26L -> Some ((":status", "304"))
-  | 27L -> Some ((":status", "404"))
-  | 28L -> Some ((":status", "503"))
-  | 29L -> Some (("accept", "*/*"))
-  | 30L -> Some (("accept", "application/dns-message"))
-  | 31L -> Some (("accept-encoding", "gzip, deflate, br"))
-  | 32L -> Some (("accept-ranges", "bytes"))
-  | 33L -> Some (("access-control-allow-headers", "cache-control"))
-  | 34L -> Some (("access-control-allow-headers", "content-type"))
-  | 35L -> Some (("access-control-allow-origin", "*"))
-  | 36L -> Some (("cache-control", "max-age=0"))
-  | 37L -> Some (("cache-control", "max-age=2592000"))
-  | 38L -> Some (("cache-control", "max-age=604800"))
-  | 39L -> Some (("cache-control", "no-cache"))
-  | 40L -> Some (("cache-control", "no-store"))
-  | 41L -> Some (("cache-control", "public, max-age=31536000"))
-  | 42L -> Some (("content-encoding", "br"))
-  | 43L -> Some (("content-encoding", "gzip"))
-  | 44L -> Some (("content-type", "application/dns-message"))
-  | 45L -> Some (("content-type", "application/javascript"))
-  | 46L -> Some (("content-type", "application/json"))
-  | 47L -> Some (("content-type", "application/x-www-form-urlencoded"))
-  | 48L -> Some (("content-type", "image/gif"))
-  | 49L -> Some (("content-type", "image/jpeg"))
-  | 50L -> Some (("content-type", "image/png"))
-  | 51L -> Some (("content-type", "text/css"))
-  | 52L -> Some (("content-type", "text/html; charset=utf-8"))
-  | 53L -> Some (("content-type", "text/plain"))
-  | 54L -> Some (("content-type", "text/plain;charset=utf-8"))
-  | 55L -> Some (("range", "bytes=0-"))
-  | 56L -> Some (("strict-transport-security", "max-age=31536000"))
-  | 57L -> Some (("strict-transport-security", "max-age=31536000; includesubdomains"))
-  | 58L -> Some (("strict-transport-security", "max-age=31536000; includesubdomains; preload"))
-  | 59L -> Some (("vary", "accept-encoding"))
-  | 60L -> Some (("vary", "origin"))
-  | 61L -> Some (("x-content-type-options", "nosniff"))
-  | 62L -> Some (("x-xss-protection", "1; mode=block"))
-  | 63L -> Some ((":status", "100"))
-  | 64L -> Some ((":status", "204"))
-  | 65L -> Some ((":status", "206"))
-  | 66L -> Some ((":status", "302"))
-  | 67L -> Some ((":status", "400"))
-  | 68L -> Some ((":status", "403"))
-  | 69L -> Some ((":status", "421"))
-  | 70L -> Some ((":status", "425"))
-  | 71L -> Some ((":status", "500"))
-  | 72L -> Some (("accept-language", ""))
-  | 73L -> Some (("access-control-allow-credentials", "FALSE"))
-  | 74L -> Some (("access-control-allow-credentials", "TRUE"))
-  | 75L -> Some (("access-control-allow-headers", "*"))
-  | 76L -> Some (("access-control-allow-methods", "get"))
-  | 77L -> Some (("access-control-allow-methods", "get, post, options"))
-  | 78L -> Some (("access-control-allow-methods", "options"))
-  | 79L -> Some (("access-control-expose-headers", "content-length"))
-  | 80L -> Some (("access-control-request-headers", "content-type"))
-  | 81L -> Some (("access-control-request-method", "get"))
-  | 82L -> Some (("access-control-request-method", "post"))
-  | 83L -> Some (("alt-svc", "clear"))
-  | 84L -> Some (("authorization", ""))
-  | 85L -> Some (("content-security-policy", "script-src 'none'; object-src 'none'; base-uri 'none'"))
-  | 86L -> Some (("early-data", "1"))
-  | 87L -> Some (("expect-ct", ""))
-  | 88L -> Some (("forwarded", ""))
-  | 89L -> Some (("if-range", ""))
-  | 90L -> Some (("origin", ""))
-  | 91L -> Some (("purpose", "prefetch"))
-  | 92L -> Some (("server", ""))
-  | 93L -> Some (("timing-allow-origin", "*"))
-  | 94L -> Some (("upgrade-insecure-requests", "1"))
-  | 95L -> Some (("user-agent", ""))
-  | 96L -> Some (("x-forwarded-for", ""))
-  | 97L -> Some (("x-frame-options", "deny"))
-  | 98L -> Some (("x-frame-options", "sameorigin"))
+  | 0 -> Some((":authority", ""))
+  | 1 -> Some((":path", "/"))
+  | 2 -> Some(("age", "0"))
+  | 3 -> Some(("content-disposition", ""))
+  | 4 -> Some(("content-length", "0"))
+  | 5 -> Some(("cookie", ""))
+  | 6 -> Some(("date", ""))
+  | 7 -> Some(("etag", ""))
+  | 8 -> Some(("if-modified-since", ""))
+  | 9 -> Some(("if-none-match", ""))
+  | 10 -> Some(("last-modified", ""))
+  | 11 -> Some(("link", ""))
+  | 12 -> Some(("location", ""))
+  | 13 -> Some(("referer", ""))
+  | 14 -> Some(("set-cookie", ""))
+  | 15 -> Some((":method", "CONNECT"))
+  | 16 -> Some((":method", "DELETE"))
+  | 17 -> Some((":method", "GET"))
+  | 18 -> Some((":method", "HEAD"))
+  | 19 -> Some((":method", "OPTIONS"))
+  | 20 -> Some((":method", "POST"))
+  | 21 -> Some((":method", "PUT"))
+  | 22 -> Some((":scheme", "http"))
+  | 23 -> Some((":scheme", "https"))
+  | 24 -> Some((":status", "103"))
+  | 25 -> Some((":status", "200"))
+  | 26 -> Some((":status", "304"))
+  | 27 -> Some((":status", "404"))
+  | 28 -> Some((":status", "503"))
+  | 29 -> Some(("accept", "*/*"))
+  | 30 -> Some(("accept", "application/dns-message"))
+  | 31 -> Some(("accept-encoding", "gzip, deflate, br"))
+  | 32 -> Some(("accept-ranges", "bytes"))
+  | 33 -> Some(("access-control-allow-headers", "cache-control"))
+  | 34 -> Some(("access-control-allow-headers", "content-type"))
+  | 35 -> Some(("access-control-allow-origin", "*"))
+  | 36 -> Some(("cache-control", "max-age=0"))
+  | 37 -> Some(("cache-control", "max-age=2592000"))
+  | 38 -> Some(("cache-control", "max-age=604800"))
+  | 39 -> Some(("cache-control", "no-cache"))
+  | 40 -> Some(("cache-control", "no-store"))
+  | 41 -> Some(("cache-control", "public, max-age=31536000"))
+  | 42 -> Some(("content-encoding", "br"))
+  | 43 -> Some(("content-encoding", "gzip"))
+  | 44 -> Some(("content-type", "application/dns-message"))
+  | 45 -> Some(("content-type", "application/javascript"))
+  | 46 -> Some(("content-type", "application/json"))
+  | 47 -> Some(("content-type", "application/x-www-form-urlencoded"))
+  | 48 -> Some(("content-type", "image/gif"))
+  | 49 -> Some(("content-type", "image/jpeg"))
+  | 50 -> Some(("content-type", "image/png"))
+  | 51 -> Some(("content-type", "text/css"))
+  | 52 -> Some(("content-type", "text/html; charset=utf-8"))
+  | 53 -> Some(("content-type", "text/plain"))
+  | 54 -> Some(("content-type", "text/plain;charset=utf-8"))
+  | 55 -> Some(("range", "bytes=0-"))
+  | 56 -> Some(("strict-transport-security", "max-age=31536000"))
+  | 57 -> Some(("strict-transport-security", "max-age=31536000; includesubdomains"))
+  | 58 -> Some(("strict-transport-security", "max-age=31536000; includesubdomains; preload"))
+  | 59 -> Some(("vary", "accept-encoding"))
+  | 60 -> Some(("vary", "origin"))
+  | 61 -> Some(("x-content-type-options", "nosniff"))
+  | 62 -> Some(("x-xss-protection", "1; mode=block"))
+  | 63 -> Some((":status", "100"))
+  | 64 -> Some((":status", "204"))
+  | 65 -> Some((":status", "206"))
+  | 66 -> Some((":status", "302"))
+  | 67 -> Some((":status", "400"))
+  | 68 -> Some((":status", "403"))
+  | 69 -> Some((":status", "421"))
+  | 70 -> Some((":status", "425"))
+  | 71 -> Some((":status", "500"))
+  | 72 -> Some(("accept-language", ""))
+  | 73 -> Some(("access-control-allow-credentials", "FALSE"))
+  | 74 -> Some(("access-control-allow-credentials", "TRUE"))
+  | 75 -> Some(("access-control-allow-headers", "*"))
+  | 76 -> Some(("access-control-allow-methods", "get"))
+  | 77 -> Some(("access-control-allow-methods", "get, post, options"))
+  | 78 -> Some(("access-control-allow-methods", "options"))
+  | 79 -> Some(("access-control-expose-headers", "content-length"))
+  | 80 -> Some(("access-control-request-headers", "content-type"))
+  | 81 -> Some(("access-control-request-method", "get"))
+  | 82 -> Some(("access-control-request-method", "post"))
+  | 83 -> Some(("alt-svc", "clear"))
+  | 84 -> Some(("authorization", ""))
+  | 85 -> Some(("content-security-policy", "script-src 'none'; object-src 'none'; base-uri 'none'"))
+  | 86 -> Some(("early-data", "1"))
+  | 87 -> Some(("expect-ct", ""))
+  | 88 -> Some(("forwarded", ""))
+  | 89 -> Some(("if-range", ""))
+  | 90 -> Some(("origin", ""))
+  | 91 -> Some(("purpose", "prefetch"))
+  | 92 -> Some(("server", ""))
+  | 93 -> Some(("timing-allow-origin", "*"))
+  | 94 -> Some(("upgrade-insecure-requests", "1"))
+  | 95 -> Some(("user-agent", ""))
+  | 96 -> Some(("x-forwarded-for", ""))
+  | 97 -> Some(("x-frame-options", "deny"))
+  | 98 -> Some(("x-frame-options", "sameorigin"))
   | _ -> None
 
-let __value (name: String) (data: Blob) (position: Int64)
-  : Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
-  match Stdlib.__Hpack.text data position with
-  | Error message -> Error message
-  | Ok text -> Ok (Stdlib.__Qpack.Field { name = name, value = text.value, next = text.next })
+let __value(name: String, data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
+  match Stdlib.__Hpack.text(data, position) with
+  | Error(message) -> Error(message)
+  | Ok(text) -> Ok(Stdlib.__Qpack.Field { name = name, value = text.value, next = text.next })
 
-let __nameReference (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
-  let first = Stdlib.Blob.__getByte data position in
-  if Stdlib.Int64.bitwiseAnd first 16L == 0L then Error "Dynamic QPACK references are disabled"
+let __nameReference(data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
+  let first = Stdlib.Blob.__getByte(data, position) in
+  if Stdlib.Int64.bitwiseAnd(first, 16) == 0 then Error("Dynamic QPACK references are disabled")
   else
-    match Stdlib.__Hpack.integer data position 4L with
-    | Error message -> Error message
-    | Ok number ->
-      match Stdlib.__Qpack.staticEntry number.value with
-      | None -> Error "Invalid QPACK static index"
-      | Some pair -> let (name, _) = pair in Stdlib.__Qpack.__value name data number.next
+    match Stdlib.__Hpack.integer(data, position, 4) with
+    | Error(message) -> Error(message)
+    | Ok(number) ->
+      match Stdlib.__Qpack.staticEntry(number.value) with
+      | None -> Error("Invalid QPACK static index")
+      | Some(pair) -> let (name, _) = pair in Stdlib.__Qpack.__value(name, data, number.next)
 
-let __literalName (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Hpack.Text, String> =
-  match Stdlib.__Hpack.integer data position 3L with
-  | Error message -> Error message
-  | Ok number ->
-    if number.value == 0L then Error "Empty HTTP header name"
-    else if number.value > 65536L then Error "QPACK string too large"
-    else if number.value > Stdlib.Blob.__byteLength data - number.next then Error "Truncated QPACK name"
+let __literalName(data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__Hpack.Text, String> =
+  match Stdlib.__Hpack.integer(data, position, 3) with
+  | Error(message) -> Error(message)
+  | Ok(number) ->
+    if number.value == 0 then Error("Empty HTTP header name")
+    else if number.value > 65536 then Error("QPACK string too large")
+    else if number.value > Stdlib.Blob.__byteLength(data) - number.next then Error("Truncated QPACK name")
     else
-      let encoded = Stdlib.__Http2Wire.__slice data number.next number.value in
-      let decoded = if Stdlib.Int64.bitwiseAnd (Stdlib.Blob.__getByte data position) 8L == 0L then Ok encoded
-                    else Stdlib.__Hpack.__huffman encoded 0L 0L 0L [] 0L in
+      let encoded = Stdlib.__Http2Wire.__slice(data, number.next, number.value) in
+      let decoded = if Stdlib.Int64.bitwiseAnd(Stdlib.Blob.__getByte(data, position), 8) == 0 then Ok(encoded)
+                    else Stdlib.__Hpack.__huffman(encoded, 0, 0, 0, [], 0) in
       match decoded with
-      | Error message -> Error message
-      | Ok bytes ->
-        match Stdlib.Blob.toString bytes with
-        | Error _ -> Error "Invalid UTF-8 in HTTP header"
-        | Ok name ->
-          if name == "" then Error "Empty HTTP header name"
-          else Ok (Stdlib.__Hpack.Text { value = name, next = number.next + number.value })
+      | Error(message) -> Error(message)
+      | Ok(bytes) ->
+        match Stdlib.Blob.toString(bytes) with
+        | Error(_) -> Error("Invalid UTF-8 in HTTP header")
+        | Ok(name) ->
+          if name == "" then Error("Empty HTTP header name")
+          else Ok(Stdlib.__Hpack.Text { value = name, next = number.next + number.value })
 
-let __field (data: Blob) (position: Int64) : Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
-  let first = Stdlib.Blob.__getByte data position in
-  if first >= 128L then
-    if Stdlib.Int64.bitwiseAnd first 64L == 0L then Error "Dynamic QPACK references are disabled"
+let __field(data: Blob, position: Int64): Stdlib.Result.Result<Stdlib.__Qpack.Field, String> =
+  let first = Stdlib.Blob.__getByte(data, position) in
+  if first >= 128 then
+    if Stdlib.Int64.bitwiseAnd(first, 64) == 0 then Error("Dynamic QPACK references are disabled")
     else
-      match Stdlib.__Hpack.integer data position 6L with
-      | Error message -> Error message
-      | Ok number ->
-        match Stdlib.__Qpack.staticEntry number.value with
-        | None -> Error "Invalid QPACK static index"
-        | Some pair ->
+      match Stdlib.__Hpack.integer(data, position, 6) with
+      | Error(message) -> Error(message)
+      | Ok(number) ->
+        match Stdlib.__Qpack.staticEntry(number.value) with
+        | None -> Error("Invalid QPACK static index")
+        | Some(pair) ->
           let (name, value) = pair in
-          Ok (Stdlib.__Qpack.Field { name = name, value = value, next = number.next })
-  else if first >= 64L then Stdlib.__Qpack.__nameReference data position
-  else if first >= 32L then
-    match Stdlib.__Qpack.__literalName data position with
-    | Error message -> Error message
-    | Ok name -> Stdlib.__Qpack.__value name.value data name.next
-  else Error "Dynamic QPACK references are disabled"
+          Ok(Stdlib.__Qpack.Field { name = name, value = value, next = number.next })
+  else if first >= 64 then Stdlib.__Qpack.__nameReference(data, position)
+  else if first >= 32 then
+    match Stdlib.__Qpack.__literalName(data, position) with
+    | Error(message) -> Error(message)
+    | Ok(name) -> Stdlib.__Qpack.__value(name.value, data, name.next)
+  else Error("Dynamic QPACK references are disabled")
 
-let __decode (data: Blob) (position: Int64) (size: Int64) (count: Int64)
-  (fields: List<(String * String)>) : Stdlib.Result.Result<List<(String * String)>, String> =
-  if position == Stdlib.Blob.__byteLength data then Ok (Stdlib.List.reverse fields)
-  else if count >= 256L then Error "QPACK header list too large"
+let __decode(data: Blob, position: Int64, size: Int64, count: Int64, fields: List<(String * String)>): Stdlib.Result.Result<List<(String * String)>, String> =
+  if position == Stdlib.Blob.__byteLength(data) then Ok(Stdlib.List.reverse(fields))
+  else if count >= 256 then Error("QPACK header list too large")
   else
-    match Stdlib.__Qpack.__field data position with
-    | Error message -> Error message
-    | Ok field ->
+    match Stdlib.__Qpack.__field(data, position) with
+    | Error(message) -> Error(message)
+    | Ok(field) ->
       let entry = (field.name, field.value) in
-      let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-      if nextSize > 65536L then Error "QPACK header list too large"
-      else Stdlib.__Qpack.__decode data field.next nextSize (count + 1L) (Stdlib.List.push fields entry)
+      let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+      if nextSize > 65536 then Error("QPACK header list too large")
+      else Stdlib.__Qpack.__decode(data, field.next, nextSize, count + 1, Stdlib.List.push(fields, entry))
 
-let decode (data: Blob) : Stdlib.Result.Result<List<(String * String)>, String> =
-  if Stdlib.Blob.__byteLength data > 65536L then Error "QPACK field section too large"
+let decode(data: Blob): Stdlib.Result.Result<List<(String * String)>, String> =
+  if Stdlib.Blob.__byteLength(data) > 65536 then Error("QPACK field section too large")
   else
-    match Stdlib.__Hpack.integer data 0L 8L with
-    | Error message -> Error message
-    | Ok count ->
-      if count.value != 0L then Error "Dynamic QPACK references are disabled"
+    match Stdlib.__Hpack.integer(data, 0, 8) with
+    | Error(message) -> Error(message)
+    | Ok(count) ->
+      if count.value != 0 then Error("Dynamic QPACK references are disabled")
       else
-        match Stdlib.__Hpack.integer data count.next 7L with
-        | Error message -> Error message
-        | Ok base ->
+        match Stdlib.__Hpack.integer(data, count.next, 7) with
+        | Error(message) -> Error(message)
+        | Ok(base) ->
           // With zero insert count a negative Base is invalid; positive Base
           // is irrelevant to static/literal fields and is explicitly allowed.
-          if Stdlib.Blob.__getByte data count.next >= 128L then Error "Invalid QPACK base"
-          else Stdlib.__Qpack.__decode data base.next 0L 0L []
+          if Stdlib.Blob.__getByte(data, count.next) >= 128 then Error("Invalid QPACK base")
+          else Stdlib.__Qpack.__decode(data, base.next, 0, 0, [])
 
-let __staticIndex (name: String) (value: String) (exact: Bool) (index: Int64) : Stdlib.Option.Option<Int64> =
-  match Stdlib.__Qpack.staticEntry index with
+let __staticIndex(name: String, value: String, exact: Bool, index: Int64): Stdlib.Option.Option<Int64> =
+  match Stdlib.__Qpack.staticEntry(index) with
   | None -> None
-  | Some entry ->
+  | Some(entry) ->
     let (entryName, entryValue) = entry in
-    if entryName == name && (Stdlib.Bool.not exact || entryValue == value) then Some index
-    else Stdlib.__Qpack.__staticIndex name value exact (index + 1L)
+    if entryName == name && (Stdlib.Bool.not(exact) || entryValue == value) then Some(index)
+    else Stdlib.__Qpack.__staticIndex(name, value, exact, index + 1)
 
-let __encode (fields: List<(String * String)>) (size: Int64) (count: Int64) (blocks: List<Blob>)
-  : Stdlib.Result.Result<Blob, String> =
+let __encode(fields: List<(String * String)>, size: Int64, count: Int64, blocks: List<Blob>): Stdlib.Result.Result<Blob, String> =
   match fields with
-  | [] -> Ok (Stdlib.Blob.concat (Stdlib.List.push (Stdlib.List.reverse blocks) (Stdlib.Blob.__fromInt64List [0L, 0L])))
+  | [] -> Ok(Stdlib.Blob.concat(Stdlib.List.push(Stdlib.List.reverse(blocks), Stdlib.Blob.__fromInt64List([0, 0]))))
   | entry :: rest ->
     let (name, value) = entry in
-    let nextSize = size + Stdlib.__Hpack.__entrySize entry in
-    if name == "" then Error "Empty HTTP header name"
-    else if count >= 256L || nextSize > 65536L then Error "QPACK header list too large"
+    let nextSize = size + Stdlib.__Hpack.__entrySize(entry) in
+    if name == "" then Error("Empty HTTP header name")
+    else if count >= 256 || nextSize > 65536 then Error("QPACK header list too large")
     else
-      let exact = if Stdlib.__Hpack.__sensitive name then None else Stdlib.__Qpack.__staticIndex name value true 0L in
+      let exact = if Stdlib.__Hpack.__sensitive(name) then None else Stdlib.__Qpack.__staticIndex(name, value, true, 0) in
       let block = match exact with
-      | Some index -> Stdlib.__Hpack.encodeInteger 6L 192L index
+      | Some(index) -> Stdlib.__Hpack.encodeInteger(6, 192, index)
       | None ->
-        let reference = match Stdlib.__Qpack.__staticIndex name value false 0L with
-        | Some index -> Stdlib.__Hpack.encodeInteger 4L 112L index
+        let reference = match Stdlib.__Qpack.__staticIndex(name, value, false, 0) with
+        | Some(index) -> Stdlib.__Hpack.encodeInteger(4, 112, index)
         | None ->
-          let raw = Stdlib.String.toBlob name in
-          let compressed = Stdlib.__Hpack.__encodeHuffman raw 0L 0L 0L [] in
-          let huffman = Stdlib.Blob.__byteLength compressed < Stdlib.Blob.__byteLength raw in
+          let raw = Stdlib.String.toBlob(name) in
+          let compressed = Stdlib.__Hpack.__encodeHuffman(raw, 0, 0, 0, []) in
+          let huffman = Stdlib.Blob.__byteLength(compressed) < Stdlib.Blob.__byteLength(raw) in
           let bytes = if huffman then compressed else raw in
-          Stdlib.Blob.concat [Stdlib.__Hpack.encodeInteger 3L (if huffman then 56L else 48L) (Stdlib.Blob.__byteLength bytes), bytes] in
-        Stdlib.Blob.concat [reference, Stdlib.__Hpack.encodeText value] in
-      Stdlib.__Qpack.__encode rest nextSize (count + 1L) (Stdlib.List.push blocks block)
+          Stdlib.Blob.concat([Stdlib.__Hpack.encodeInteger(3, (if huffman then 56 else 48), Stdlib.Blob.__byteLength(bytes)), bytes]) in
+        Stdlib.Blob.concat([reference, Stdlib.__Hpack.encodeText(value)]) in
+      Stdlib.__Qpack.__encode(rest, nextSize, count + 1, Stdlib.List.push(blocks, block))
 
-let encode (fields: List<(String * String)>) : Stdlib.Result.Result<Blob, String> =
-  Stdlib.__Qpack.__encode fields 0L 0L []
+let encode(fields: List<(String * String)>): Stdlib.Result.Result<Blob, String> =
+  Stdlib.__Qpack.__encode(fields, 0, 0, [])
 
 // Zero capacity permits only the one-byte capacity-zero instruction. Every
 // other capacity has a nonzero prefix, so it can be rejected immediately.
-let encoderInstructions (data: Blob) (position: Int64) : Stdlib.Result.Result<Int64, String> =
-  if position < 0L || position > Stdlib.Blob.__byteLength data then Error "Invalid QPACK instruction offset"
-  else if position == Stdlib.Blob.__byteLength data then Ok position
+let encoderInstructions(data: Blob, position: Int64): Stdlib.Result.Result<Int64, String> =
+  if position < 0 || position > Stdlib.Blob.__byteLength(data) then Error("Invalid QPACK instruction offset")
+  else if position == Stdlib.Blob.__byteLength(data) then Ok(position)
   else
-    let first = Stdlib.Blob.__getByte data position in
-    if first < 32L || first >= 64L then Error "Dynamic QPACK instructions are disabled"
-    else if first != 32L then Error "QPACK capacity exceeds advertised limit"
-    else Stdlib.__Qpack.encoderInstructions data (position + 1L)
+    let first = Stdlib.Blob.__getByte(data, position) in
+    if first < 32 || first >= 64 then Error("Dynamic QPACK instructions are disabled")
+    else if first != 32 then Error("QPACK capacity exceeds advertised limit")
+    else Stdlib.__Qpack.encoderInstructions(data, position + 1)

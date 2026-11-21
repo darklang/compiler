@@ -19,7 +19,6 @@ let pathOf(s: String): Stdlib.Result.Result<String, Stdlib.Url.ParseError> =
   Stdlib.Url.parse(s) |> Stdlib.Result.map(fun u -> u.path)
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.Tests.qp: Unknown function or value 'Stdlib.Url.queryParams'"
 let qp(
   s: String)
   : Stdlib.Result.Result<List<(String * String)>, Stdlib.Url.ParseError> =
@@ -735,7 +734,6 @@ test errorMessages =
 
 
 // toString(parse(s)) == s for anything already in normal form.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test roundTripExact =
   [ "https://example.com"
     "https://example.com/"
@@ -823,7 +821,6 @@ test toStringOfBuiltRecord =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("http://x/y")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'qp'" class=missing-support reason=upstream-dependency
 test queryParams =
   Stdlib.Test.all(
     [ qp("https://example.com/foo/bar?arg1=some_val&arg2=other_val#somehash")
@@ -855,7 +852,6 @@ test queryParams =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok([ ("a b", "1") ])) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.percentDecode'" class=missing-support reason=upstream-dependency
 test percentDecode =
   Stdlib.Test.all(
     [ Stdlib.Url.percentDecode("a%20b") |> Stdlib.Test.equal("a b")
@@ -872,7 +868,6 @@ test percentDecode =
       Stdlib.Url.percentDecode("%FF") |> Stdlib.Test.equal("�") ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.percentEncode'" class=missing-support reason=upstream-dependency
 test percentEncode =
   Stdlib.Test.all(
     [ Stdlib.Url.percentEncode("AZaz09-._~") |> Stdlib.Test.equal("AZaz09-._~")
@@ -1073,7 +1068,6 @@ test resolve =
   |> Stdlib.Test.all
 
 
-// @compiler blocked: compiler-crash diagnostic="runtime exit code 139 (SIGSEGV)"
 test resolveAgainstEmptyPath =
   Stdlib.Test.all(
     [ (Stdlib.Url.parse("http://a"), "g", "http://a/g")
@@ -1089,7 +1083,6 @@ test resolveAgainstEmptyPath =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(expected))))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.encodeQuery'" class=missing-support reason=upstream-dependency
 test encodeQuery =
   Stdlib.Test.all(
     [ Stdlib.Url.encodeQuery([ ("q", "a b"), ("n", "1") ])
@@ -1107,7 +1100,6 @@ test encodeQuery =
           [ ("a&b", "c=d"), ("é", "+ %"), ("a&b", "") ])) ])
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.Tests.withPath: Unknown function or value 'Stdlib.Url.withPathSegments'"
 let withPath(
   s: String,
   segments: List<String>)
@@ -1117,7 +1109,6 @@ let withPath(
     Stdlib.Url.toString(Stdlib.Url.withPathSegments(u, segments)))
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.Tests.withQuery: Unknown function or value 'Stdlib.Url.withQueryParams'"
 let withQuery(
   s: String,
   params: List<(String * String)>)
@@ -1127,7 +1118,6 @@ let withQuery(
     Stdlib.Url.toString(Stdlib.Url.withQueryParams(u, params)))
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.pathSegments'" class=missing-support reason=upstream-dependency
 test withPathSegments =
   let segments = [ "a b", "x/y", "é", "?#", "..", ".", "", "+", "%" ]
   Stdlib.Test.all(
@@ -1179,7 +1169,6 @@ test withPathSegments =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("/a/%2E%2E/b")) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.queryParams'" class=missing-support reason=upstream-dependency
 test withQueryParams =
   let params =
     [ ("a", "1")
@@ -1225,7 +1214,6 @@ test resolveGuardsPath =
   |> Stdlib.Test.all
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.formDecode'" class=missing-support reason=upstream-dependency
 test formDecode =
   [ ("List+map", "List map")
     ("C%2B%2B", "C++")
@@ -1237,7 +1225,6 @@ test formDecode =
   |> Stdlib.Test.all
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.Tests.segmentsOf: Unknown function or value 'Stdlib.Url.pathSegments'"
 let segmentsOf(
   s: String)
   : Stdlib.Result.Result<List<String>, Stdlib.Url.ParseError> =
@@ -1247,7 +1234,6 @@ let segmentsOf(
 
 // Includes the path examples from elm/url's Url.Parser docs and its old route
 // tests; unlike Elm's `string`, segments come back decoded.
-// @compiler xfail compile: "Unknown function or value 'segmentsOf'" class=missing-support reason=upstream-dependency
 test pathSegments =
   [ ("https://example.com", [])
     ("https://example.com/", [])
@@ -1336,7 +1322,6 @@ test elmUrlFromString =
             Stdlib.Option.Option.Some("cats")))) ])
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.percentEncode'" class=missing-support reason=upstream-dependency
 test elmUrlPercent =
   Stdlib.Test.all(
     [ [ ("hat", "hat")
@@ -1361,7 +1346,6 @@ test elmUrlPercent =
 
 // Url.Builder's examples. Elm's builders take the path as a string, so these set
 // `path` directly and the query with withQueryParams.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Stdlib.Url.Tests.at: Unknown function or value 'Stdlib.Url.withQueryParams'"
 let at(
   host: Stdlib.Option.Option<String>,
   port: Stdlib.Option.Option<Int64>,
@@ -1385,7 +1369,6 @@ let at(
   |> Stdlib.Url.toString
 
 
-// @compiler xfail compile: "Unknown function or value 'at'" class=missing-support reason=upstream-dependency
 test elmUrlBuilder =
   Stdlib.Test.all(
     [ at(
@@ -1489,7 +1472,6 @@ test elmUrlBuilder =
 // Url.Parser.Query's examples. Elm's `string` and `int` give Nothing for a
 // repeated key; queryParams keeps every repeat, in order, and leaves choosing
 // to the caller.
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Url.queryParams'" class=missing-support reason=upstream-dependency
 test elmUrlQuery =
   [ ("?search=cats", [ ("search", "cats") ])
     ("?search=cats&search=dogs", [ ("search", "cats"), ("search", "dogs") ])
@@ -1553,7 +1535,6 @@ test whatwgFailures =
   |> Stdlib.Test.all
 
 
-// @compiler xfail compile: "Unknown function or value 'Stdlib.Test.table'" class=missing-support reason=upstream-dependency
 test whatwgRoundTrip =
   [ "telnet://user:pass@foobar.com:23/"
     "ut2004://10.10.10.10:7777/Index.ut2"

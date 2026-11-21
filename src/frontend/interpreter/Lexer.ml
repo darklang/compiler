@@ -438,11 +438,6 @@ let letterOrDigit value = letter value || digit value
    Unterminated `$'…`: take to end of line.
    Unknown character: record it, skip it, and keep lexing.
 *)
-(* The interpreter reads a bare integer as Int64 (darklang/dark@1d3a109);
-   this compiler's own sources read it as an Int. The parser sets this while
-   it reads an interpreter source or one that asked for current syntax. *)
-let bareIntegerIsInt64 = ref false
-
 let tokenize text =
   let source = units text in
   let length = Array.length source in
@@ -571,8 +566,7 @@ let tokenize text =
   (* The interpreter's width suffixes since darklang/dark@1d3a109 (`1s8`,
      `1u64`, `1z` for BigInt) are accepted beside the pinned ones. Longer
      suffixes come first, so `1s16` is not read as `1s` followed by `16`.
-     The compiler's own `s` is an Int16; where a bare integer is an Int64, as
-     in the interpreter, `1s` is an Int64 too. *)
+     A bare integer and `1s` are Int64s. *)
   let suffixes =
     [
       "s128"; "u128"; "s16"; "u16"; "s32"; "u32"; "s64"; "u64"; "s8"; "u8";
@@ -638,13 +632,9 @@ let tokenize text =
     | "Q" -> parse 128 true (fun value -> TInt128 value) "Int128"
     | "Z" -> parse 128 false (fun value -> TUInt128 value) "UInt128"
     | "y" -> parse 8 true (fun value -> TInt8 (Z.to_int value)) "Int8"
-    | "s" when !bareIntegerIsInt64 ->
-        parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
-    | "s" -> parse 16 true (fun value -> TInt16 (Z.to_int value)) "Int16"
+    | "s" -> parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
     | "l" -> parse 32 true (fun value -> TInt32 (Z.to_int32 value)) "Int32"
-    | _ when !bareIntegerIsInt64 ->
-        parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
-    | _ -> if ascii then Ok (TInt (Z.of_string_base 10 digits), 0) else invalid
+    | _ -> parse 64 true (fun value -> TInt64 (Z.to_int64 value)) "Int64"
   in
   let rec scanString index closing =
     if index >= length then Error "Unterminated string literal"

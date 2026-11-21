@@ -15,7 +15,6 @@ val notCode =
 
 
 /// Every page `dark docs` prints from text, with its name.
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.DocsExamples.pages: Unknown function or value 'Cli.Docs.Command.Topics.allTopics'"
 let pages(): List<(String * String)> =
   Cli.Docs.Command.Topics.allTopics()
   |> Stdlib.List.filter(fun t -> t.name != "signatures")
@@ -186,7 +185,6 @@ let sources(block: List<String>): List<(LanguageTools.Parser.FileKind * String)>
       [ (LanguageTools.Parser.FileKind.Script, asScript(Stdlib.String.join(block, "\n"))) ]
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.DocsExamples.check: Unknown function or value 'LanguageTools.Parser.Parse.parse'"
 let check(page: String, kind: LanguageTools.Parser.FileKind, source: String): Option<String> =
   let (_, diagnostics) = LanguageTools.Parser.Parse.parse(kind, source)
   let wrong = Stdlib.String.contains(Stdlib.String.toLowercase(source), "// wrong")
@@ -199,7 +197,6 @@ let check(page: String, kind: LanguageTools.Parser.FileKind, source: String): Op
     Option.Some($"docs {page}: {why}\n{source}")
 
 
-// @compiler blocked: upstream-dependency diagnostic="Darklang.Cli.Tests.DocsExamples.failures: Unknown function or value 'check'"
 let failures(page: String, text: String): List<String> =
   blocks(text)
   |> Stdlib.List.map(fun b -> sources(b))
@@ -207,7 +204,6 @@ let failures(page: String, text: String): List<String> =
   |> Stdlib.List.filterMap(fun((kind, source)) -> check(page, kind, source))
 
 
-// @compiler xfail compile: "Unknown function or value 'pages'" class=missing-support reason=upstream-dependency
 test everyDarkExampleParses =
   let found =
     pages()
@@ -217,7 +213,6 @@ test everyDarkExampleParses =
   Stdlib.Test.expect(Stdlib.List.isEmpty(found), Stdlib.String.join(found, "\n\n"))
 
 
-// @compiler xfail compile: "Unknown function or value 'failures'" class=missing-support reason=upstream-dependency
 test theCheckFindsBrokenExamples =
   let page(lines: List<String>): String =
     lines |> Stdlib.List.map(fun l -> "  " + l) |> Stdlib.String.join("\n")

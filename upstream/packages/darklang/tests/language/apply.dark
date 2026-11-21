@@ -1,6 +1,5 @@
 module Darklang.Language.Tests.Apply
 
-// @compiler error-message compile: "Expression is not callable" reason=diagnostic-difference
 test bytesValueIsNotCallable =
   Stdlib.Bytes.empty()
   => raises "Cannot call a Bytes value as a function."
@@ -18,7 +17,6 @@ test lambdasAndOperators =
       |> Stdlib.Test.equal(7) ])
 
 // `map` gives its callback one argument, and a two-parameter lambda takes two, so it raises.
-// @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
 test callbackGivenTooFewArguments =
   ([ 1, 2 ] |> Stdlib.List.map(fun(x, y) -> x))
   => raises "Lambda expects 2 arguments, but got 1 argument"
@@ -49,7 +47,6 @@ let returnsInt(): Int64 = 5
 
 let returnsString(): String = "string"
 
-// @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.Apply.shouldReturnStringButDoesNot: Expected TString, got TInt64"
 let shouldReturnStringButDoesNot(): String = 5
 
 let returnsOptionSome(): Stdlib.Option.Option<Int64> =
@@ -60,7 +57,6 @@ let returnsOptionNone(): Stdlib.Option.Option<Int64> = Stdlib.Option.Option.None
 let returnsResultOk(): Stdlib.Result.Result<Int64, 'err> =
   Stdlib.Result.Result.Ok(5)
 
-// @compiler blocked: aot-type-error diagnostic="Darklang.Language.Tests.Apply.derrorFn: Expected TString, got TInt64"
 let derrorFn(msg: String): String = msg + Stdlib.Test.raiseRuntimeError(msg)
 
 let fnWithTypeArgs<'a, 'b>(a: 'a, b: 'b): 'a = a
@@ -114,7 +110,6 @@ module InferFromParts =
 
   test fromATuple = sameAsSecond((1, "a"), "b") |> Stdlib.Test.equal("b")
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test aRecordMismatchRaises =
     sameAsBoxed(Box { v = 1 }, "x")
     => raises
@@ -122,7 +117,6 @@ module InferFromParts =
 
 // A fn named with type args and not called is that fn as a value, specialised to them.
 module TypedFnValues =
-  // @compiler blocked: upstream-dependency diagnostic="Darklang.Language.Tests.Apply.TypedFnValues.twice: Indirect call argument count mismatch"
   let twice(f: (List<Int64> * (Int64 -> Int64)) -> List<Int64>): List<Int64> =
     f(f([ 1, 2 ], fun x -> x + 1), fun x -> x * 10)
 
@@ -136,7 +130,6 @@ module TypedFnValues =
      h(4))
     |> Stdlib.Test.equal(4)
 
-  // @compiler xfail compile: "Unknown function or value 'twice'" class=missing-support reason=upstream-dependency
   test passedToAnotherFn =
     twice(Stdlib.List.map<Int64, Int64>) |> Stdlib.Test.equal([ 20, 30 ])
 
@@ -145,28 +138,24 @@ module TypedFnValues =
     |> Stdlib.List.map(fnWithTypeArgAndOneParam<Int64>)
     |> Stdlib.Test.equal([ 1, 2 ])
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test argsCheckedAgainstTheTypeArgs =
     (let h = fnWithTypeArgAndOneParam<Int64>
      h("str"))
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypeArgAndOneParam's 1st parameter `arg` expects Int64, but got String (\"str\")"
 
-  // @compiler xfail compile: "Function value type argument count mismatch" class=missing-support reason=compiler-gap
   test wrongNumberOfTypeArgsRaises =
     (let h = fnWithTypeArgAndOneParam<Int64, String>
      h(1))
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypeArgAndOneParam expects 1 type argument, but got 2 type arguments"
 
-  // @compiler xfail compile: "Type arguments require a named function" class=aot-rejection reason=aot-arity-error
   test typeArgsCannotBeGivenTwice =
     (let h = fnWithTypeArgAndOneParam<Int64>
      h<Int64>(1))
     => raises "Cannot apply type arguments more than once"
 
 module InvalidFnCalls =
-  // @compiler xfail compile: "Unknown function or value 'functionWhichDoesntExist'" class=aot-rejection reason=aot-name-error
   test missingFunctionRaises =
     (functionWhichDoesntExist(6))
     => raises "There is no variable named: functionWhichDoesntExist"
@@ -176,54 +165,46 @@ module InvalidFnCalls =
   test zeroTypeArgsAreInferred =
     fnWithTypeArgAndOneParam(1) |> Stdlib.Test.equal(1)
 
-  // @compiler xfail compile: "Function 'fnWithTypeArgAndOneParam' expects 1 type arguments" class=aot-rejection reason=aot-arity-error
   test tooManyTypeArgsRaises =
     fnWithTypeArgAndOneParam<Int64, String>(1)
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypeArgAndOneParam expects 1 type argument, but got 2 type arguments"
 
   // errors around args
-  // @compiler xfail compile: "Function 'stringFn' expects 1 arguments" class=aot-rejection reason=aot-arity-error
   test tooManyArgsRaises =
     stringFn("str1", "str2")
     => raises
       "Darklang.Language.Tests.Apply.stringFn expects 1 argument, but got 2 arguments"
 
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test wrongArgTypeRaises =
     stringFn(5)
     => raises
       "Darklang.Language.Tests.Apply.stringFn's 1st parameter `key` expects String, but got Int64 (5). Try wrapping it with `Stdlib.display`."
 
-  // @compiler xfail compile: "Expected TInt64, got TString" class=aot-rejection reason=aot-type-error
   test argTypeFollowsTypeArgRaises =
     fnWithTypeArgAndOneParam<Int64>("str2")
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypeArgAndOneParam's 1st parameter `arg` expects Int64, but got String (\"str2\")"
 
   // errors around return value
-  // @compiler xfail compile: "Unknown function or value 'shouldReturnStringButDoesNot'" class=missing-support reason=upstream-dependency
   test wrongReturnTypeRaises =
     (shouldReturnStringButDoesNot())
     => raises
       "Darklang.Language.Tests.Apply.shouldReturnStringButDoesNot's return value expects String, but got Int64 (5). Try wrapping it with `Stdlib.display`."
 
   // A function must return the type chosen by its type argument.
-  // @compiler xfail compile: "Expected TString, got TInt64" class=aot-rejection reason=aot-type-error
   test wrongTypedReturnRaises =
     fnWithTypedReturn<String>()
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypedReturn's return value expects String, but got Int64 (5). Try wrapping it with `Stdlib.display`."
 
   // errors around type args take priority over ones about args
-  // @compiler xfail compile: "Function 'fnWithTypeArgAndOneParam' expects 1 type arguments" class=aot-rejection reason=aot-arity-error
   test typeArgErrorComesFirst =
     fnWithTypeArgAndOneParam<Int64, String>(1, "str")
     => raises
       "Darklang.Language.Tests.Apply.fnWithTypeArgAndOneParam expects 1 type argument, but got 2 type arguments"
 
   // misc errors
-  // @compiler xfail compile: "Unknown function or value 'derrorFn'" class=missing-support reason=upstream-dependency
   test runtimeErrorPropagates =
     derrorFn("msg") => raises "Uncaught exception: msg"
 
@@ -261,7 +242,6 @@ module GenericTypeArgsAreOK =
 
   // No partial application: a call that stops short raises rather than handing
   // back a function waiting for the rest.
-  // @compiler blocked: compiler-gap diagnostic="Expected compilation error but compilation succeeded"
   test tooFewArguments =
     (inner<Bool, String>(true))
     => raises
@@ -287,14 +267,11 @@ test argumentsThatFitExactly =
       tuplesArg([ (1, ArgMode.Flat), (2, ArgMode.Break) ]) |> Stdlib.Test.equal(2)
       optionArg(Stdlib.Option.Option.Some(ArgMode.Break)) |> Stdlib.Test.equal(true) ])
 
-// @compiler xfail compile: "Expected TSum (\"Darklang.Language.Tests.Apply.ArgMode\", []), got TInt64" class=aot-rejection reason=aot-type-error
 test aTupleThatDoesNotFitRaises =
   tupleArg((1, 2)) => raises "Darklang.Language.Tests.Apply.tupleArg's 1st parameter `t` expects (Int64 * ArgMode), but got (Int64 * Int64) ((1, 2))"
 
-// @compiler xfail compile: "Expected TSum (\"Darklang.Language.Tests.Apply.ArgMode\", []), got TInt64" class=aot-rejection reason=aot-type-error
 test aListOfTuplesThatDoesNotFitRaises =
   tuplesArg([ (1, 2) ]) => raises "Darklang.Language.Tests.Apply.tuplesArg's 1st parameter `ts` expects List<(Int64 * ArgMode)>, but got List<(Int64 * Int64)> ([(1, 2)])"
 
-// @compiler xfail compile: "Expected TSum (\"Darklang.Language.Tests.Apply.ArgMode\", []), got TInt64" class=aot-rejection reason=aot-type-error
 test anOptionThatDoesNotFitRaises =
   optionArg(Stdlib.Option.Option.Some(3)) => raises "Darklang.Language.Tests.Apply.optionArg's 1st parameter `o` expects Darklang.Stdlib.Option.Option<ArgMode>, but got Darklang.Stdlib.Option.Option<Int64> (Some(3))"
