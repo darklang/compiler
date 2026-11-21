@@ -24,7 +24,7 @@ def main():
         cached = ("--cache-dir", str(cache))
 
         def start(output, *flags):
-            return subprocess.Popen([compiler, *flags, "--progress=json", "-q", "--emit-result", "-e",
+            return subprocess.Popen([compiler, *flags, "--verbose=json", "-q", "--emit-result", "-e",
                 "(2L ** 10L) + 1L", "-o", str(output)], env=env, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True, cwd=root)
 
