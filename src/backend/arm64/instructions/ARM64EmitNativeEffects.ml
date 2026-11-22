@@ -637,6 +637,21 @@ let emitCliNative (ctx : codeGenContext) (dest : LIR.reg)
               Symbolic.SVC syscalls.ARM64.svcImmediate;
               Symbolic.MOV_reg (destReg, Symbolic.X0);
             ]
+      | LIR.ProcessExit -> (
+          match args with
+          | [ code ] ->
+              loadCliOperand Symbolic.X0 code
+              |> Result.map (fun loads ->
+                  let syscalls = ARM64.targetSyscalls ctx.target in
+                  loads
+                  @ [
+                      Symbolic.MOVZ
+                        ( syscalls.ARM64.syscallRegister,
+                          syscalls.ARM64.numbers.Platform.exit,
+                          0 );
+                      Symbolic.SVC syscalls.ARM64.svcImmediate;
+                    ])
+          | _ -> Error "ProcessExit expects one exit code")
       | LIR.SecureRandomFill -> (
           match args with
           | [ buffer; length ] ->

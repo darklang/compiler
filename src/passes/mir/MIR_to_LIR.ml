@@ -24,6 +24,7 @@ let convertCliOperation operation =
   | MIR.StartupStack -> LIR.StartupStack
   | MIR.ExecutableState -> LIR.ExecutableState
   | MIR.GetUid -> LIR.GetUid
+  | MIR.ProcessExit -> LIR.ProcessExit
   | MIR.SocketTcp4 -> LIR.SocketTcp4
   | MIR.SocketTcp6 -> LIR.SocketTcp6
   | MIR.SocketUdp4 -> LIR.SocketUdp4

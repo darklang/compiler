@@ -5262,25 +5262,15 @@ packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Test
 packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.watchEventsWalksSeveralEvents	xfail compile: "Unknown function or value 'events'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.watchVnodeEvents	xfail compile: "Unknown function or value 'vnodeEvents'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.watchVnodeEventsWalksSeveralEvents	xfail compile: "Unknown function or value 'vnodeEvents'" class=missing-support reason=upstream-dependency
-packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.copyWriteAt	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.copyBuffered	xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.copyFallbackAndFinish	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/file.dark	Darklang.Stdlib.Cli.File.Bytes.Tests.watchEdges	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.posixError	blocked: upstream-dependency diagnostic="Darklang.Stdlib.Cli.Posix.Tests.posixError: Expected TInt, got TInt64"
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.syscallErrnos	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.unlinkAtRemovesDirectory	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.flockLocksAndUnlocks	xfail compile: "Expected TBool, got TSum (\"Darklang.Stdlib.Cli.Posix.Lock\", [])" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.readlinkAtTruncates	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.bufferGrowth	xfail compile: "Operator is unavailable for this type" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.kernelSignedField	xfail compile: "Expected TList TUInt8, got TBlob" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.accountFieldFromPasswd	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.errorMessages	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.tempRetry	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.writeAll	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-contract
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.publicWrappers	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.setFileTimes	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/posix.dark	Darklang.Stdlib.Cli.Posix.Tests.pidAndExitCodeInspect	xfail runtime: "false" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.inheritedChildExitCode	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.runBytesKeepsRawOutput	xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.outputTextReplacesInvalidUtf8	xfail compile: "Unknown function or value 'Stdlib.Cli.Process.runBytes'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.executeBytesKeepsRawOutput	xfail compile: "Unknown function or value 'Stdlib.Cli.executeBytes'" class=missing-support reason=upstream-dependency
@@ -5288,9 +5278,6 @@ packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Test
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.executeInDirectoryWithBytes	xfail compile: "Unknown function or value 'Stdlib.Cli.Unix.executeInDirectoryWithBytes'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.missingProgramsAreErrors	xfail runtime: "false" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.timesOut	xfail compile: "Unknown function or value 'Stdlib.Test.onRealClock'" class=missing-support reason=upstream-dependency
-packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.invalidChildPoll	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.invalidChildDescriptors	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
-packages/darklang/tests/stdlib/cli/process.dark	Darklang.Stdlib.Cli.Process.Tests.invalidChildClose	xfail compile: "Expected TInt, got TInt64" class=missing-support reason=compiler-gap
 packages/darklang/tests/stdlib/cli/sgr.dark	Darklang.Stdlib.Cli.Tui.Text.Tests.Sgr.stripSgr	xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.stripSgr'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/sgr.dark	Darklang.Stdlib.Cli.Tui.Text.Tests.Sgr.clipToWidth	xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.stripSgr'" class=missing-support reason=upstream-dependency
 packages/darklang/tests/stdlib/cli/sgr.dark	Darklang.Stdlib.Cli.Tui.Text.Tests.Sgr.wrapAtColumn	xfail compile: "Unknown function or value 'Stdlib.Cli.Tui.Text.wrapAtColumn'" class=missing-support reason=upstream-dependency

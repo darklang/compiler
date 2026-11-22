@@ -35,7 +35,7 @@ jobs:
           command: docker exec dark-ci bash scripts/check-porting
       - run:
           name: Prepare the stdlib cache
-          command: docker exec dark-ci bash -c 'cd /tmp && /workspace/_build/default/bin/dark.exe -q -e "1L" -o /tmp/warm'
+          command: docker exec dark-ci bash -c '/workspace/_build/default/bin/dark.exe prepare --cache-dir "$HOME/.cache/darkc-tests"'
           no_output_timeout: 15m
       - run:
           name: Run native regression checks

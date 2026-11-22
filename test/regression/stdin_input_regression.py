@@ -10,10 +10,12 @@ import sys
 import tempfile
 import termios
 import time
+import darkc_cache
 
 
 def main():
     compiler = str(pathlib.Path(sys.argv[1]).resolve())
+    cache = darkc_cache.flags(compiler)
     with tempfile.TemporaryDirectory(prefix='dark-stdin-') as directory:
         root = pathlib.Path(directory)
         programs = {
@@ -41,7 +43,7 @@ let _ = Stdlib.Cli.Posix.fdWrite 1z (Stdlib.String.toBlob (a + "|" + b + "|" + c
             'overflow': 'let _ = Builtin.stdinReadExactly 2147483648z in 0L',
         }
         binaries = {}
-        batch = [compiler, "--batch", "-q", "--leak-check", "--"]
+        batch = [compiler, "--batch", *cache, "-q", "--leak-check", "--"]
         for name, code in programs.items():
             source = root / (name + '.dark')
             source.write_text(code)
@@ -122,7 +124,7 @@ let _ = Stdlib.Cli.Posix.fdWrite 1z (Stdlib.String.toBlob (a + "|" + b + "|" + c
         # Also exercise ordinary binaries without leak instrumentation.
         source = root / 'plain.dark'
         source.write_text(programs['all'])
-        subprocess.run([compiler, '-q', str(source), '-o', str(root / 'plain')], check=True, timeout=300)
+        subprocess.run([compiler, *cache, '-q', str(source), '-o', str(root / 'plain')], check=True, timeout=300)
         result = subprocess.run([root / 'plain'], input=b'plain', capture_output=True, timeout=15)
         assert (result.returncode, result.stdout, result.stderr) == (0, b'plain', b''), result
     print('Stdin stream, UTF-16 boundaries, terminal keys, resize and secret regressions passed')

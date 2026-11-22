@@ -1,7 +1,7 @@
 (* PackageManager.mli - Hosted package resolution and persistent response cache. *)
 [@@@warning "-30"]
 
-type config = { server : string; cachePath : string }
+type config = { server : string; cachePath : string option }
 type resolvedSource = { name : string; source : string }
 
 type itemKind =
@@ -20,9 +20,7 @@ type locatedEntity = {
 
 type fetchResult = Found of string | Missing
 
-val defaultServer : string
-val defaultCachePath : unit -> string
-val defaultConfig : unit -> config
+val config : server:string -> cacheDirectory:string option -> config
 val kindPath : itemKind -> string
 val allKinds : itemKind list
 val cacheRead : config -> string -> (fetchResult option, string) result
@@ -62,3 +60,15 @@ val resolveWritten :
   NameResolution.resolutionEnvironment ->
   Validation.validatedSourceFile list ->
   (resolvedSource list, string) result
+
+val entryFunction :
+  config -> string -> ((string * string list * string) option, string) result
+
+type root = Hash of string | Name of string
+
+val callPath :
+  config ->
+  NameResolution.resolutionEnvironment ->
+  root ->
+  string ->
+  (string * string) list option

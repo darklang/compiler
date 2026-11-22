@@ -206,6 +206,7 @@ and cliOperation (value : LIR.cliOperation) =
   | LIR.ChildLaunch -> union "CliOperation" "ChildLaunch" []
   | LIR.PosixWait4 -> union "CliOperation" "PosixWait4" []
   | LIR.PosixKeventVnode -> union "CliOperation" "PosixKeventVnode" []
+  | LIR.ProcessExit -> union "CliOperation" "ProcessExit" []
 
 and label (value : LIR.label) =
   match value with LIR.Label field0 -> union "Label" "Label" [ text field0 ]

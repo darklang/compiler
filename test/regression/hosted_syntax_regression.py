@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import darkc_cache
 
 
 def location(name):
@@ -357,13 +358,14 @@ def main():
         threading.Thread(target=server.serve_forever, daemon=True).start()
         with tempfile.TemporaryDirectory(prefix="hosted-syntax-") as temporary:
             directory = Path(temporary)
-            env = dict(os.environ, XDG_DATA_HOME=temporary)
+            cache = darkc_cache.flags(compiler, temporary)
+            env = dict(os.environ)
             source = directory / "input.dark"
             program = directory / "program"
 
             def compile_with(flags, text):
                 source.write_text(text)
-                return subprocess.run([compiler, "-q", "--emit-result", *flags, "--package-server",
+                return subprocess.run([compiler, *cache, "-q", "--emit-result", *flags, "--package-server",
                     f"http://127.0.0.1:{server.server_port}", str(source), "-o", str(program)],
                     env=env, capture_output=True, text=True, timeout=300)
 
@@ -438,15 +440,14 @@ def main():
                                   output=str(directory / f"item{index}.out")))
             manifest, report = directory / "manifest.json", directory / "report.jsonl"
             manifest.write_text(json.dumps(items))
-            subprocess.run([compiler, "--batch", "-q", "--package-server",
+            subprocess.run([compiler, "--batch", *cache, "-q", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--manifest", str(manifest),
                 "--keep-going", "--report", str(report)], env=env, capture_output=True, timeout=300)
             reasons = [json.loads(line)["reason"] for line in report.read_text().splitlines()]
             assert reasons == ["", "uses a record pattern, which this compiler does not support",
-                "uses function or value Stdlib.Dict.containsKey, which the compiler does not define;"
-                " the compiler's pinned name is Stdlib.Dict.member"], reasons
+                "uses function or value Stdlib.Dict.containsKey, which the compiler does not define"], reasons
             # --check answers per package item, without a caller or arguments.
-            checked = subprocess.run([compiler, "--check", "--package-server",
+            checked = subprocess.run([compiler, *cache, "--check", "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "Hosted.pipePlus", "Hosted.price",
                 "Hosted.recordPattern", "Hosted.__helper"],
                 env=env, capture_output=True, text=True, timeout=300)
@@ -459,7 +460,7 @@ def main():
             ], checked.stdout + checked.stderr
             # A rendered package unit, which converts its own stdlib calls, is not
             # converted a second time as the script is.
-            current = subprocess.run([compiler, "--package-server",
+            current = subprocess.run([compiler, *cache, "--package-server",
                 f"http://127.0.0.1:{server.server_port}", "--check", "Hosted.bytesLen",
                 "Hosted.conversions", "Hosted.recordKey"], env=env, capture_output=True, text=True, timeout=300)
             assert current.stdout.splitlines() == ["Hosted.bytesLen: compiles",

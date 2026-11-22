@@ -25,6 +25,7 @@ grouped by purpose; each subject has one canonical source.
 
 - [Architecture overview](compiler/overview.md)
 - [Compiler pipeline](compiler/pipeline.md)
+- [darkc command line for `dark compile`](compiler/command-line.md)
 - [Compiler source organization](compiler/source-organization.md)
 - [Complete embedded library source inventory](compiler/library-sources.md)
 - [Compiler identities](compiler/identities.md)

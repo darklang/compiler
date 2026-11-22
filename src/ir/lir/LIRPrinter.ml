@@ -128,6 +128,7 @@ let prettyPrintCliOperation = function
   | LIR.StartupStack -> "StartupStack"
   | LIR.ExecutableState -> "ExecutableState"
   | LIR.GetUid -> "GetUid"
+  | LIR.ProcessExit -> "ProcessExit"
   | LIR.SocketTcp4 -> "SocketTcp4"
   | LIR.SocketTcp6 -> "SocketTcp6"
   | LIR.SocketUdp4 -> "SocketUdp4"

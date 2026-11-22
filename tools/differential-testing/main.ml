@@ -13,7 +13,8 @@ let main () =
   and timeout = ref 2000
   and limit = ref None in
   let artifacts = ref "differential-test-results"
-  and interpreter = ref "darklang-interpreter" in
+  and interpreter = ref "darklang-interpreter"
+  and cacheDir = ref None in
   let replay = ref None and minimize = ref None and generate = ref None in
   let positive flag assign value =
     if value < 1 then raise (Arg.Bad (flag ^ " must be positive"))
@@ -47,6 +48,9 @@ let main () =
       ( "--interpreter",
         Arg.Set_string interpreter,
         "PATH Semantic oracle executable" );
+      ( "--cache-dir",
+        Arg.String (fun value -> cacheDir := Some value),
+        "DIR Keep the prepared stdlib in DIR between runs" );
       ("--replay", Arg.String (setAction replay), "FILE Replay a source file");
       ( "--minimize",
         Arg.String (setAction minimize),
@@ -100,7 +104,7 @@ let main () =
         | Error message -> failwith message
       in
       let stdlib =
-        match StdlibCompilation.buildStdlib target with
+        match StdlibCache.buildStdlib ~directory:!cacheDir target with
         | Ok stdlib -> stdlib
         | Error message -> failwith message
       in

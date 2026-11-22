@@ -125,7 +125,9 @@ returns None for missing/unreadable data or an unmatched UID. It does not
 resolve NSS-only or macOS Directory Services accounts. Linux CPU count uses
 the process affinity mask; macOS queries HW_AVAILCPU, with a minimum-one
 fallback. This can differ from the interpreter's online-CPU count.
-PID and UID adapters expose native real process/user IDs as Int.
+PID and UID adapters expose native real process/user IDs as Int64, as Dark's do.
+The syscall, child-process and clock builtins take Dark's own types: descriptors
+and child handles are Int, counts, flags, modes, exit codes and errnos are Int64.
 
 ## Terminal and input boundaries
 

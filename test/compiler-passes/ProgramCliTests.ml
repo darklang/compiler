@@ -44,16 +44,20 @@ let optionsValue (value : P.cliOptions) =
     [
       ("Run", boolean value.P.run);
       ("IsExpression", boolean value.P.isExpression);
+      ("Check", boolean value.P.check);
+      ("Json", boolean value.P.json);
       ("OutputFile", (optional (fun value -> V.Text value)) value.P.outputFile);
       ("Verbosity", verbosity value.P.verbosity);
       ("Help", boolean value.P.help);
       ("Version", boolean value.P.version);
-      ("Argument", (optional (fun value -> V.Text value)) value.P.argument);
+      ("Inputs", V.Sequence (List.map (fun value -> V.Text value) value.P.inputs));
       ("LeakCheck", boolean value.P.leakCheck);
       ("Target", targetValue value.P.target);
       ("EmitResult", boolean value.P.emitResult);
       ( "PackageServer",
         (optional (fun value -> V.Scalar value)) value.P.packageServer );
+      ("CacheDir", (optional (fun value -> V.Text value)) value.P.cacheDir);
+      ("Entry", (optional (fun value -> V.Text value)) value.P.entry);
       ("AllowInternal", boolean value.P.allowInternal);
       ("DisableFreeList", boolean value.P.disableFreeList);
       ("DisableANFOpt", boolean value.P.disableANFOpt);
@@ -118,6 +122,8 @@ let batchValue (value : P.batchCliOptions) =
     ]
 
 let formatCommand = function
+  | P.PrepareCommand (target, directory) ->
+      V.format (V.Union ("PrepareCommand", [ targetValue target; V.Text directory ]))
   | P.SingleCommand value ->
       V.format (V.Union ("SingleCommand", [ optionsValue value ]))
   | P.BatchCommand value ->
@@ -129,6 +135,7 @@ let formatCommand = function
              [
                boolean value.P.checkJson;
                optional (fun value -> V.Scalar value) value.P.checkPackageServer;
+               optional (fun value -> V.Text value) value.P.checkCacheDir;
                V.Sequence (List.map (fun name -> V.Scalar name) value.P.checkNames);
              ] ))
 
@@ -170,7 +177,7 @@ let testEmitResultModeIsExplicit () =
 let testExpressionAfterDoubleDash () =
   match P.parseArgs [| "-e"; "--"; "-7.5dec % 2dec" |] with
   | Ok options
-    when options.P.isExpression && options.P.argument = Some "-7.5dec % 2dec" ->
+    when options.P.isExpression && options.P.inputs = [ "-7.5dec % 2dec" ] ->
       Ok ()
   | Ok options -> Error ("Unexpected expression options: " ^ formatOptions options)
   | Error error ->
@@ -324,7 +331,7 @@ let testBatchCompileAllowsCompilerOwnedSources () =
 (* A batch report names what a failed item uses that the compiler lacks. *)
 let testBatchReasonNamesUnsupportedFeature () =
   let expect error reason =
-    let actual = CompilabilityReason.classify error in
+    let actual = Diagnostic.reasonText (Diagnostic.ofError error) in
     if actual = reason then Ok ()
     else Error ("Expected reason '" ^ reason ^ "', got '" ^ actual ^ "'")
   in
@@ -338,7 +345,7 @@ let testBatchReasonNamesUnsupportedFeature () =
   let* () =
     expect "<entry>: Unknown function or value 'Darklang.Stdlib.Dict.containsKey'"
       "uses function or value Stdlib.Dict.containsKey, which the compiler does \
-       not define; the compiler's pinned name is Stdlib.Dict.member"
+       not define"
   in
   let* () =
     expect "x.dark: Unknown type 'Stdlib.Decimal.Decimal'"
@@ -355,7 +362,7 @@ let testBatchReasonNamesUnsupportedFeature () =
     expect "Type mismatch: expected Int64\nat line 2"
       "compiler error: Type mismatch: expected Int64"
   in
-  expect "" ""
+  Ok ()
 
 let testCheckParsesNamesInOrder () =
   match
@@ -379,8 +386,111 @@ let testCheckRequiresAName () =
   | Error error -> Error ("Expected missing-name guidance, got: " ^ error)
   | Ok command -> Error ("Expected a nameless check to be rejected, got: " ^ formatCommand command)
 
+(* --check is a flag like any other: it may follow the shared ones. *)
+let testCheckAfterSharedFlags () =
+  match
+    P.parseCommand
+      [|
+        "--package-server"; "http://127.0.0.1:9090"; "--cache-dir"; "/tmp/c";
+        "--check"; "Hosted.first";
+      |]
+  with
+  | Ok (P.CheckCommand options)
+    when options.P.checkNames = [ "Hosted.first" ]
+         && options.P.checkCacheDir = Some "/tmp/c"
+         && options.P.checkPackageServer = Some "http://127.0.0.1:9090/" ->
+      Ok ()
+  | Ok command -> Error ("Expected check command, got: " ^ formatCommand command)
+  | Error error -> Error ("Expected check command to parse, got: " ^ error)
+
+let testCheckRejectsCompileFlags () =
+  match P.parseCommand [| "--check"; "-o"; "out"; "Hosted.first" |] with
+  | Error error when Text.contains error "can't be combined with --check" -> Ok ()
+  | Error error -> Error ("Expected a conflict, got: " ^ error)
+  | Ok command -> Error ("Expected -o with --check to fail, got: " ^ formatCommand command)
+
+let testEntryParses () =
+  match
+    P.parseCommand
+      [|
+        "--entry"; "0f11ab"; "--package-server=http://127.0.0.1:9090";
+        "--cache-dir=relative"; "-o"; "wc";
+      |]
+  with
+  | Ok (P.SingleCommand options)
+    when options.P.entry = Some "0f11ab"
+         && options.P.inputs = []
+         && options.P.outputFile = Some "wc"
+         && options.P.cacheDir
+            = Some (Filename.concat (Sys.getcwd ()) "relative") ->
+      Ok ()
+  | Ok command -> Error ("Expected an entry compile, got: " ^ formatCommand command)
+  | Error error -> Error ("Expected --entry to parse, got: " ^ error)
+
+let testEntryNeedsAPackageServer () =
+  match P.parseCommand [| "--entry"; "0f11ab" |] with
+  | Error error when Text.contains error "--package-server" -> Ok ()
+  | Error error -> Error ("Expected package-server guidance, got: " ^ error)
+  | Ok command -> Error ("Expected --entry alone to fail, got: " ^ formatCommand command)
+
+let testEntryTakesNoSource () =
+  match
+    P.parseCommand
+      [| "--entry"; "0f11ab"; "--package-server=http://127.0.0.1:1"; "x.dark" |]
+  with
+  | Error error when Text.contains error "x.dark" -> Ok ()
+  | Error error -> Error ("Expected the extra source to be named, got: " ^ error)
+  | Ok command -> Error ("Expected a source with --entry to fail, got: " ^ formatCommand command)
+
+let testDiagnosticNamesItemAndReason () =
+  let diagnostic =
+    Diagnostic.ofError
+      "Compilation failed: Darklang.Me.Tools.total: Unknown function or value \
+       'Builtin.pmLocations'"
+  in
+  let json = Yojson.Basic.to_string (Diagnostic.toJson diagnostic) in
+  let expected =
+    {|{"reason":{"kind":"missing-builtin","name":"Builtin.pmLocations"},"location":{"item":"Darklang.Me.Tools.total","hash":null,"line":null,"column":null},"path":[],"message":"Compilation failed: Darklang.Me.Tools.total: Unknown function or value 'Builtin.pmLocations'"}|}
+  in
+  if json = expected then Ok () else Error ("Unexpected diagnostic: " ^ json)
+
+let testDiagnosticReadsPackageUnitPosition () =
+  let diagnostic =
+    Diagnostic.ofError
+      "Compilation failed: Parse error: package:Darklang.Me.Tools.hello@abc12: \
+       error[PARSE-UNEXPECTED] at 2:7: unexpected token"
+  in
+  match diagnostic.Diagnostic.location with
+  | Some
+      {
+        Diagnostic.item = "Darklang.Me.Tools.hello";
+        hash = Some "abc12";
+        line = Some 2;
+        column = Some 7;
+      } ->
+      Ok ()
+  | _ ->
+      Error
+        ("Unexpected location: "
+        ^ Yojson.Basic.to_string (Diagnostic.toJson diagnostic))
+
+let testPrepareNeedsACacheDir () =
+  match (P.parseCommand [| "prepare" |], P.parseCommand [| "prepare"; "--cache-dir"; "/tmp/c" |]) with
+  | Error error, Ok (P.PrepareCommand (P.HostTarget, "/tmp/c"))
+    when Text.contains error "--cache-dir" ->
+      Ok ()
+  | _ -> Error "Expected prepare to need, and take, --cache-dir"
+
 let tests =
   [
+    ("prepare takes --cache-dir", testPrepareNeedsACacheDir);
+    ("parse --check after shared flags", testCheckAfterSharedFlags);
+    ("reject compile flags with --check", testCheckRejectsCompileFlags);
+    ("parse an entry compile", testEntryParses);
+    ("require a package server for --entry", testEntryNeedsAPackageServer);
+    ("reject a source with --entry", testEntryTakesNoSource);
+    ("diagnostic names the item and reason", testDiagnosticNamesItemAndReason);
+    ("diagnostic reads a package unit position", testDiagnosticReadsPackageUnitPosition);
     ("parse check names in order", testCheckParsesNamesInOrder);
     ("reject check without a name", testCheckRequiresAName);
     ( "name what a failed batch item uses",

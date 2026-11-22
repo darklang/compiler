@@ -10,28 +10,29 @@ type Error =
 
 /// Result of a stat() call.
 type StatResult =
-  { mode: Int
-    size: Int
-    mtimeSec: Int }
+  { mode: Int64
+    size: Int64
+    mtimeSec: Int64 }
 
 /// Standard permission modes
 // -- Open flags ---------------------------------------------------
 /// Open a file. Returns a file descriptor.
-let openFile(path: String, flags: Int, mode: Int): Result.Result<Int, Error> =
+let openFile(path: String, flags: Int64, mode: Int64): Result.Result<Int, Error> =
   Builtin.syscallOpen(path, flags, mode)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 
 /// Read up to `count` bytes from an open file descriptor.
-let fdRead(fd: Int, count: Int): Result.Result<Blob, Error> =
+let fdRead(fd: Int, count: Int64): Result.Result<Blob, Error> =
   Builtin.syscallRead(fd, count)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 
 /// Write <param bytes> to an open file descriptor. Returns the number
 /// of bytes written.
-let fdWrite(fd: Int, bytes: Blob): Result.Result<Int, Error> =
-  Stdlib.Cli.Posix.__writeAll((fun chunk -> Builtin.syscallWrite(fd, chunk) |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)), bytes, 0z)
+let fdWrite(fd: Int, bytes: Blob): Result.Result<Int64, Error> =
+  Stdlib.Cli.Posix.__writeAll((fun chunk -> Builtin.syscallWrite(fd, chunk) |> Stdlib.Result.map(Stdlib.Int.fromInt64) |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)), bytes, 0z)
+  |> Stdlib.Result.map(Stdlib.Int.__toInt64Unchecked)
 
 
 /// Close an open file descriptor.
@@ -43,7 +44,7 @@ let fdClose(fd: Int): Result.Result<Unit, Error> =
 /// Read all bytes from a file descriptor until EOF.
 /// Accumulates chunks (as Blobs) and concats once at EOF.
 let fdReadAll(fd: Int, acc: List<Blob>): Result.Result<Blob, Error> =
-  (fdRead(fd, 4096z))
+  (fdRead(fd, 4096))
   |> Stdlib.Result.andThen(fun chunk ->
     if Stdlib.Blob.length(chunk) == 0z then
       Stdlib.Result.Result.Ok(Stdlib.Blob.concat(acc))
@@ -52,8 +53,8 @@ let fdReadAll(fd: Int, acc: List<Blob>): Result.Result<Blob, Error> =
 
 
 /// Seek to a byte offset from the start of an open file.
-let fdSeekFromStart(fd: Int, offset: Int): Result.Result<Int, Error> =
-  Builtin.syscallLseek(fd, offset, 0z)
+let fdSeekFromStart(fd: Int, offset: Int64): Result.Result<Int64, Error> =
+  Builtin.syscallLseek(fd, offset, 0)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 
@@ -63,8 +64,9 @@ let stat(path: String): Result.Result<StatResult, Error> =
   |> Stdlib.Result.andThen(Stdlib.Cli.Posix.__kernelMetadata)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
   |> Stdlib.Result.map(fun metadata ->
-    StatResult { mode = metadata.mode, size = metadata.size
-                 mtimeSec = metadata.mtimeSec })
+    StatResult { mode = Stdlib.Int.__toInt64Unchecked(metadata.mode)
+                 size = Stdlib.Int.__toInt64Unchecked(metadata.size)
+                 mtimeSec = Stdlib.Int.__toInt64Unchecked(metadata.mtimeSec) })
 
 /// Get the current working directory
 let getCwd(): Result.Result<String, Error> =
@@ -76,7 +78,7 @@ let chdir(path: String): Result.Result<Unit, Error> =
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Create a directory
-let mkdir(path: String, mode: Int): Result.Result<Unit, Error> =
+let mkdir(path: String, mode: Int64): Result.Result<Unit, Error> =
   Builtin.syscallMkdir(path, mode)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
@@ -87,7 +89,7 @@ let rmdir(path: String): Result.Result<Unit, Error> =
 
 /// Remove a file
 let unlink(path: String): Result.Result<Unit, Error> =
-  Builtin.syscallUnlinkAt(path, 0z)
+  Builtin.syscallUnlinkAt(path, 0)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Rename/move a file or directory
@@ -96,7 +98,7 @@ let rename(oldpath: String, newpath: String): Result.Result<Unit, Error> =
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Change file permissions
-let chmod(path: String, mode: Int): Result.Result<Unit, Error> =
+let chmod(path: String, mode: Int64): Result.Result<Unit, Error> =
   Builtin.syscallChmod(path, mode)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
@@ -104,9 +106,9 @@ let chmod(path: String, mode: Int): Result.Result<Unit, Error> =
 let utimesNow(path: String): Result.Result<Unit, Error> =
   let result =
     if Stdlib.Cli.Posix.__abiMac() then
-      let seconds = Stdlib.DateTime.__toSecondsInt(Stdlib.DateTime.now())
-      Builtin.syscallSetattrlistTimes(path, seconds, 0z, seconds, 0z)
-    else Builtin.syscallUtimensAt(path, 0z, 1073741823z, 0z, 1073741823z)
+      let seconds = Stdlib.Int.__toInt64Unchecked(Stdlib.DateTime.__toSecondsInt(Stdlib.DateTime.now()))
+      Builtin.syscallSetattrlistTimes(path, seconds, 0, seconds, 0)
+    else Builtin.syscallUtimensAt(path, 0, 1073741823, 0, 1073741823)
   result |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Create a symbolic link
@@ -142,7 +144,7 @@ let mkdtemp(prefix: String): Result.Result<String, Error> =
 /// Match a string against a glob pattern.
 /// If pathMode is true, * does not match /
 let flock(fd: Int, exclusive: Bool): Result.Result<Unit, Error> =
-  Builtin.syscallFlock(fd, if exclusive then 2z else 8z)
+  Builtin.syscallFlock(fd, if exclusive then 2 else 8)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Get the owner username of a file.
@@ -172,7 +174,7 @@ let uname(): Result.Result<(String * String * String), Error> =
 
 /// Send a signal to a process
 let kill(pid: Pid, signal: Signal): Result.Result<Unit, Error> =
-  Builtin.syscallKill(Stdlib.Int.fromInt64(Pid.toInt64(pid)), Stdlib.Int.fromInt64(Signal.toInt64(signal)))
+  Builtin.syscallKill(Pid.toInt64(pid), Signal.toInt64(signal))
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 /// Common errno values (Linux/macOS)
@@ -195,9 +197,9 @@ let isDirectory(path: String): Bool =
 /// Signal 0 checks process existence without sending a signal.
 let isProcessRunning(pid: Pid): Bool =
   // EPERM means the process exists but we lack permission to signal it
-  match Builtin.syscallKill(Stdlib.Int.fromInt64(Pid.toInt64(pid)), 0z) with
+  match Builtin.syscallKill(Pid.toInt64(pid), 0) with
   | Ok(_) -> true
-  | Error(errno) -> Stdlib.Int.toInt64(errno) == Some(Errno.eperm)
+  | Error(errno) -> errno == Errno.eperm
 
 
 /// Create a directory and all missing parents (like mkdir -p).
@@ -243,18 +245,18 @@ let __abiX64(): Bool = Builtin.runtimeTargetArchitecture() == "x64"
 
 let __abiArm32(): Bool = Builtin.runtimeTargetArchitecture() == "arm"
 
-let __abiOpenCreate(): Int = if __abiMac() then 512z else 64z
+let __abiOpenCreate(): Int64 = if __abiMac() then 512 else 64
 
-let __abiOpenTruncate(): Int = if __abiMac() then 1024z else 512z
+let __abiOpenTruncate(): Int64 = if __abiMac() then 1024 else 512
 
-let __abiOpenAppend(): Int = if __abiMac() then 8z else 1024z
+let __abiOpenAppend(): Int64 = if __abiMac() then 8 else 1024
 
-let __abiOpenExclusive(): Int = if __abiMac() then 2048z else 128z
+let __abiOpenExclusive(): Int64 = if __abiMac() then 2048 else 128
 
-let __abiRemoveDirectory(): Int = if __abiMac() then 128z else 512z
+let __abiRemoveDirectory(): Int64 = if __abiMac() then 128 else 512
 
-let __abiOpenDirectory(): Int =
-  if __abiMac() then 1048576z else if __abiX64() then 65536z else 16384z
+let __abiOpenDirectory(): Int64 =
+  if __abiMac() then 1048576 else if __abiX64() then 65536 else 16384
 
 let __abiStatModeOffset(): Int =
   if __abiMac() then 4z else if __abiX64() then 24z else if __abiArm32() then 16z else 16z
@@ -281,20 +283,20 @@ let __abiDirectoryNameOffset(): Int = if __abiMac() then 21z else 19z
 
 /// Bounds-checked decoding of kernel byte records. No OS effects occur here.
 
-let __kernelUnsigned(bytes: List<UInt8>, width: Int): Result.Result<Int, Int> =
+let __kernelUnsigned(bytes: List<UInt8>, width: Int): Result.Result<Int, Int64> =
   if width == 0z then Ok(0z)
   else
     match bytes with
-    | [] -> Error(5z)
+    | [] -> Error(5)
     | byte :: rest ->
       match __kernelUnsigned(rest, width - 1z) with
       | Error(e) -> Error(e)
       | Ok(high) -> Ok(Stdlib.Int.fromUInt8(byte) + 256z * high)
 
-let __kernelField(bytes: List<UInt8>, offset: Int, width: Int): Result.Result<Int, Int> =
+let __kernelField(bytes: List<UInt8>, offset: Int, width: Int): Result.Result<Int, Int64> =
   __kernelUnsigned(Stdlib.List.__dropInt(bytes, offset), width)
 
-let __kernelSignedField(bytes: List<UInt8>, offset: Int, width: Int): Result.Result<Int, Int> =
+let __kernelSignedField(bytes: List<UInt8>, offset: Int, width: Int): Result.Result<Int, Int64> =
   match __kernelField(bytes, offset, width) with
   | Error(e) -> Error(e)
   | Ok(n) ->
@@ -304,7 +306,7 @@ let __kernelSignedField(bytes: List<UInt8>, offset: Int, width: Int): Result.Res
 type __KernelMetadata =
   { mode: Int, size: Int, mtimeSec: Int, uid: Int, device: Int, inode: Int }
 
-let __kernelMetadata(buffer: Blob): Result.Result<__KernelMetadata, Int> =
+let __kernelMetadata(buffer: Blob): Result.Result<__KernelMetadata, Int64> =
   let bytes = Stdlib.Blob.toList(buffer)
   __kernelField(bytes, Stdlib.Cli.Posix.__abiStatModeOffset(), Stdlib.Cli.Posix.__abiStatModeWidth())
   |> Stdlib.Result.andThen(fun mode ->
@@ -322,19 +324,19 @@ let __kernelMetadata(buffer: Blob): Result.Result<__KernelMetadata, Int> =
                          device = device, inode = inode }))))))
 
 /// Decode records within one read, consuming each record before the next.
-let __kernelEntriesWithLength(bytes: List<UInt8>, remaining: Int, reversed: List<String>): Result.Result<List<String>, Int> =
+let __kernelEntriesWithLength(bytes: List<UInt8>, remaining: Int, reversed: List<String>): Result.Result<List<String>, Int64> =
   match bytes with
   | [] -> Ok(reversed)
   | _ ->
     __kernelField(bytes, 16z, 2z)
     |> Stdlib.Result.andThen(fun length ->
       let nameOffset = Stdlib.Cli.Posix.__abiDirectoryNameOffset()
-      if length <= nameOffset || length > remaining then Error(5z)
+      if length <= nameOffset || length > remaining then Error(5)
       else
         let record = Stdlib.List.__takeInt(bytes, length)
         let nameBytes = Stdlib.List.__dropInt(record, nameOffset)
         let name = Stdlib.List.takeWhile(nameBytes, fun byte -> byte != 0u8)
-        if Stdlib.List.__lengthInt(name) == Stdlib.List.__lengthInt(nameBytes) then Error(5z)
+        if Stdlib.List.__lengthInt(name) == Stdlib.List.__lengthInt(nameBytes) then Error(5)
         else
           let name = Stdlib.String.fromBytesWithReplacement(name)
           let next =
@@ -342,16 +344,16 @@ let __kernelEntriesWithLength(bytes: List<UInt8>, remaining: Int, reversed: List
             else Stdlib.List.push(reversed, name)
           __kernelEntriesWithLength(Stdlib.List.__dropInt(bytes, length), remaining - length, next))
 
-let __kernelEntries(bytes: List<UInt8>, reversed: List<String>): Result.Result<List<String>, Int> =
+let __kernelEntries(bytes: List<UInt8>, reversed: List<String>): Result.Result<List<String>, Int64> =
   __kernelEntriesWithLength(bytes, Stdlib.List.__lengthInt(bytes), reversed)
 
 
 /// Directory iteration and record decoding over single-call kernel primitives.
 
-let __directoryReadAll(fd: Int, reversed: List<String>): Result.Result<List<String>, Int> =
-  match Builtin.syscallGetdents(fd, 32768z) with
+let __directoryReadAll(fd: Int, reversed: List<String>): Result.Result<List<String>, Int64> =
+  match Builtin.syscallGetdents(fd, 32768) with
   | Error(e) ->
-    if e == 4z then __directoryReadAll(fd, reversed) else Error(e)
+    if e == 4 then __directoryReadAll(fd, reversed) else Error(e)
   | Ok(bytes) ->
     if Stdlib.Blob.length(bytes) == 0z then Ok(Stdlib.List.reverse(reversed))
     else
@@ -360,7 +362,7 @@ let __directoryReadAll(fd: Int, reversed: List<String>): Result.Result<List<Stri
       | Ok(next) -> __directoryReadAll(fd, next)
 
 let __directoryList(path: String): Result.Result<List<String>, Posix.Error> =
-  match Posix.openFile(path, Stdlib.Cli.Posix.__abiOpenDirectory(), 0z) with
+  match Posix.openFile(path, Stdlib.Cli.Posix.__abiOpenDirectory(), 0) with
   | Error(e) -> Error(e)
   | Ok(fd) ->
     let result = __directoryReadAll(fd, []) |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
@@ -372,29 +374,29 @@ let __directoryList(path: String): Result.Result<List<String>, Posix.Error> =
 
 /// Path buffer growth and text decoding over one-call kernel primitives.
 
-let __pathReadlinkWith(read: Int -> Result.Result<Blob, Int>, count: Int): Result.Result<Blob, Int> =
-  if count <= 0z then Error(22z)
+let __pathReadlinkWith(read: Int -> Result.Result<Blob, Int64>, count: Int): Result.Result<Blob, Int64> =
+  if count <= 0z then Error(22)
   else
     match read(count) with
     | Error(e) ->
-      if e == 4z then __pathReadlinkWith(read, count) else Error(e)
+      if e == 4 then __pathReadlinkWith(read, count) else Error(e)
     | Ok(bytes) ->
       if Stdlib.Blob.length(bytes) < count then Ok(bytes)
-      else if count >= 1048576z then Error(if Stdlib.Cli.Posix.__abiMac() then 63z else 36z)
+      else if count >= 1048576z then Error(if Stdlib.Cli.Posix.__abiMac() then 63 else 36)
       else __pathReadlinkWith(read, count * 2z)
 
 let __pathReadlink(path: String): Result.Result<String, Posix.Error> =
-  __pathReadlinkWith((fun count -> Builtin.syscallReadlinkAt(path, count)), 256z)
+  __pathReadlinkWith((fun count -> Builtin.syscallReadlinkAt(path, Stdlib.Int.__toInt64Unchecked(count))), 256z)
   |> Stdlib.Result.map(Stdlib.String.fromBlobWithReplacement)
   |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
-let __pathCwdWith(read: Int -> Result.Result<Blob, Int>, count: Int): Result.Result<Blob, Int> =
-  if count <= 0z then Error(22z)
+let __pathCwdWith(read: Int -> Result.Result<Blob, Int64>, count: Int): Result.Result<Blob, Int64> =
+  if count <= 0z then Error(22)
   else
     match read(count) with
-    | Error(4z) -> __pathCwdWith(read, count)
-    | Error(34z) ->
-      if count >= 1048576z then Error(34z) else __pathCwdWith(read, count * 2z)
+    | Error(4) -> __pathCwdWith(read, count)
+    | Error(34) ->
+      if count >= 1048576z then Error(34) else __pathCwdWith(read, count * 2z)
     | other -> other
 
 let __pathPathText(bytes: Blob): String =
@@ -404,7 +406,7 @@ let __pathPathText(bytes: Blob): String =
 let __pathGetCwd(): Result.Result<String, Posix.Error> =
   let bytes =
     if Stdlib.Cli.Posix.__abiMac() then
-      match Builtin.syscallOpen(".", Stdlib.Cli.Posix.__abiOpenDirectory(), 0z) with
+      match Builtin.syscallOpen(".", Stdlib.Cli.Posix.__abiOpenDirectory(), 0) with
       | Error(e) -> Error(e)
       | Ok(fd) ->
         let result = Builtin.syscallFcntlGetPath(fd)
@@ -415,7 +417,7 @@ let __pathGetCwd(): Result.Result<String, Posix.Error> =
           match closed with
           | Error(e) -> Error(e)
           | Ok(_) -> Ok(bytes)
-    else __pathCwdWith(Builtin.syscallGetcwd, 256z)
+    else __pathCwdWith((fun count -> Builtin.syscallGetcwd(Stdlib.Int.__toInt64Unchecked(count))), 256z)
   bytes |> Stdlib.Result.map(__pathPathText) |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)
 
 
@@ -547,7 +549,8 @@ let __macMessage(errno: Int): String =
     else if errno == 107z then "Capabilities insufficient"
     else Stdlib.String.append("Unknown error: ", __decimal(errno))
 
-let __fromErrno(errno: Int): Stdlib.Cli.Posix.Error =
+let __fromErrno(code: Int64): Stdlib.Cli.Posix.Error =
+    let errno = Stdlib.Int.fromInt64(code)
     let message =
         if Stdlib.Cli.Posix.__abiMac() then __macMessage(errno)
         else if errno == 1z then "Operation not permitted"
@@ -682,7 +685,7 @@ let __fromErrno(errno: Int): Stdlib.Cli.Posix.Error =
         else if errno == 132z then "Operation not possible due to RF-kill"
         else if errno == 133z then "Memory page has hardware error"
         else Stdlib.String.append("Unknown error ", __decimal(errno))
-    Stdlib.Cli.Posix.Error { errno = Stdlib.Int.__toInt64Unchecked(errno)
+    Stdlib.Cli.Posix.Error { errno = code
                             message = message }
 
 
@@ -728,14 +731,14 @@ let __accountLookup(uid: String, index: Int): Stdlib.Option.Option<String> =
 
 /// Collision retries for exclusive temporary-entry creation.
 
-let __tempEntropy(remaining: Int, reversed: List<Blob>): Result.Result<Blob, Int> =
+let __tempEntropy(remaining: Int, reversed: List<Blob>): Result.Result<Blob, Int64> =
   if remaining == 0z then Ok(Stdlib.Blob.concat(Stdlib.List.reverse(reversed)))
   else
-    match Builtin.syscallGetentropy(remaining) with
-    | Error(e) -> if e == 4z then __tempEntropy(remaining, reversed) else Error(e)
+    match Builtin.syscallGetentropy(Stdlib.Int.__toInt64Unchecked(remaining)) with
+    | Error(e) -> if e == 4 then __tempEntropy(remaining, reversed) else Error(e)
     | Ok(bytes) ->
       let count = Stdlib.Blob.length(bytes)
-      if count <= 0z || count > remaining then Error(5z)
+      if count <= 0z || count > remaining then Error(5)
       else __tempEntropy(remaining - count, Stdlib.List.push(reversed, bytes))
 
 let __tempCandidate(prefix: String): Result.Result<String, Stdlib.Cli.Posix.Error> =
@@ -756,16 +759,16 @@ let __tempFile(prefix: String): Result.Result<(Int * String), Stdlib.Cli.Posix.E
   __tempRetry((fun _ ->
     __tempCandidate(prefix)
     |> Stdlib.Result.andThen(fun path ->
-      let flags = 2z | Stdlib.Cli.Posix.__abiOpenCreate()
+      let flags = 2 | Stdlib.Cli.Posix.__abiOpenCreate()
                     | Stdlib.Cli.Posix.__abiOpenExclusive()
-      Stdlib.Cli.Posix.openFile(path, flags, 384z)
+      Stdlib.Cli.Posix.openFile(path, flags, 384)
       |> Stdlib.Result.map(fun fd -> (fd, path)))), 100z)
 
 let __tempDirectory(prefix: String): Result.Result<String, Stdlib.Cli.Posix.Error> =
   __tempRetry((fun _ ->
     __tempCandidate(prefix)
     |> Stdlib.Result.andThen(fun path ->
-      Stdlib.Cli.Posix.mkdir(path, 448z)
+      Stdlib.Cli.Posix.mkdir(path, 448)
       |> Stdlib.Result.map(fun _ -> path))), 100z)
 
 
@@ -782,6 +785,6 @@ let __uname(): Result.Result<(String * String * String), Posix.Error> =
     else
       Builtin.syscallUname()
       |> Stdlib.Result.andThen(fun bytes ->
-        if Stdlib.Blob.length(bytes) < 390z then Error(5z)
+        if Stdlib.Blob.length(bytes) < 390z then Error(5)
         else Ok((Stdlib.Cli.Sys.__text(bytes, 0z, 65z), Stdlib.Cli.Sys.__text(bytes, 65z, 65z), Stdlib.Cli.Sys.__text(bytes, 260z, 65z))))
   result |> Stdlib.Result.mapError(Stdlib.Cli.Posix.__fromErrno)

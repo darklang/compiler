@@ -12,3 +12,4 @@ let __kill(pid: Int64, signal: Int64): Stdlib.Result.Result<Unit, Stdlib.Cli.__N
 let __sleep(delayMs: Float): Unit = ()
 let __getpid(): Int64 = 0
 let __getuid(): Int64 = 0
+let __exit(code: Int64): Unit = ()

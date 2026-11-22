@@ -61,8 +61,8 @@ selected target unless the change explicitly includes another architecture.
 # Run an expression (compile to temp, execute, print exit code)
 ./dark -r -e "2 + 3"
 
-# Compile a file to dark.out
-./dark prog.dark
+# Compile a file to dark.out, keeping the prepared stdlib between runs
+./dark --cache-dir ~/.cache/darkc prog.dark
 
 # Compile to a specific output path
 ./dark prog.dark -o output
@@ -93,6 +93,10 @@ launching the produced executable.
 - `-e EXPR` / `--expression` — compile an inline expression
 - `-o PATH` / `--output`     — output path (default `dark.out`)
 - `--package-server URL`     — resolve referenced hosted packages from an HTTP server
+- `--cache-dir DIR`          — keep the prepared stdlib and package answers in `DIR`;
+  without it nothing is kept, and every run prepares the stdlib again (about 80 s)
+- `--entry HASH`             — compile the package fn with this hash as an executable
+- `--json`                   — errors (and `--check` results) as JSON lines
 - `-q` / `--quiet`           — suppress progress output
 - `-v`, `-vv`, `-vvv`        — verbose (pass names, timing, all IRs)
 
@@ -113,7 +117,7 @@ name them after `--check`. One prepared standard library serves every name:
 ./dark --check --package-server http://127.0.0.1:9090 Hosted.price Stdlib.Int64.add
 # Hosted.price: can't compile: uses the Decimal type, which this compiler does not support
 # Stdlib.Int64.add: compiles
-./dark --check --json Stdlib.List.map   # one JSON object per name: name, status, reason, error
+./dark --check --json Stdlib.List.map   # one JSON object per name: name, status, typeArguments, diagnostic
 ```
 
 A generic function referenced this way has no type arguments to specialize
@@ -171,3 +175,6 @@ otool -tv ./output
 file ./output
 xxd ./output | head
 ```
+
+[The command line Dark uses](compiler/command-line.md) describes `--entry`,
+`--check --json` and the diagnostics in full.

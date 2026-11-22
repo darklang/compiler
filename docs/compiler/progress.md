@@ -1,8 +1,8 @@
 # Stdlib preparation progress
 
-The first compile after installing a new darkc prepares the standard library and caches it in
-`~/.cache/dark-compiler/` (or `$XDG_CACHE_HOME/dark-compiler/`). That takes about a minute and a half and
-several GB of memory. Later compiles read the cache.
+The first compile after installing a new darkc prepares the standard library and, given
+`--cache-dir DIR`, keeps it in DIR. That takes about a minute and a half and several GB of memory.
+Later compiles with the same DIR read it from there.
 
 With `--progress=json`, darkc prints one JSON object per line on stderr as preparation goes on,
 for a caller such as `dark compile` to show. Without the flag it prints nothing.

@@ -7,14 +7,18 @@ let __posixInt64(value: Int): Int64 =
     | Some(value) -> value
     | None -> Builtin.crash("Encountered an out-of-range integer value")
 
+let __posixWidth32(value: Int64): Int64 =
+    if value < -2147483648 || value > 2147483647 then Builtin.crash("Encountered an out-of-range integer value")
+    else value
+
 let __posixInt32(value: Int): Int64 =
     let narrowed = Builtin.__posixInt64(value) in
     if narrowed < -2147483648 || narrowed > 2147483647 then Builtin.crash("Encountered an out-of-range integer value")
     else narrowed
 
-let __checkedOpen(path: String, flags: Int, mode: Int): Stdlib.Result.Result<Int, Stdlib.Cli.Posix.Error> =
-    let flags = Builtin.__posixInt32(flags) in
-    let mode = Builtin.__posixInt32(mode) in
+let __checkedOpen(path: String, flags: Int64, mode: Int64): Stdlib.Result.Result<Int, Stdlib.Cli.Posix.Error> =
+    let flags = Builtin.__posixWidth32(flags) in
+    let mode = Builtin.__posixWidth32(mode) in
     let openAt = fun(fd, name) -> Stdlib.Cli.__Posix.__intResult(Stdlib.Cli.__Posix.__openAt(fd, name, Stdlib.Int64.bitwiseOr(flags, Stdlib.Cli.__Posix.__nofollow()), mode)) in
     if path != "" && Stdlib.String.replaceAll(path, "/", "") == "" then
         Stdlib.Cli.__Posix.__withCString("/", fun ptr -> openAt(Stdlib.Cli.__Posix.__cwdFd(), ptr))
@@ -23,20 +27,20 @@ let __checkedOpen(path: String, flags: Int, mode: Int): Stdlib.Result.Result<Int
 let __checkedChdir(path: String): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
     Stdlib.Cli.__Posix.__withDirectory(path, fun fd -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__chdir(fd)))
 
-let __checkedMkdir(path: String, mode: Int): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    let mode = Builtin.__posixInt32(mode) in
+let __checkedMkdir(path: String, mode: Int64): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
+    let mode = Builtin.__posixWidth32(mode) in
     Stdlib.Cli.__Posix.__withEntry(path, fun(fd, name) -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__mkdirAt(fd, name, mode)))
 
-let __checkedUnlinkAt(path: String, flags: Int): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    let flags = Builtin.__posixInt32(flags) in
+let __checkedUnlinkAt(path: String, flags: Int64): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
+    let flags = Builtin.__posixWidth32(flags) in
     Stdlib.Cli.__Posix.__withEntry(path, fun(fd, name) -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__unlinkAt(fd, name, flags)))
 
 let __checkedRename(oldpath: String, newpath: String): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
     Stdlib.Cli.__Posix.__withEntry(oldpath, fun(fromFd, fromName) ->
         Stdlib.Cli.__Posix.__withEntry(newpath, fun(toFd, toName) -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__renameAt(fromFd, fromName, toFd, toName))))
 
-let __checkedChmod(path: String, mode: Int): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
-    let mode = Builtin.__posixInt32(mode) in
+let __checkedChmod(path: String, mode: Int64): Stdlib.Result.Result<Unit, Stdlib.Cli.Posix.Error> =
+    let mode = Builtin.__posixWidth32(mode) in
     if Stdlib.Cli.__Posix.__mac() then
         Stdlib.Cli.__Posix.__withEntry(path, fun(fd, name) -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__chmodAt(fd, name, mode, 32)))
     else Stdlib.Cli.__Posix.__metadataPath(path, fun(heldFd, held) ->

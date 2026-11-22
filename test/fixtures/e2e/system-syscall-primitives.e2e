@@ -1,6 +1,6 @@
 // Kernel host records are decoded in shared Dark code.
-match Builtin.syscallUname () with | Ok bytes -> Stdlib.Blob.length bytes == 390z | Error e -> e == 38z || e == 78z = true
-match Builtin.syscallSchedGetaffinity 0z 128z with | Ok mask -> Stdlib.Blob.length mask > 0z | Error e -> e == 38z || e == 78z = true
+match Builtin.syscallUname () with | Ok bytes -> Stdlib.Blob.length bytes == 390z | Error e -> e == 38 || e == 78 = true
+match Builtin.syscallSchedGetaffinity 0 128 with | Ok mask -> Stdlib.Blob.length mask > 0z | Error e -> e == 38 || e == 78 = true
 Stdlib.Cli.Sys.cpuCount () > 0z = true
 Builtin.posixUname () = compileerror="Unknown function"
 Builtin.posixCpuCount () = compileerror="Unknown function"

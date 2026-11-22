@@ -161,6 +161,7 @@ and cliOperation (value : MIR.cliOperation) =
   | MIR.ChildLaunch -> union "CliOperation" "ChildLaunch" []
   | MIR.PosixWait4 -> union "CliOperation" "PosixWait4" []
   | MIR.PosixKeventVnode -> union "CliOperation" "PosixKeventVnode" []
+  | MIR.ProcessExit -> union "CliOperation" "ProcessExit" []
 
 and label (value : MIR.label) =
   match value with MIR.Label field0 -> union "Label" "Label" [ text field0 ]

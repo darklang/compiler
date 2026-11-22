@@ -7,10 +7,12 @@ import subprocess
 import sys
 import tempfile
 import termios
+import darkc_cache
 
 
 def main():
     compiler = str(pathlib.Path(sys.argv[1]).resolve())
+    cache = darkc_cache.flags(compiler)
     with tempfile.TemporaryDirectory(prefix="dark-terminal-") as directory:
         root = pathlib.Path(directory)
         source = root / "facts.dark"
@@ -20,7 +22,7 @@ let report = $"{Stdlib.Bool.toString facts.inputIsTerminal}|{Stdlib.Bool.toStrin
 let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)], check=True, timeout=120)
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(source), "-o", str(binary)], check=True, timeout=120)
         color_source = root / "color.dark"
         color_binary = root / "color"
         color_source.write_text('''let initial = Darklang.Cli.Terminal.colorEnabled () in
@@ -28,7 +30,7 @@ let report = Stdlib.Bool.toString initial in
 let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(color_source), "-o", str(color_binary)], check=True, timeout=120)
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(color_source), "-o", str(color_binary)], check=True, timeout=120)
         interactive_source = root / "interactive.dark"
         interactive_binary = root / "interactive"
         interactive_source.write_text('''let raw = Builtin.stdinIsInteractive () in
@@ -37,7 +39,7 @@ let report = $"{Stdlib.Bool.toString raw}|{Stdlib.Bool.toString public}" in
 let _ = Stdlib.Cli.Posix.fdWrite 2z (Stdlib.String.toBlob report) in
 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(interactive_source), "-o", str(interactive_binary)], check=True, timeout=120)
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(interactive_source), "-o", str(interactive_binary)], check=True, timeout=120)
         master, slave = pty.openpty()
         try:
             original_attributes = termios.tcgetattr(slave)

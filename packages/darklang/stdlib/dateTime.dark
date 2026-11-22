@@ -353,7 +353,7 @@ let __daysInMonth(month: Int64, year: Int64): Int64 =
 // Shared clock implementation.
 /// Clock record decoding, scaling and interrupted-sleep retries in shared Dark.
 
-let __timespec(bytes: Blob): Result.Result<(Int * Int), Int> =
+let __timespec(bytes: Blob): Result.Result<(Int * Int), Int64> =
   let width = if Stdlib.Cli.Posix.__abiArm32() then 4z else 8z
   let record = Stdlib.Blob.toList(bytes)
   Stdlib.Cli.Posix.__kernelSignedField(record, 0z, width)
@@ -361,9 +361,9 @@ let __timespec(bytes: Blob): Result.Result<(Int * Int), Int> =
     Stdlib.Cli.Posix.__kernelSignedField(record, width, width)
     |> Stdlib.Result.map(fun nanos -> (seconds, nanos)))
 
-let __realtimeNanoseconds(): Result.Result<(Int * Int), Int> =
+let __realtimeNanoseconds(): Result.Result<(Int * Int), Int64> =
   if Builtin.runtimeTargetOS() == "browser" then
-    let ticks = Builtin.runtimeRealtimeTicks()
+    let ticks = Stdlib.Int.fromInt64(Builtin.runtimeRealtimeTicks())
     Ok((ticks / 10000000z, (ticks % 10000000z) * 100z))
   else if Stdlib.Cli.Posix.__abiMac() then
     Builtin.syscallGettimeofday()
@@ -373,12 +373,14 @@ let __realtimeNanoseconds(): Result.Result<(Int * Int), Int> =
       |> Stdlib.Result.andThen(fun seconds ->
         Stdlib.Cli.Posix.__kernelSignedField(record, 8z, 4z)
         |> Stdlib.Result.map(fun micros -> (seconds, micros * 1000z))))
-  else Builtin.syscallClockGettime(0z) |> Stdlib.Result.andThen(__timespec)
+  else Builtin.syscallClockGettime(0) |> Stdlib.Result.andThen(__timespec)
 
-let __monotonicNanoseconds(): Result.Result<(Int * Int), Int> =
+let __monotonicNanoseconds(): Result.Result<(Int * Int), Int64> =
   if Builtin.runtimeTargetOS() == "browser" then
-    let (ticks, frequency) = Builtin.runtimeMonotonicCounter()
-    if frequency <= 0z then Error(5z)
+    let (ticks64, frequency64) = Builtin.runtimeMonotonicCounter()
+    let ticks = Stdlib.Int.fromInt64(ticks64)
+    let frequency = Stdlib.Int.fromInt64(frequency64)
+    if frequency <= 0z then Error(5)
     else Ok((ticks / frequency, ((ticks % frequency) * 1000000000z) / frequency))
   else if Stdlib.Cli.Posix.__abiMac() then
     Builtin.syscallMachAbsoluteTime()
@@ -392,11 +394,11 @@ let __monotonicNanoseconds(): Result.Result<(Int * Int), Int> =
           |> Stdlib.Result.andThen(fun numerator ->
             Stdlib.Cli.Posix.__kernelField(record, 4z, 4z)
             |> Stdlib.Result.andThen(fun denominator ->
-              if denominator == 0z then Error(5z)
+              if denominator == 0z then Error(5)
               else
                 let nanos = (ticks / denominator) * numerator + ((ticks % denominator) * numerator) / denominator
                 Ok((nanos / 1000000000z, nanos % 1000000000z)))))))
-  else Builtin.syscallClockGettime(1z) |> Stdlib.Result.andThen(__timespec)
+  else Builtin.syscallClockGettime(1) |> Stdlib.Result.andThen(__timespec)
 
 let __monotonicMilliseconds(): Int =
   match __monotonicNanoseconds() with
@@ -414,21 +416,21 @@ let __today(): DateTime =
   let start = if remainder < 0z then seconds - remainder - 86400z else seconds - remainder
   Stdlib.DateTime.__fromSecondsInt(start)
 
-let __sleepWith(sleep: Int -> Int -> (Int * Blob), seconds: Int, nanos: Int): Result.Result<Unit, Int> =
-  let (rc, remaining) = sleep(seconds, nanos)
-  if rc == 0z then Ok()
-  else if rc == -4z then
+let __sleepWith(sleep: Int64 -> Int64 -> (Int64 * Blob), seconds: Int, nanos: Int): Result.Result<Unit, Int64> =
+  let (rc, remaining) = sleep(Stdlib.Int.__toInt64Unchecked(seconds), Stdlib.Int.__toInt64Unchecked(nanos))
+  if rc == 0 then Ok()
+  else if rc == -4 then
     __timespec(remaining) |> Stdlib.Result.andThen(fun pair ->
       let (seconds, nanos) = pair
       __sleepWith(sleep, seconds, nanos))
-  else Error(0z - rc)
+  else Error(0 - rc)
 
-let __sleepNanoseconds(seconds: Int, nanos: Int): Result.Result<Unit, Int> =
+let __sleepNanoseconds(seconds: Int, nanos: Int): Result.Result<Unit, Int64> =
   __sleepWith(Builtin.syscallNanosleep, seconds, nanos)
 
 let __sleepMilliseconds(milliseconds: Float): Unit =
   let nanos = Stdlib.Float64.toInt(milliseconds * 1000000.0)
-  if Builtin.runtimeTargetOS() == "browser" then Builtin.runtimeDelayTicks(nanos / 100z)
+  if Builtin.runtimeTargetOS() == "browser" then Builtin.runtimeDelayTicks(Stdlib.Int.__toInt64Unchecked(nanos / 100z))
   else __sleepNanoseconds(nanos / 1000000000z, nanos % 1000000000z) |> Builtin.unwrap
 
 // The interpreter's DateTime representation builtins, 100ns ticks since the Unix epoch.

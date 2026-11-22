@@ -542,6 +542,12 @@ let emitCliNative (ctx : X64CodeGenTypes.funcCtx) (dest : LIR.reg)
           Ok
             (loadImm64 X.RAX 102L @ [ X.SYSCALL ]
             @ if destReg = X.RAX then [] else [ X.MOV_reg (destReg, X.RAX) ])
+      | LIR.ProcessExit -> (
+          match args with
+          | [ code ] ->
+              loadCliOperand X.RDI code
+              |> Result.map (fun loads -> loads @ genExitSyscall)
+          | _ -> Error "ProcessExit expects one exit code")
       | LIR.GetArgv -> (
           match args with
           | [ LIR.Imm index ] when index >= 0L ->

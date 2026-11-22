@@ -1,11 +1,7 @@
 // Typed checked-path kernel adapters. Policy/marshalling stays private.
 module Builtin
 
-let __withTimes(a: Int, an: Int, m: Int, mn: Int, action: RawPtr -> 'a): 'a =
-    let a = Builtin.__posixInt64(a) in
-    let an = Builtin.__posixInt64(an) in
-    let m = Builtin.__posixInt64(m) in
-    let mn = Builtin.__posixInt64(mn) in
+let __withTimes(a: Int64, an: Int64, m: Int64, mn: Int64, action: RawPtr -> 'a): 'a =
     let times = __mapped_alloc(32) in
     let _ = __raw_write_word(times, 0, a) in
     let _ = __raw_write_word(times, 8, an) in
@@ -15,18 +11,18 @@ let __withTimes(a: Int, an: Int, m: Int, mn: Int, action: RawPtr -> 'a): 'a =
     let _ = __mapped_free(times) in
     result
 
-let syscallUtimensAt(path: String, a: Int, an: Int, m: Int, mn: Int): Stdlib.Result.Result<Unit, Int> =
-    if Stdlib.Cli.__Posix.__mac() then Error(78z)
+let syscallUtimensAt(path: String, a: Int64, an: Int64, m: Int64, mn: Int64): Stdlib.Result.Result<Unit, Int64> =
+    if Stdlib.Cli.__Posix.__mac() then Error(78)
     else
         Builtin.__withTimes(a, an, m, mn, fun times ->
             Stdlib.Cli.__Posix.__metadataPath(path, fun(heldFd, held) ->
                 let rc = Stdlib.Cli.__Posix.__withCString("", fun ptr -> Stdlib.Cli.__Posix.__utimesAt(heldFd, ptr, times, 4096)) in
                 if rc == -22 then Stdlib.Cli.__Posix.__withCString(held, fun ptr -> Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__utimesAt(Stdlib.Cli.__Posix.__cwdFd(), ptr, times, 0)))
                 else Stdlib.Cli.__Posix.__unitResult(rc)))
-        |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+        |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallSetattrlistTimes(path: String, a: Int, an: Int, m: Int, mn: Int): Stdlib.Result.Result<Unit, Int> =
-    if Stdlib.Cli.__Posix.__mac() == false then Error(38z)
+let syscallSetattrlistTimes(path: String, a: Int64, an: Int64, m: Int64, mn: Int64): Stdlib.Result.Result<Unit, Int64> =
+    if Stdlib.Cli.__Posix.__mac() == false then Error(38)
     else
         // XNU attribute order is MODTIME followed by ACCTIME.
         Builtin.__withTimes(m, mn, a, an, fun times ->
@@ -38,31 +34,31 @@ let syscallSetattrlistTimes(path: String, a: Int, an: Int, m: Int, mn: Int): Std
                 let result = Stdlib.Cli.__Posix.__unitResult(Stdlib.Cli.__Posix.__setAttributesAt(fd, name, attrs, times, 32, 1)) in
                 let _ = __mapped_free(attrs) in
                 result))
-        |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+        |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallGetcwd(count: Int): Stdlib.Result.Result<Blob, Int> =
-    let count = Builtin.__posixInt32(count) in
-    if count <= 0 then Error(22z)
+let syscallGetcwd(count: Int64): Stdlib.Result.Result<Blob, Int64> =
+    let count = Builtin.__posixWidth32(count) in
+    if count <= 0 then Error(22)
     else
         let buffer = __mapped_alloc(count) in
         let rc = Stdlib.Cli.__Posix.__getCwd(buffer, count) in
-        let result = if rc < 0 then Error(Stdlib.Int.fromInt64(0 - rc))
+        let result = if rc < 0 then Error(0 - rc)
                      else Ok(Stdlib.Cli.__Posix.__bufferBytes(buffer, 0, rc, [])) in
         let _ = __mapped_free(buffer) in
         result
 
-let syscallFcntlGetPath(fd: Int): Stdlib.Result.Result<Blob, Int> =
+let syscallFcntlGetPath(fd: Int): Stdlib.Result.Result<Blob, Int64> =
     let fd = Builtin.__posixInt32(fd) in
     let buffer = __mapped_alloc(1024) in
     let rc = Stdlib.Cli.__Posix.__fcntlGetPath(fd, 50, buffer) in
-    let result = if rc < 0 then Error(Stdlib.Int.fromInt64(0 - rc))
+    let result = if rc < 0 then Error(0 - rc)
                  else Ok(Stdlib.Cli.__Posix.__bufferBytes(buffer, 0, 1024, [])) in
     let _ = __mapped_free(buffer) in
     result
 
-let syscallReadlinkAt(path: String, count: Int): Stdlib.Result.Result<Blob, Int> =
-    let count = Builtin.__posixInt32(count) in
-    if count <= 0 then Error(22z)
+let syscallReadlinkAt(path: String, count: Int64): Stdlib.Result.Result<Blob, Int64> =
+    let count = Builtin.__posixWidth32(count) in
+    if count <= 0 then Error(22)
     else
         Stdlib.Cli.__Posix.__withEntry(path, fun(fd, name) ->
             let buffer = __mapped_alloc(count) in
@@ -72,32 +68,32 @@ let syscallReadlinkAt(path: String, count: Int): Stdlib.Result.Result<Blob, Int>
                 else Ok(Stdlib.Cli.__Posix.__bufferBytes(buffer, 0, rc, [])) in
             let _ = __mapped_free(buffer) in
             result)
-        |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+        |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallUnlinkAt(path: String, flags: Int): Stdlib.Result.Result<Unit, Int> =
+let syscallUnlinkAt(path: String, flags: Int64): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedUnlinkAt(path, flags)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallOpen(path: String, flags: Int, mode: Int): Stdlib.Result.Result<Int, Int> =
+let syscallOpen(path: String, flags: Int64, mode: Int64): Stdlib.Result.Result<Int, Int64> =
     Builtin.__checkedOpen(path, flags, mode)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallMkdir(path: String, mode: Int): Stdlib.Result.Result<Unit, Int> =
+let syscallMkdir(path: String, mode: Int64): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedMkdir(path, mode)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallChdir(path: String): Stdlib.Result.Result<Unit, Int> =
+let syscallChdir(path: String): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedChdir(path)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallRename(oldpath: String, newpath: String): Stdlib.Result.Result<Unit, Int> =
+let syscallRename(oldpath: String, newpath: String): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedRename(oldpath, newpath)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallChmod(path: String, mode: Int): Stdlib.Result.Result<Unit, Int> =
+let syscallChmod(path: String, mode: Int64): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedChmod(path, mode)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)
 
-let syscallSymlink(target: String, linkpath: String): Stdlib.Result.Result<Unit, Int> =
+let syscallSymlink(target: String, linkpath: String): Stdlib.Result.Result<Unit, Int64> =
     Builtin.__checkedSymlink(target, linkpath)
-    |> Stdlib.Result.mapError(fun error -> Stdlib.Int.fromInt64(error.errno))
+    |> Stdlib.Result.mapError(fun error -> error.errno)

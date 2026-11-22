@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+import darkc_cache
 
 HERE = Path(__file__).resolve().parent
 # Nothing listens here, so a call that needs the package store fails rather than reaching one.
@@ -22,12 +23,13 @@ OFFLINE = "http://127.0.0.1:9"
 
 def outcomes(compiler, calls):
     with tempfile.TemporaryDirectory(prefix="agreement-") as temporary:
-        env = dict(os.environ, XDG_DATA_HOME=temporary)
+        cache = darkc_cache.flags(compiler, temporary)
+        env = dict(os.environ)
 
         def outcome(indexed):
             index, call = indexed
             program = Path(temporary) / f"{index}.out"
-            built = subprocess.run([compiler, "--package-server", OFFLINE, "-q",
+            built = subprocess.run([compiler, *cache, "--package-server", OFFLINE, "-q",
                 "--emit-result", "-e", call["expr"], "-o", str(program)],
                 capture_output=True, text=True, timeout=600, env=env, cwd=temporary)
             if built.returncode != 0:

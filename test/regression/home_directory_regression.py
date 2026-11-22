@@ -5,10 +5,12 @@ import pathlib
 import subprocess
 import sys
 import tempfile
+import darkc_cache
 
 
 def main():
     compiler = str(pathlib.Path(sys.argv[1]).resolve())
+    cache = darkc_cache.flags(compiler)
     uid = str(os.getuid())
     fallback = "none"
     for line in pathlib.Path("/etc/passwd").read_text().splitlines():
@@ -26,7 +28,7 @@ def main():
   | None -> "none"
 in let _ = Builtin.print report in 0L
 ''', encoding="utf-8")
-        subprocess.run([compiler, "-q", "--leak-check", str(source), "-o", str(binary)],
+        subprocess.run([compiler, *cache, "-q", "--leak-check", str(source), "-o", str(binary)],
                        check=True, timeout=120)
         for home, expected in [("/explicit/雪", "some:/explicit/雪"), ("", "some:"),
                                (None, fallback)]:

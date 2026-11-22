@@ -9,7 +9,7 @@ let currentUser(): Stdlib.Option.Option<String> =
   | None ->
     match Env.get("USER") with
     | Some(u) -> Stdlib.Option.Option.Some(u)
-    | None -> Stdlib.Cli.Posix.__accountLookup(Stdlib.Cli.Posix.__decimal(Builtin.syscallGetuid()), 0z)
+    | None -> Stdlib.Cli.Posix.__accountLookup(Stdlib.Cli.Posix.__decimal(Stdlib.Int.fromInt64(Builtin.syscallGetuid())), 0z)
 
 
 /// Get the system hostname.
@@ -42,12 +42,12 @@ let cpuCount(): Int =
 
 /// Get the current process ID.
 let currentPid(): Int64 =
-  Stdlib.Int.__toInt64Unchecked(Builtin.syscallGetpid())
+  Builtin.syscallGetpid()
 
 
 /// Check if the current user is root (uid 0).
 let isRoot(): Bool =
-  (Builtin.syscallGetuid()) == 0z
+  (Builtin.syscallGetuid()) == 0
 
 
 /// Host record selection, buffer growth and decoding shared by both engines.
@@ -59,15 +59,15 @@ let __text(buffer: Blob, offset: Int, length: Int): String =
   |> Stdlib.List.takeWhile(fun byte -> byte != 0u8)
   |> Stdlib.String.fromBytesWithReplacement
 
-let __sysctlWith(mib: List<Int>, count: Int): Result.Result<Blob, Int> =
-  match Builtin.syscallSysctl(mib, count) with
+let __sysctlWith(mib: List<Int>, count: Int): Result.Result<Blob, Int64> =
+  match Builtin.syscallSysctl(Stdlib.List.map(mib, Stdlib.Int.__toInt64Unchecked), Stdlib.Int.__toInt64Unchecked(count)) with
   | Error(e) ->
-    if e == 4z then __sysctlWith(mib, count)
-    else if e == 12z && count < 1048576z then __sysctlWith(mib, count * 2z)
+    if e == 4 then __sysctlWith(mib, count)
+    else if e == 12 && count < 1048576z then __sysctlWith(mib, count * 2z)
     else Error(e)
   | Ok(bytes) -> Ok(bytes)
 
-let __sysctlText(mib: List<Int>): Result.Result<String, Int> =
+let __sysctlText(mib: List<Int>): Result.Result<String, Int64> =
   __sysctlWith(mib, 256z)
   |> Stdlib.Result.map(fun bytes -> __text(bytes, 0z, Stdlib.Blob.length(bytes)))
 
@@ -75,17 +75,17 @@ let __countBits(value: Int): Int =
   if value == 0z then 0z
   else value % 2z + __countBits(value / 2z)
 
-let __affinityWith(count: Int): Result.Result<Blob, Int> =
-  match Builtin.syscallSchedGetaffinity(0z, count) with
+let __affinityWith(count: Int): Result.Result<Blob, Int64> =
+  match Builtin.syscallSchedGetaffinity(0, Stdlib.Int.__toInt64Unchecked(count)) with
   | Error(e) ->
-    if e == 4z then __affinityWith(count)
-    else if e == 22z && count < 1048576z then __affinityWith(count * 2z)
+    if e == 4 then __affinityWith(count)
+    else if e == 22 && count < 1048576z then __affinityWith(count * 2z)
     else Error(e)
   | Ok(mask) -> Ok(mask)
 
 /// Available CPUs means the calling process's affinity on Linux, hw.ncpu on
 /// Darwin, and one on the interpreter's single-threaded browser runtime.
-let __cpuCount(): Result.Result<Int, Int> =
+let __cpuCount(): Result.Result<Int, Int64> =
   let result =
     if Builtin.runtimeTargetOS() == "browser" then Ok(1z)
     else if Stdlib.Cli.Posix.__abiMac() then
@@ -96,4 +96,4 @@ let __cpuCount(): Result.Result<Int, Int> =
       |> Stdlib.Result.map(fun bytes ->
         Stdlib.List.fold(Stdlib.Blob.toList(bytes), 0z,
           fun(total, byte) -> total + __countBits(Stdlib.Int.fromUInt8(byte))))
-  result |> Stdlib.Result.andThen(fun count -> if count > 0z then Ok(count) else Error(5z))
+  result |> Stdlib.Result.andThen(fun count -> if count > 0z then Ok(count) else Error(5))
