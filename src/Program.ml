@@ -1347,7 +1347,7 @@ let usageLines =
     "  -o, --output FILE      Output file (default: dark.out)";
     "  --emit-result          Print a file's final expression result when executed";
     "  -q, --quiet            Suppress compilation output";
-    "  --progress=json        Report stdlib preparation as JSON lines on stderr";
+    "  --verbose=json         Report stdlib preparation as JSON lines on stderr";
     "  -v, --verbose          Show compilation pass names (-vv adds timing, -vvv dumps IRs)";
     "  --leak-check           Enable leak checking, including in batch mode (debug builds only)";
     "  -h, --help             Show this help message";
@@ -1470,10 +1470,10 @@ let entrySource (options : cliOptions) hash =
                     ^ Diagnostic.reasonText diagnostic;
                 }))
 
-(* --progress=json applies to every command, so it comes out before parsing. *)
+(* --verbose=json applies to every command, so it comes out before parsing. *)
 let progressFirst argv =
   let rec split json reversed = function
-    | "--progress=json" :: rest -> split true reversed rest
+    | "--verbose=json" :: rest -> split true reversed rest
     | "--" :: _ as rest -> (json, List.rev_append reversed rest)
     | arg :: rest -> split json (arg :: reversed) rest
     | [] -> (json, List.rev reversed)

@@ -4,11 +4,11 @@ The first compile after installing a new darkc prepares the standard library and
 `--cache-dir DIR`, keeps it in DIR. That takes about a minute and a half and several GB of memory.
 Later compiles with the same DIR read it from there.
 
-With `--progress=json`, darkc prints one JSON object per line on stderr as preparation goes on,
+With `--verbose=json`, darkc prints one JSON object per line on stderr as preparation goes on,
 for a caller such as `dark compile` to show. Without the flag it prints nothing.
 
 ```text
-$ darkc --progress=json -q -r -e "2 + 3"
+$ darkc --verbose=json -q -r -e "2 + 3"
 {"type":"progress","task":"prepare-stdlib","stage":"parse","percent":0,"elapsedMs":40}
 {"type":"progress","task":"prepare-stdlib","stage":"type-check","percent":10,"elapsedMs":9825}
 {"type":"progress","task":"prepare-stdlib","stage":"convert","percent":11,"elapsedMs":12092}

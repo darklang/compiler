@@ -106,7 +106,7 @@ Prepares the stdlib into `DIR` and exits: 0 on success, 1 with the error on
 stderr. It prints nothing else. A compile that finds the prepared stdlib in
 the same `--cache-dir` starts in seconds.
 
-With `--progress=json`, any command reports the stages of a preparation as JSON
+With `--verbose=json`, any command reports the stages of a preparation as JSON
 lines on stderr; [progress.md](progress.md) has the format.
 
 ## Exit codes
