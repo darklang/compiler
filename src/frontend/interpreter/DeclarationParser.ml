@@ -78,3 +78,60 @@ let parseDecl parseBlock state index =
           description = docOf state index;
         },
       after )
+
+(* `extern name(p: T, ...): R from "library"`: a fn whose body is the native call it names.
+   The symbol is the fn's name unless a second string gives it: `from "library" "symbol"`. *)
+let parseExternDecl state index =
+  let keyword = rng state index in
+  let name =
+    match tok state (index + 1) with
+    | TIdent name -> { WT.range = rng state (index + 1); name }
+    | _ ->
+        errExpected state (index + 1) "a declaration name";
+        { WT.range = rng state (index + 1); name = "_" }
+  in
+  let parameters, afterParams =
+    DeclarationSupport.parseParams state (index + 2)
+  in
+  let colon, next =
+    if tok state afterParams = TColon then
+      (rng state afterParams, afterParams + 1)
+    else begin
+      errExpected state afterParams "':' before the return type";
+      (zeroWidthAtEnd (rng state afterParams), afterParams)
+    end
+  in
+  let returnType, afterReturn = TypeParser.parseTypeRef state next in
+  let library, symbol, after =
+    match
+      ( tok state afterReturn,
+        tok state (afterReturn + 1),
+        tok state (afterReturn + 2) )
+    with
+    | TIdent "from", TStringLit library, TStringLit symbol
+      when (rng state (afterReturn + 2)).start.row
+           = (rng state (afterReturn + 1)).end_.row ->
+        (library, symbol, afterReturn + 3)
+    | TIdent "from", TStringLit library, _ ->
+        (library, name.WT.name, afterReturn + 2)
+    | _ ->
+        errExpected state afterReturn "'from \"library\"'";
+        ("", name.WT.name, afterReturn)
+  in
+  let last = rng state (max afterReturn (after - 1)) in
+  ( WT.DFunction
+      {
+        WT.range = span keyword last;
+        name;
+        typeParams = [];
+        bounds = [];
+        parameters;
+        effects = None;
+        returnType;
+        body = WT.EExtern (span (rng state afterReturn) last, library, symbol);
+        keywordLet = keyword;
+        symbolColon = colon;
+        symbolEquals = zeroWidthAtEnd (rng state (afterReturn - 1));
+        description = docOf state index;
+      },
+    after )

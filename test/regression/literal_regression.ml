@@ -43,4 +43,25 @@ let () =
   | Ok source when source = integer ^ "Q" -> ()
   | Ok source -> Crash.crash ("Package integer spelling changed: " ^ source)
   | Error error -> Crash.crash ("Package integer decoding failed: " ^ error));
+  let extern library =
+    `Assoc
+      [
+        ( "EExtern",
+          `List
+            [
+              `Null;
+              `Stringlit ("\"" ^ library ^ "\"");
+              `Stringlit "\"getpid\"";
+              `List [ `Assoc [ ("EUnit", `List [ `Null ]) ] ];
+            ] );
+      ]
+  in
+  (match PackageManager.renderExpr [] "getpid" (extern "kernel") with
+  | Ok "Builtin.syscallGetpid (())" -> ()
+  | Ok source -> Crash.crash ("A package kernel extern renders as " ^ source)
+  | Error error ->
+      Crash.crash ("Package kernel extern decoding failed: " ^ error));
+  (match PackageManager.renderExpr [] "getpid" (extern "libc") with
+  | Error _ -> ()
+  | Ok source -> Crash.crash ("A libc extern rendered as " ^ source));
   print_endline "Exact float source and package integer regressions passed"

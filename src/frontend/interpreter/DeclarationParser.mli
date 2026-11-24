@@ -4,3 +4,6 @@ val parseDecl :
   ParserSupport.parserState ->
   int ->
   WrittenTypes.declaration * int
+
+val parseExternDecl :
+  ParserSupport.parserState -> int -> WrittenTypes.declaration * int

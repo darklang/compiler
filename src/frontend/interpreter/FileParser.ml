@@ -220,6 +220,12 @@ and parseItemsBody grammar state itemScope start minColumn =
           in
           RevBuffer.add declarations declaration;
           stop := after
+      | TIdent "extern", TIdent _ when tok state (!stop + 2) = TLParen ->
+          let declaration, after =
+            DeclarationParser.parseExternDecl state !stop
+          in
+          RevBuffer.add declarations declaration;
+          stop := after
       | TIdent "test", TIdent _
         when tok state (!stop + 2) = TEquals
              || tok state (!stop + 2) = TColon

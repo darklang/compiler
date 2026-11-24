@@ -378,5 +378,6 @@ let rec checkExpression (globals : globals) locals symbols expected expression =
   | WT.EInfix (_, (_, infix), left, right) ->
       WrittenOperatorSupport.check checkExpression checkedLiteral globals locals
         symbols expected infix left right
+  | WT.EExtern _ -> Error "An extern is only the whole body of its declaration"
   | WT.EError _ ->
       Error "Expression requires source name resolution and type checking"

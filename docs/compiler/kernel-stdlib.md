@@ -13,6 +13,12 @@ there are no public syscall/runtime wrapper packages or separate algorithm modul
 trusted authorization. `Builtin.runtimeX` is not a claim that an OS syscall exists.
 There is no generic syscall-number/pointer escape hatch and no new fork primitive.
 
+The interpreter declares each kernel call in `Stdlib.Cli.Posix` as
+`extern name(params): T from "kernel"`, with `from "kernel" "symbol"` when the
+symbol differs from the name. The compiler reads such a declaration, in source or
+in package JSON, as a call to its own `Builtin.syscall<Symbol>` with the
+declaration's parameters in order; any other library is refused.
+
 Kernel failures are `Result<value, Int>` with a positive numeric errno. Shared
 Dark code supplies error messages, record decoding, retries, complete writes,
 temporary-entry naming, and file-copy algorithms. Buffers returned by adapters

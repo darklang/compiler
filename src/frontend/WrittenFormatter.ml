@@ -322,6 +322,8 @@ let rec expr (value : WrittenTypes.expr) =
               tuple [ (fun _ -> "") part0; pipeExpr part1 ])
             field2;
         ]
+  | WrittenTypes.EExtern (field0, field1, field2) ->
+      union "EExtern" [ (fun _ -> "") field0; quoted field1; quoted field2 ]
   | WrittenTypes.EStatement (field0, field1, field2) ->
       union "EStatement" [ (fun _ -> "") field0; expr field1; expr field2 ]
   | WrittenTypes.EError field0 -> union "EError" [ (fun _ -> "") field0 ]

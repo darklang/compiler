@@ -301,7 +301,7 @@ let rec expr ctx e =
   match e with
   | W.EUnit _ | W.EBool _ | W.EInt _ | W.EInt64 _ | W.EInt8 _ | W.EUInt8 _ | W.EInt16 _
   | W.EUInt16 _ | W.EInt32 _ | W.EUInt32 _ | W.EUInt64 _ | W.EInt128 _ | W.EUInt128 _
-  | W.EFloat _ | W.EChar _ | W.EVariable _ | W.EFnName _ | W.EError _ -> []
+  | W.EFloat _ | W.EChar _ | W.EVariable _ | W.EFnName _ | W.EExtern _ | W.EError _ -> []
   | W.EString _ -> []
   | W.EInfix (_, _, a, b) | W.EStatement (_, a, b) -> go a @ go b
   | W.ELet (_, W.LPVariable _, W.ELambda (lambdaRange, _, body, keyword, _), rest, _, _)

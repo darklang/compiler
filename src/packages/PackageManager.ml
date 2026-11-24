@@ -980,6 +980,18 @@ let rec renderExpr parameters selfName element =
       let* argument = recurse argument in
       let+ cases = ResultList.mapResults case (arrayItems cases) in
       "(match " ^ argument ^ " with " ^ String.concat " " cases ^ ")"
+  (* An extern's body: a kernel call is the compiler's `Builtin.syscall<Symbol>`. *)
+  | "EExtern", [ _; library; symbol; args ] -> (
+      let* library = stringValue library in
+      let* symbol = stringValue symbol in
+      match library with
+      | "kernel" -> (
+          let name = "Builtin.syscall" ^ String.capitalize_ascii symbol in
+          match resultConversion name with
+          | Some conversion ->
+              Result.map (convert conversion) (application name (`List []) args)
+          | None -> application name (`List []) args)
+      | _ -> unsupportedFeature ("the native library " ^ library))
   (* `;` after a parenthesised let does not parse here; a discarded binding
      sequences the same way. *)
   | "EStatement", [ _; first; next ] ->

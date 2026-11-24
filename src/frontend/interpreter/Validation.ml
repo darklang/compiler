@@ -190,6 +190,7 @@ let rec exprIssues insideFunction expression =
     else []
   in
   match expression with
+  | WT.EExtern _ -> []
   | WT.EError range ->
       [ issue range RecoveryHole "A recovered expression cannot be lowered" ]
   | WT.ELambda (range, patterns, body, _, _) ->

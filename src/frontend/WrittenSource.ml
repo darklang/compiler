@@ -24,9 +24,40 @@ let moduleSegments name =
       Ok (List.map NameSyntax.identifierText (NameSyntax.segments qualified))
   | None -> Error ("Invalid parsed module name '" ^ name ^ "'")
 
+(* A kernel extern's body calls `Builtin.syscall<Symbol>`, the compiler's own kernel call,
+   with the declaration's parameters in order. *)
+let externBody (fn : WT.fnDecl) =
+  match fn.WT.body with
+  | WT.EExtern (range, "kernel", symbol) ->
+      let identifier name = { WT.range; name } in
+      let callee =
+        WT.EFnName
+          ( range,
+            {
+              WT.range;
+              modules = [ (identifier "Builtin", range) ];
+              fn = identifier ("syscall" ^ String.capitalize_ascii symbol);
+            } )
+      in
+      let args =
+        List.filter_map
+          (function
+            | WT.FPNormal (_, name, _, _, _, _, _) ->
+                Some (WT.EVariable (range, name.WT.name))
+            | WT.FPUnit _ -> None)
+          fn.WT.parameters
+      in
+      Ok { fn with WT.body = WT.EApply (range, callee, [], args) }
+  | WT.EExtern (_, library, _) ->
+      Error
+        ("extern " ^ fn.WT.name.WT.name ^ ": no native library \"" ^ library
+       ^ "\" here")
+  | _ -> Ok fn
+
 let rec flattenDeclaration path = function
   | WT.DTest _ -> Error "Named package test requires a test execution adapter"
-  | WT.DFunction fn -> Ok [ Function (path, fn) ]
+  | WT.DFunction fn ->
+      Result.map (fun fn -> [ Function (path, fn) ]) (externBody fn)
   | WT.DValue value -> Ok [ Value (path, value) ]
   | WT.DType typ -> Ok [ Type (path, typ) ]
   | WT.DTrait trait_ -> Ok [ Trait (path, trait_) ]

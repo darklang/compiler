@@ -183,7 +183,7 @@ let check checkExpression (globals : globals) locals symbols expected
     | WT.EUnit _ | WT.EBool _ | WT.EInt _ | WT.EInt64 _ | WT.EInt8 _
     | WT.EUInt8 _ | WT.EInt16 _ | WT.EUInt16 _ | WT.EInt32 _ | WT.EUInt32 _
     | WT.EUInt64 _ | WT.EInt128 _ | WT.EUInt128 _ | WT.EFloat _ | WT.EChar _
-    | WT.EError _ ->
+    | WT.EExtern _ | WT.EError _ ->
         false
   in
   (* A package fn's local `let shown(loc: PackageLocation) = loc.name`

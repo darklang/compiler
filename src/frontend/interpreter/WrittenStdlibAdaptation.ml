@@ -191,6 +191,7 @@ let rec expr (e : WT.expr) : WT.expr =
           a,
           b )
   | WT.EStatement (range, first, second) -> WT.EStatement (range, expr first, expr second)
+  | WT.EExtern _ as extern -> extern
   | WT.EPipe (range, initial, stages) -> pipe range (expr initial) stages
 
 (* A stage calling a fn that needs conversion is the call with the value so far

@@ -296,5 +296,55 @@ let () =
       rejects
         (String.make 200 '(' ^ "1" ^ String.make 200 ')')
         "nesting too deep");
+  run "an extern is a fn whose body names its native call" (fun () ->
+      let extern source =
+        match (parsed source).WT.declarations with
+        | [ WT.DFunction fn ] -> fn
+        | _ -> failwith "Expected one fn"
+      in
+      let call (fn : WT.fnDecl) =
+        match WrittenSource.externBody fn with
+        | Ok { WT.body = WT.EApply (_, WT.EFnName (_, name), [], args); _ } ->
+            ( String.concat "."
+                (List.map
+                   (fun ((m : WT.identifier), _) -> m.WT.name)
+                   name.WT.modules)
+              ^ "." ^ name.WT.fn.WT.name,
+              List.map (function WT.EVariable (_, v) -> v | _ -> "?") args )
+        | Ok _ -> failwith "Expected a call"
+        | Error message -> failwith message
+      in
+      let opened =
+        extern
+          "extern open(path: String, flags: Int64, mode: Int64): Result<Int, \
+           Int64> from \"kernel\""
+      in
+      require
+        (match opened.WT.body with
+        | WT.EExtern (_, "kernel", "open") -> true
+        | _ -> false)
+        "open binds kernel open";
+      require
+        (call opened = ("Builtin.syscallOpen", [ "path"; "flags"; "mode" ]))
+        "open calls the compiler's kernel open with its parameters";
+      let renamed =
+        extern
+          "extern kernelKill(pid: Int64, signal: Int64): Result<Unit, Int64> \
+           from \"kernel\" \"kill\""
+      in
+      require
+        (call renamed = ("Builtin.syscallKill", [ "pid"; "signal" ]))
+        "a second string names the symbol";
+      require
+        (call (extern "extern getpid(): Int64 from \"kernel\"")
+        = ("Builtin.syscallGetpid", []))
+        "a unit extern passes nothing";
+      require
+        (Result.is_error
+           (WrittenSource.externBody
+              (extern "extern f(x: Int64): Int64 from \"libc\"")))
+        "only kernel externs compile");
+  run "an extern needs its library" (fun () ->
+      rejects "extern f(x: Int64): Int64" "'from \"library\"'");
   if !failures <> 0 then
     failwith (Printf.sprintf "%d parser port regressions failed" !failures)

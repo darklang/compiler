@@ -9,6 +9,7 @@ type item =
 
 val items : Validation.validatedSourceFile -> (item list, string) result
 val moduleSegments : string -> (string list, string) result
+val externBody : WrittenTypes.fnDecl -> (WrittenTypes.fnDecl, string) result
 
 val validateSourceUnits :
   bool ->

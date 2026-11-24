@@ -176,6 +176,8 @@ and expr =
   | EMatch of range * expr * matchCase list * range * range
   | EPipe of range * expr * (range * pipeExpr) list
   | EStatement of range * expr * expr
+  (* The body of `extern name(...): T from "library"`: the call the declaration binds. *)
+  | EExtern of range * string * string
   | EError of range
 
 and matchCase = {
