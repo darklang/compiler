@@ -521,7 +521,7 @@ let range(start: Int64, end_: Int64): Stdlib.Regex.Range =
 let capture(input: String, caps: Dict<Int64, (Int64 * Int64)>, key: Int64): Stdlib.Option.Option<Stdlib.Regex.Capture> =
     match Stdlib.Dict.get(caps, key) with
     | Some((start, end_)) ->
-        Stdlib.Option.Option.Some(Stdlib.Regex.Capture { text = Stdlib.String.slice(input, start, end_), range = Stdlib.Regex.__Engine.range(start, end_) })
+        Stdlib.Option.Option.Some(Stdlib.Regex.Capture { text = Stdlib.String.__sliceInt(input, Stdlib.Int.fromInt64(start), Stdlib.Int.fromInt64(end_)), range = Stdlib.Regex.__Engine.range(start, end_) })
     | None -> Stdlib.Option.Option.None
 
 // Named groups are keyed -1, -2, ... in the order they open.
@@ -535,7 +535,7 @@ let found(input: String, parser: Stdlib.Regex.__Engine.Parser, m: (Int64 * Int64
     let (start, end_, caps) = m in
     let names = Stdlib.List.reverse(parser.names) in
     Stdlib.Regex.Match {
-        text = Stdlib.String.slice(input, start, end_),
+        text = Stdlib.String.__sliceInt(input, Stdlib.Int.fromInt64(start), Stdlib.Int.fromInt64(end_)),
         range = Stdlib.Regex.__Engine.range(start, end_),
         captures = Stdlib.List.map(Stdlib.List.range(1, parser.unnamed), Stdlib.Regex.__Engine.capture(input, caps)),
         namedCaptures = Stdlib.Dict.fromListOverwritingDuplicates(Stdlib.List.map(Stdlib.List.range(1, Stdlib.List.length(names)), Stdlib.Regex.__Engine.namedEntry(input, caps, names)))
@@ -543,8 +543,8 @@ let found(input: String, parser: Stdlib.Regex.__Engine.Parser, m: (Int64 * Int64
 
 let pieces(input: String, matches: List<(Int64 * Int64 * Dict<Int64, (Int64 * Int64)>)>, last: Int64, acc: List<String>): List<String> =
     match matches with
-    | [] -> Stdlib.List.reverse(Stdlib.List.push(acc, Stdlib.String.slice(input, last, Stdlib.String.length(input))))
-    | (start, end_, _) :: rest -> Stdlib.Regex.__Engine.pieces(input, rest, end_, Stdlib.List.push(acc, Stdlib.String.slice(input, last, start)))
+    | [] -> Stdlib.List.reverse(Stdlib.List.push(acc, Stdlib.String.__sliceInt(input, Stdlib.Int.fromInt64(last), Stdlib.Int.fromInt64(Stdlib.String.length(input)))))
+    | (start, end_, _) :: rest -> Stdlib.Regex.__Engine.pieces(input, rest, end_, Stdlib.List.push(acc, Stdlib.String.__sliceInt(input, Stdlib.Int.fromInt64(last), Stdlib.Int.fromInt64(start))))
 
 let scan(pattern: String, caseInsensitive: Bool, multiline: Bool, input: String, firstOnly: Bool, withMatches: Bool): Stdlib.Result.Result<(List<String> * List<Stdlib.Regex.Match>), Stdlib.Regex.RegexError> =
     match Stdlib.Regex.__Engine.parse(pattern) with

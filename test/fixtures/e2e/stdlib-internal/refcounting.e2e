@@ -17,7 +17,7 @@ let source = "{\"n\": null}" in match Stdlib.AltJson.__parseObjectFields source 
 let __stringRefcount (s: String): Int64 = __raw_get<Int64> (__string_to_rawptr s) 0L
 let s = dynamicString "abc" in __stringRefcount s = stdout="1\n" stderr="" // fresh dynamic string starts with one owned reference
 let s = "a" + "b" in 0L = stdout="0\n" stderr="" // string concat reclaimed
-let src = "a" + "bc" in let s = Stdlib.String.slice src 0L 1L in 0L = stdout="0\n" stderr="" // unaligned string slice reclaimed
+let src = "a" + "bc" in let s = Stdlib.String.slice src 0L 1L |> Stdlib.Result.withDefault "" in 0L = stdout="0\n" stderr="" // unaligned string slice reclaimed
 let s = Stdlib.String.fromList (['a']) in 0L = stdout="0\n" stderr="" // unaligned string builder reclaimed
 let s = Stdlib.Float64.toString 1.25 in 0L = stdout="0\n" stderr="" // float toString result reclaimed
 let sign = if false then "-" else "" in let s = sign + "1" in 0L = stdout="0\n" stderr="" // branch-selected literal string reclaimed

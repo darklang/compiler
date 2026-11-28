@@ -281,21 +281,21 @@ Stdlib.String.contains "" "a" = false
 // =============================================================================
 
 // Basic slice (start, end exclusive)
-Stdlib.String.slice "hello world" 0L 5L = "hello"
-Stdlib.String.slice "hello world" 6L 11L = "world"
-Stdlib.String.slice "hello world" 0L 11L = "hello world"
+Stdlib.String.slice "hello world" 0L 5L = Stdlib.Result.Result.Ok "hello"
+Stdlib.String.slice "hello world" 6L 11L = Stdlib.Result.Result.Ok "world"
+Stdlib.String.slice "hello world" 0L 11L = Stdlib.Result.Result.Ok "hello world"
 
 // Slice from middle
-Stdlib.String.slice "abcdef" 2L 5L = "cde"
+Stdlib.String.slice "abcdef" 2L 5L = Stdlib.Result.Result.Ok "cde"
 
 // Empty result
-Stdlib.String.slice "hello" 0L 0L = ""
-Stdlib.String.slice "hello" 5L 5L = ""
+Stdlib.String.slice "hello" 0L 0L = Stdlib.Result.Result.Ok ""
+Stdlib.String.slice "hello" 5L 5L = Stdlib.Result.Result.Ok ""
 
 // Clamping behavior
-Stdlib.String.slice "hello" 0L 100L = "hello"
-Stdlib.String.slice "hello" 10L 15L = ""
-Stdlib.String.slice "hello" 4L 2L = ""
+Stdlib.String.slice "hello" 0L 100L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+Stdlib.String.slice "hello" 10L 15L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+Stdlib.String.slice "hello" 4L 2L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
 
 // =============================================================================
 // Stdlib.String.first and drop Tests
@@ -317,5 +317,5 @@ Stdlib.String.dropFirst "hello" (-1L) = "hello"
 // Stdlib.String.slice Tests
 // =============================================================================
 
-Stdlib.String.slice "hello world" 0L 5L = "hello"
-Stdlib.String.slice "hello world" 6L 11L = "world"
+Stdlib.String.slice "hello world" 0L 5L = Stdlib.Result.Result.Ok "hello"
+Stdlib.String.slice "hello world" 6L 11L = Stdlib.Result.Result.Ok "world"

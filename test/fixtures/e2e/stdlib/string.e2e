@@ -205,20 +205,20 @@ Stdlib.String.indexOf "" "a" = None
 // Stdlib.String.slice - Extract EGC range (end exclusive)
 // ===================================================================
 
-Stdlib.String.slice "hello" 0L 2L = "he"
-Stdlib.String.slice "hello" 0L 5L = "hello"
-Stdlib.String.slice "hello" 1L 4L = "ell"
-Stdlib.String.slice "hello" 2L 10L = "llo"
-Stdlib.String.slice "hello" 0L 0L = ""
-Stdlib.String.slice "hello" 5L 5L = ""
+Stdlib.String.slice "hello" 0L 2L = Stdlib.Result.Result.Ok "he"
+Stdlib.String.slice "hello" 0L 5L = Stdlib.Result.Result.Ok "hello"
+Stdlib.String.slice "hello" 1L 4L = Stdlib.Result.Result.Ok "ell"
+Stdlib.String.slice "hello" 2L 10L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+Stdlib.String.slice "hello" 0L 0L = Stdlib.Result.Result.Ok ""
+Stdlib.String.slice "hello" 5L 5L = Stdlib.Result.Result.Ok ""
 
 // ===================================================================
 // Stdlib.String.slice - Extract substring by start and end index
 // ===================================================================
 
-Stdlib.String.slice "hello" 0L 2L = "he"
-Stdlib.String.slice "hello" 1L 4L = "ell"
-Stdlib.String.slice "hello" 0L 5L = "hello"
+Stdlib.String.slice "hello" 0L 2L = Stdlib.Result.Result.Ok "he"
+Stdlib.String.slice "hello" 1L 4L = Stdlib.Result.Result.Ok "ell"
+Stdlib.String.slice "hello" 0L 5L = Stdlib.Result.Result.Ok "hello"
 
 // ===================================================================
 // Stdlib.String.first - Take first n bytes

@@ -880,8 +880,10 @@ let getByteAt(value: String, index: Int64): Stdlib.Option.Option<UInt8> =
 let repeat(value: String, count: Int64): String =
     Stdlib.String.__repeatInt(value, Stdlib.Int.fromInt64(count))
 
-let slice(value: String, from: Int64, to_: Int64): String =
-    Stdlib.String.__sliceInt(value, Stdlib.Int.fromInt64(from), Stdlib.Int.fromInt64(to_))
+let slice(value: String, from: Int64, to_: Int64): Result.Result<String, Stdlib.String.IndexError> =
+    match Builtin.stringSlice(value, from, to_) with
+    | Some(sliced) -> Result.Result.Ok(sliced)
+    | None -> Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds)
 
 let first(value: String, characterCount: Int64): String =
     Stdlib.String.__firstInt(value, Stdlib.Int.fromInt64(characterCount))
@@ -928,8 +930,10 @@ let padEnd(value: String, padWith: Char, goalLength: Int64): String =
     let padCount = goalLength - Stdlib.String.length(value) in
     if padCount <= 0 || padCount > 2147483647 then value else value + Stdlib.String.repeat(Stdlib.String.fromChar(padWith), padCount)
 
-let random(length: Int64): Result.Result<String, String> =
-    Stdlib.String.__randomInt(Stdlib.Int.fromInt64(length))
+let random(length: Int64): String =
+    match Stdlib.String.__randomInt(Stdlib.Int.fromInt64(length)) with
+    | Ok(value) -> value
+    | Error(_) -> ""
 
 impl Stdlib.Display for String =
   let display(value: String): String = value

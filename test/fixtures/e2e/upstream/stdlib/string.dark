@@ -290,11 +290,11 @@ module Digest =
 module Random =
   (Stdlib.String.random 5L) == (Stdlib.String.random 5L) = false
 
-  Stdlib.String.length ((Stdlib.String.random 10L) |> Builtin.unwrap) = 10L
-  Stdlib.String.length ((Stdlib.String.random 5L) |> Builtin.unwrap) = 5L
-  Stdlib.String.length ((Stdlib.String.random 0L) |> Builtin.unwrap) = 0L
+  Stdlib.String.length (Stdlib.String.random 10L) = 10L
+  Stdlib.String.length (Stdlib.String.random 5L) = 5L
+  Stdlib.String.length (Stdlib.String.random 0L) = 0L
 
-  Stdlib.String.random -1L = Stdlib.Result.Result.Error "Expected `length` to be positive, but it was `-1`"
+  Stdlib.String.random -1L = ""
 
 
 module HtmlEscape =
@@ -768,21 +768,21 @@ module Contains =
 
 
 module Slice =
-  Stdlib.String.slice "abcd" -2L 4L = "cd"
-  Stdlib.String.slice "abcd" -5L -6L = ""
-  Stdlib.String.slice "abcd" -5L 1L = "a"
-  Stdlib.String.slice "abcd" 0L -1L = "abc"
-  Stdlib.String.slice "abcd" 2L 3L = "c"
-  Stdlib.String.slice "abcd" 2L 6L = "cd"
-  Stdlib.String.slice "abcd" 3L 2L = ""
-  Stdlib.String.slice "abcd" 5L 6L = ""
-  Stdlib.String.slice "🧑🏽‍🦰🧑🏻‍🍼✋✋🏻✋🏿" 2L 10L = "✋✋🏻✋🏿"
-  Stdlib.String.slice "Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇" 1L 3L = "ä͖̭̈̇lͮ̒ͫ"
-  Stdlib.String.slice "﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽" 2L 6L = "﷽﷽﷽﷽"
-  Stdlib.String.slice "👱👱🏻👱🏼👱🏽👱🏾👱🏿" 2L 6L = "👱🏼👱🏽👱🏾👱🏿"
-  Stdlib.String.slice "🧟‍♀️🧟‍♂️" 2L 4L = ""
-  Stdlib.String.slice "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷" 2L 10L = "🏳️‍⚧️‍️🇵🇷"
-  Stdlib.String.slice "abc" 0L 4503599627370498L = "abc"
+  Stdlib.String.slice "abcd" -2L 4L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" -5L -6L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" -5L 1L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" 0L -1L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" 2L 3L = Stdlib.Result.Result.Ok "c"
+  Stdlib.String.slice "abcd" 2L 6L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" 3L 2L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abcd" 5L 6L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "🧑🏽‍🦰🧑🏻‍🍼✋✋🏻✋🏿" 2L 10L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇" 1L 3L = Stdlib.Result.Result.Ok "ä͖̭̈̇lͮ̒ͫ"
+  Stdlib.String.slice "﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽" 2L 6L = Stdlib.Result.Result.Ok "﷽﷽﷽﷽"
+  Stdlib.String.slice "👱👱🏻👱🏼👱🏽👱🏾👱🏿" 2L 6L = Stdlib.Result.Result.Ok "👱🏼👱🏽👱🏾👱🏿"
+  Stdlib.String.slice "🧟‍♀️🧟‍♂️" 2L 4L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷" 2L 10L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
+  Stdlib.String.slice "abc" 0L 4503599627370498L = Stdlib.Result.Result.Error Stdlib.String.IndexError.IndexOutOfBounds
 
 
 module First =
