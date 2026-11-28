@@ -1,0 +1,9 @@
+// Upstream package code calls these builtins directly.
+Builtin.listGetAt [1L, 2L] 1L = Stdlib.Option.Option.Some 2L
+Builtin.listGetAt [1L, 2L] 2L = Stdlib.Option.Option.None
+Builtin.listDrop [1L, 2L, 3L] 2L = [3L]
+Builtin.listReverse [1L, 2L, 3L] = [3L, 2L, 1L]
+Builtin.int64ToString -42L = "-42"
+Builtin.stringSlice "héllo" 1L 3L = Stdlib.Option.Option.Some "él"
+Builtin.stringSlice "héllo" 3L 9L = Stdlib.Option.Option.None
+Builtin.stringSlice "héllo" 3L 2L = Stdlib.Option.Option.None

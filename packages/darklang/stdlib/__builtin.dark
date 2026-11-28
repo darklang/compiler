@@ -31,6 +31,25 @@ let stringSlugify(value: String): String =
     let trimmed = Stdlib.String.__trimEndCodepoints(Stdlib.String.__trimStartCodepoints(filtered)) in
     Builtin.__slugifySeparators(trimmed, false, [])
 
+// The characters from `from` up to `to_`, or None unless 0 <= from <= to_ <= length.
+let stringSlice(value: String, from: Int64, to_: Int64): Stdlib.Option.Option<String> =
+    if from < 0 || to_ < from then Stdlib.Option.Option.None
+    else
+        // walks only as far as `to_`, and copies only the slice
+        let start = Stdlib.String.__graphemeOffsetAt(value, 0, [], from) in
+        let end_ = if start < 0 then -1 else Stdlib.String.__graphemeOffsetAt(value, start, [], to_ - from) in
+        if end_ < 0 then Stdlib.Option.Option.None
+        else Stdlib.Option.Option.Some(Stdlib.String.__byteSlice(value, start, end_))
+
+// Bridges for upstream package code that calls these builtins directly.
+let listGetAt(list: List<'a>, index: Int64): Stdlib.Option.Option<'a> = Stdlib.List.getAt(list, index)
+
+let listDrop(list: List<'a>, count: Int64): List<'a> = Stdlib.List.drop(list, count)
+
+let listReverse(list: List<'a>): List<'a> = Stdlib.List.reverse(list)
+
+let int64ToString(value: Int64): String = Stdlib.Int64.toString(value)
+
 // Native code has no reads in flight: every value is ready where it is computed.
 let runtimeForce(value: 'a): 'a = value
 
