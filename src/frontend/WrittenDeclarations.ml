@@ -277,10 +277,12 @@ let[@warning "-4"] predeclareFunctions allowInternal types items symbols =
       (DarkStdlib.buildModuleRegistry ())
       (builtinFunctions, builtinSymbols)
   in
-  let result =
+  (* Every signature is resolved before reporting, so a source move names all
+     the fns it broke at once. *)
+  let functions, symbols, errors =
     List.fold_left
-      (fun result item ->
-        bind result (fun (functions, symbols) ->
+      (fun (functions, symbols, errors) item ->
+        let declared =
             match item with
             | WS.Function (path, fn) ->
                 let name = String.concat "." (path @ [ fn.WT.name.WT.name ]) in
@@ -300,7 +302,8 @@ let[@warning "-4"] predeclareFunctions allowInternal types items symbols =
                     collectWrittenTypeParams found fn.WT.returnType
                   in
                   let typeParams = S.of_list allParams in
-                  bind
+                  Result.map_error (fun error -> name ^ ": " ^ error)
+                  @@ bind
                     (ResultList.traverse
                        (function
                          | WT.FPUnit _ -> Ok AST.TUnit
@@ -325,14 +328,18 @@ let[@warning "-4"] predeclareFunctions allowInternal types items symbols =
                             symbols ))
                         (resolveWrittenType allowInternal types path typeParams
                            fn.WT.returnType))
-            | _ -> Ok (functions, symbols)))
-      (Ok (M.empty, intrinsicSymbols))
+            | _ -> Ok (functions, symbols)
+        in
+        match declared with
+        | Ok (functions, symbols) -> (functions, symbols, errors)
+        | Error error -> (functions, symbols, error :: errors))
+      (M.empty, intrinsicSymbols, [])
       items
   in
-  map
-    (fun (functions, symbols) ->
-      (M.fold M.add functions intrinsicFunctions, symbols))
-    result
+  match errors with
+  | [] -> Ok (M.fold M.add functions intrinsicFunctions, symbols)
+  | _ -> Error (String.concat "\n" (List.rev errors))
+
 
 let checkFunction (checkExpression : expressionChecker) globals symbols path
     (fn : WT.fnDecl) =
@@ -771,11 +778,20 @@ let checkItems (checkExpression : expressionChecker) baseEnvironment
                                  (initialGlobals, symbols, [], None)
                                  values)
                               (fun state ->
-                                List.fold_left
-                                  (fun result item ->
-                                    bind result (fun state ->
-                                        checkItem state item))
-                                  (Ok state) rest)
+                                (* A failed item is skipped and the rest are
+                                   still checked, so every failure is named. *)
+                                let state, errors =
+                                  List.fold_left
+                                    (fun (state, errors) item ->
+                                      match checkItem state item with
+                                      | Ok state -> (state, errors)
+                                      | Error error -> (state, error :: errors))
+                                    (state, []) rest
+                                in
+                                match errors with
+                                | [] -> Ok state
+                                | _ ->
+                                    Error (String.concat "\n" (List.rev errors)))
                           in
                           bind result
                             (fun

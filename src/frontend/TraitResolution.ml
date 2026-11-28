@@ -80,7 +80,11 @@ let rec candidates catalog available stack ((traitName, args) as obligation) =
             | error :: _
               when String.starts_with ~prefix:"Cyclic trait obligation" error ->
                 Error error
-            | _ -> Error ("No implementation of trait '" ^ traitName ^ "'"))
+            | _ ->
+                Error
+                  ("No implementation of trait '" ^ traitName ^ "' for "
+                  ^ String.concat ", "
+                      (List.map CheckingDiagnostics.typeToString args)))
         | [ candidate ] -> Ok candidate
         | _ -> Error ("Ambiguous implementation of trait '" ^ traitName ^ "'"))
 
