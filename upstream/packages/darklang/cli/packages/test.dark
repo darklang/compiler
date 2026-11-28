@@ -11,15 +11,15 @@ type Outcome =
   | Passed
   | Failed(messages: List<String>)
   | RuntimeFailed(message: String)
-  /// A `Stdlib.Test.table`: each row is its own test, named by its arguments.
+  /// A `Stdlib.Test.table`: each row is its own test, in a group named after the test.
   | Rows(rows: List<(String * Outcome)>)
 
 
 /// The tests <param outcome> reports, each as its name and how it went: one per
-/// table row, after <param name>, or the test itself.
+/// table row, as `name › (args)`, or the test itself.
 let reported(name: String, outcome: Outcome): List<(String * Outcome)> =
   match outcome with
-  | Rows(rows) -> Stdlib.List.map(rows, fun((args, row)) -> (name + args, row))
+  | Rows(rows) -> Stdlib.List.map(rows, fun((args, row)) -> ($"{name} › {args}", row))
   | _ -> [ (name, outcome) ]
 
 
@@ -55,13 +55,43 @@ type Counts =
     ran: Int64
     /// Of those that ran, how many needed their own process and store copy.
     isolated: Int64
-    /// Of those isolated, how many wrote to the shared store and reran on a copy.
-    reran: Int64
-    timings: List<Timing> }
+    timings: List<Timing>
+    /// Each test reported so far, latest first, for `--json`.
+    results: List<TestJson> }
+
+
+/// One test as `test run --json` reports it. <param status> is `passed`, `failed`, or
+/// `error` when the test could not be judged; <param messages> say why.
+type TestJson =
+  { name: String
+    status: String
+    messages: List<String>
+    cached: Bool }
+
+
+/// What `test run --json` prints: every test, in the order they finished, and the totals.
+type RunJson =
+  { tests: List<TestJson>
+    passed: Int64
+    failed: Int64
+    ran: Int64
+    cached: Int64
+    seed: Int64 }
+
+
+let testJson(name: String, outcome: Outcome, cached: Bool): TestJson =
+  let (status, messages) =
+    match outcome with
+    | Passed -> ("passed", [])
+    | Failed(messages) -> ("failed", messages)
+    | RuntimeFailed(message) -> ("error", [ message ])
+    | Rows(_) -> if isPassed(outcome) then ("passed", []) else ("failed", [])
+
+  TestJson { name = name, status = status, messages = messages, cached = cached }
 
 
 val usage =
-  "Usage: test run [--force] [--jobs <count>] [--seed <n>] [name-or-module ...]\n       test count [--for <item>] [module]\n       test add <location> <body> | <source-file> | -"
+  "Usage: test run [--force] [--brief | --verbose] [--json] [--jobs <count>] [--seed <n>] [name-or-module ... | <script>.dark]\n       test count [--for <item>] [module]\n       test add <location> <body> | <source-file> | - [--description <text>]"
 
 
 let fullPath(
@@ -126,23 +156,22 @@ let filterSegments(filter: String): List<String> =
   |> Stdlib.List.filter(fun seg -> seg != "")
 
 
-/// <param filter> up to a table row's arguments: `lengths` of `lengths("a", 1)`.
+/// <param filter> up to a table row's arguments: `lengths › ` of `lengths › ("a", 1)`.
 let testPart(filter: String): String =
   match Stdlib.String.indexOf(filter, "(") with
-  | Some(at) -> Stdlib.String.slice(filter, 0, at)
+  | Some(at) -> Stdlib.String.first(filter, at)
   | None -> filter
 
 
 /// Whether <param filters> keep the test <param name> reports for the test at
 /// <param path>: any filter that selects the test, unless it names a table row,
-/// as in `lengths("a", 1)`, and <param name> is another one.
+/// as in `lengths › ("a", 1)` or `lengths("a", 1)`, and <param name> is another one.
 let rowSelected(filters: List<String>, path: String, name: String): Bool =
   Stdlib.List.isEmpty(filters)
   || Stdlib.List.any(filters, fun f ->
     let test = testPart(f)
     selects(test, path)
-    && (test == f
-        || name == path + Stdlib.String.slice(f, Stdlib.String.length(test), Stdlib.String.length(f))))
+    && (test == f || name == $"{path} › {Stdlib.String.dropFirst(f, Stdlib.String.length(test))}"))
 
 
 /// The actual judging function, including its followed dependencies, and the
@@ -264,9 +293,10 @@ let runFresh(
       if Stdlib.Test.passed(result) then
         (args, Outcome.Passed)
       else
-        (args,
-         Outcome.Failed(
-           LanguageTools.PackageManager.Test.rowFailureLines(ctx(), test.body, result))))
+        (
+          args,
+          Outcome.Failed(
+            LanguageTools.PackageManager.Test.rowFailureLines(ctx(), test.body, result))))
     |> Outcome.Rows
   | Ok(result) ->
     Outcome.Failed(LanguageTools.PackageManager.Test.failureLines(ctx(), test.body, result))
@@ -287,9 +317,7 @@ let isCacheable(test: LanguageTools.ProgramTypes.PackageTest.PackageTest, cacheS
   mayCache(test) && cacheSafe
 
 
-/// <param reran>: the test wrote to the shared store, so this is its run on a copy.
-let printOutcome(name: String, outcome: Outcome, reran: Bool): Unit =
-  let name = if reran then $"{name} (reran on a copy)" else name
+let printOutcome(name: String, outcome: Outcome): Unit =
   match outcome with
   | Passed -> Stdlib.printLine(Stdlib.Cli.UI.Colors.success($"PASS {name}"))
   | Failed(messages) ->
@@ -300,7 +328,7 @@ let printOutcome(name: String, outcome: Outcome, reran: Bool): Unit =
   | RuntimeFailed(message) ->
     Stdlib.printLine(Stdlib.Cli.UI.Colors.error($"ERROR {name}"))
     Stdlib.printLine(Stdlib.Cli.UI.Colors.dimText($"  {message}"))
-  | Rows(_) -> reported(name, outcome) |> Stdlib.List.iter(fun((n, o)) -> printOutcome(n, o, reran))
+  | Rows(_) -> reported(name, outcome) |> Stdlib.List.iter(fun((n, o)) -> printOutcome(n, o))
 
 
 let isPassed(outcome: Outcome): Bool =
@@ -310,7 +338,7 @@ let isPassed(outcome: Outcome): Bool =
   | Rows(rows) -> Stdlib.List.all(rows, fun((_, row)) -> isPassed(row))
 
 
-val addUsage = "Usage: test add <location> <body> | <source-file> | -"
+val addUsage = "Usage: test add <location> <body> | <source-file> | - [--description <text>]"
 
 
 /// Print why `test add` saved nothing, with its usage, and fail the command.
@@ -324,13 +352,20 @@ let addFailed(state: AppState, message: String): AppState =
 /// the body alone (`Foo.double 4 |> Stdlib.Test.equal 8`) or a whole
 /// declaration, `test name = ...` with an optional doc comment, which is what
 /// a file or stdin usually holds.
-let addTest(state: AppState, locationStr: String, definition: String): AppState =
-  match Location.parseRelativeTo(state.packageData.currentLocation, locationStr) with
+let addTest(
+  state: AppState,
+  locationStr: String,
+  definition: String,
+  description: Option<String>)
+  : AppState =
+  match Location.parseFrom(
+          state.currentBranchId,
+          state.packageData.currentLocation,
+          locationStr) with
   | Error(msg) -> addFailed(state, $"Invalid location: {msg}")
   | Ok(location) ->
     let trimmed = Stdlib.String.trim(definition)
     let isFullDeclaration = Stdlib.String.startsWith(codeAfterComments(definition), "test ")
-
     let fullSource =
       if isFullDeclaration then definition else $"test {location.name} = {definition}"
 
@@ -346,6 +381,10 @@ let addTest(state: AppState, locationStr: String, definition: String): AppState 
       else
         match sourceFile.declarations with
         | [Test(written)] ->
+          let written =
+            { written with
+                description = Stdlib.Option.withDefault(description, written.description) }
+
           if written.name.name != location.name then
             addFailed(
               state,
@@ -378,13 +417,13 @@ let execute(state: AppState, args: List<String>): AppState =
   match args with
   | ["add"] -> addFailed(state, "test add needs a location and a body")
   | ["add", location, ...definitionParts] ->
-    match definitionFromArgs(definitionParts) with
+    match definitionAndDescription(definitionParts) with
     | Error(message) -> addFailed(state, message)
-    | Ok(definition) ->
+    | Ok((definition, description)) ->
       if Stdlib.String.isEmpty(Stdlib.String.trim(definition)) then
         addFailed(state, "test add needs a body after the location")
       else
-        addTest(state, location, definition)
+        addTest(state, location, definition, description)
   | ["run", ...runArgs] -> runTests(state, runArgs)
   | ["count", ...countArgs] -> countTests(state, countArgs)
   | [] ->
@@ -406,6 +445,8 @@ let runTests(state: AppState, args: List<String>): AppState =
   let defaults =
     RunOptions
       { force = false
+        json = false
+        brief = Stdlib.Bool.not(Stdlib.Cli.Sys.isTerminal(1))
         jobs = if cores < 16 then cores else 16
         seed = Option.None
         filters = [] }
@@ -415,19 +456,157 @@ let runTests(state: AppState, args: List<String>): AppState =
     printErr(message)
     Stdlib.printErrorLine(usage)
     { state with exitCode = 1 }
+  | Ok(options) when Stdlib.List.any(options.filters, isScript) ->
+    match options.filters with
+    | [path] -> runScriptTests(state, options, path)
+    | _ ->
+      printErr("test run takes one script, or test names and modules, not both")
+      Stdlib.printErrorLine(usage)
+      { state with exitCode = 1 }
   | Ok(options) ->
-    let fresh =
-      Stdlib.BigInt.random(Stdlib.BigInt.fromInt64(1), Stdlib.BigInt.fromInt64(9999999))
-      |> Stdlib.BigInt.toInt64
-      |> Stdlib.Option.withDefault(1)
-
-    let seed = Stdlib.Option.withDefault(options.seed, fresh)
+    let seed = Stdlib.Option.withDefault(options.seed, freshSeed())
     LanguageTools.PackageManager.Test.withStoreSnapshot(state.currentBranchId, seed, fun run ->
-      runTestsInRun(run, state, options))
+      runTestsInRun(run, state, options, selectedTests(state.currentBranchId, options.filters)))
+
+
+/// Whether <param arg> names a script rather than a test: test names never end in `.dark`.
+let isScript(arg: String): Bool =
+  Stdlib.String.endsWith(arg, ".dark")
+
+
+/// The module a script's tests are saved under while they run.
+val scriptModule = "Script"
+
+
+/// `dark test run todo.dark`: run the tests in a script with only its declarations in scope. No
+/// top-level statement runs. The declarations go into the current branch's draft under `Script`
+/// for the run, which runs them like stored tests (in this process when pure, else in a worker on
+/// the virtual clock) and never from the cache, and those ops are dropped after.
+let runScriptTests(state: AppState, options: RunOptions, path: String): AppState =
+  match Stdlib.Cli.File.readText(path) with
+  | Error(_) ->
+    printErr($"Can't read {path}")
+    { state with exitCode = 1 }
+  | Ok(source) ->
+    match LanguageTools.Parser.Parse.parse(LanguageTools.Parser.FileKind.Script, source) with
+    | Some(SourceFile(sourceFile)), [] ->
+      match LanguageTools.ScriptTests.belowLet(sourceFile) with
+      | [] -> runScriptTestsIn(state, options, sourceFile)
+      | belowLet ->
+        Stdlib.List.iter(belowLet, fun b -> Stdlib.printErrorLine(belowLetText(b)))
+        { state with exitCode = 1 }
+    | _, diagnostics ->
+      let _ = Errors.reportParseErrors(diagnostics)
+      { state with exitCode = 1 }
+
+
+/// A script test that uses a top-level `let` or calls a function below the first one, as a
+/// diagnostic with a hint.
+let belowLetText(b: LanguageTools.ScriptTests.BelowLet): String =
+  let at = $"{Stdlib.display(b.range.start.row + 1)}:{Stdlib.display(b.range.start.column + 1)}"
+  let letLine = Stdlib.display(b.letLine)
+  if b.usesLet then
+    let calls =
+      b.calls
+      |> Stdlib.List.map(fun c -> $"calls `{c}`, which ")
+      |> Stdlib.String.join("")
+
+    let passTo =
+      match Stdlib.List.last(b.calls) with
+      | Some(fn) -> $", or pass it to `{fn}` as an argument"
+      | None -> ""
+
+    $"error[SCRIPT-TEST-USES-LET] at {at}: `{b.test}` {calls}uses the top-level `let {b.letName}` on line {letLine}.\n  hint: make it a `val` if it's a constant{passTo}"
+  else
+    let fn = Stdlib.String.join(b.calls, "")
+    $"error[SCRIPT-TEST-BELOW-LET] at {at}: `{b.test}` calls `{fn}`, which is defined below the top-level `let {b.letName}` on line {letLine}.\n  hint: move `{fn}` above line {letLine}"
+
+
+let runScriptTestsIn(
+  state: AppState,
+  options: RunOptions,
+  sourceFile: LanguageTools.WrittenTypes.SourceFile.SourceFile)
+  : AppState =
+  let branchId = state.currentBranchId
+  let rootModule =
+    LanguageTools.WrittenTypes.ModuleDeclaration.ModuleDeclaration
+      { range = sourceFile.range
+        name = (sourceFile.range, scriptModule)
+        declarations =
+          sourceFile.declarations |> Stdlib.List.map(LanguageTools.Parser.Parse.toModuleDeclaration)
+        keywordModule = sourceFile.range }
+
+  let ctx =
+    LanguageTools.NameResolver.NRContext
+      { onMissing = LanguageTools.NameResolver.OnMissing.Allow
+        pm = LanguageTools.PackageManager.pm()
+        branchId = branchId
+        owner = scriptModule
+        currentModule = [] }
+
+  let (ops, unresolvedNames) = LanguageTools.Parser.Parse.moduleToPackageOps(ctx, rootModule)
+  let locations =
+    ops
+    |> Stdlib.List.filterMap(fun op ->
+      match op with
+      | SetName(location, _, _) -> Option.Some(location)
+      | _ -> Option.None)
+
+  let taken =
+    locations
+    |> Stdlib.List.filter(fun location ->
+      Stdlib.Option.isSome(Rename.referenceAt(branchId, location)))
+
+  if Stdlib.Bool.not(Stdlib.List.isEmpty(taken)) then
+    printErr($"`{scriptModule}` already holds names on this branch; a script's tests run under it")
+    { state with exitCode = 1 }
+  else if Errors.reportUnresolvedNames(branchId, [ scriptModule ], unresolvedNames) then
+    { state with exitCode = 1 }
+  else
+    let draftBefore = SCM.PackageOps.draftEntriesFor(branchId) |> Stdlib.List.map(fun e -> e.id)
+    let result =
+      match SCM.PackageOps.addAuthored(branchId, ops) with
+      | Error(message) ->
+        printErr($"Couldn't save the script's declarations to run its tests: {message}")
+        { state with exitCode = 1 }
+      | Ok(_) ->
+        let options = { options with force = true, filters = [ scriptModule ] }
+        LanguageTools.PackageManager.Test.withStoreSnapshot(
+          branchId,
+          Stdlib.Option.withDefault(options.seed, freshSeed()),
+          fun run ->
+            // Look up only tests declared in this file. The general "Script" filter
+            // would load every visible test before narrowing the list.
+            let selected =
+              liveTests(branchId, [ scriptModule ], "")
+              |> Stdlib.List.filter(fun item -> Stdlib.List.contains(locations, item.location))
+              |> Stdlib.List.sortBy(groupedPath)
+
+            runTestsInRun(run, state, options, selected))
+
+    let added =
+      SCM.PackageOps.draftEntriesFor(branchId)
+      |> Stdlib.List.map(fun e -> e.id)
+      |> Stdlib.List.filter(fun id -> Stdlib.Bool.not(Stdlib.List.contains(draftBefore, id)))
+
+    let _ = SCM.PackageOps.dropBranchOps(branchId, added)
+    result
+
+
+/// A seed for a run that was not given one.
+let freshSeed(): Int64 =
+  Stdlib.BigInt.random(Stdlib.BigInt.fromInt64(1), Stdlib.BigInt.fromInt64(9999999))
+  |> Stdlib.BigInt.toInt64
+  |> Stdlib.Option.withDefault(1)
 
 
 type RunOptions =
   { force: Bool
+    /// Print one JSON answer instead of a line per test.
+    json: Bool
+    /// Show failures and the final counts without progress or passing rows. On by default when
+    /// stdout is not a terminal.
+    brief: Bool
     jobs: Int64
     seed: Option<Int64>
     filters: List<String> }
@@ -437,13 +616,16 @@ let parseRunOptions(options: RunOptions, args: List<String>): Result<RunOptions,
   match args with
   | [] -> Result.Ok(options)
   | ["--force", ...rest] -> parseRunOptions({ options with force = true }, rest)
+  | ["--json", ...rest] -> parseRunOptions({ options with json = true }, rest)
+  | ["--brief", ...rest] -> parseRunOptions({ options with brief = true }, rest)
+  | ["--verbose", ...rest] -> parseRunOptions({ options with brief = false }, rest)
   | ["--jobs", value, ...rest] ->
     match Stdlib.Int64.parse(value) with
     | Ok(jobs) when jobs > 0 -> parseRunOptions({ options with jobs = jobs }, rest)
     | _ -> Result.Error("--jobs needs a positive whole number")
   | ["--jobs"] -> Result.Error("--jobs needs a positive whole number")
   | [arg, ...rest] when Stdlib.String.startsWith(arg, "--jobs=") ->
-    let value = Stdlib.String.slice(arg, 7, Stdlib.String.length(arg))
+    let value = Stdlib.String.dropFirst(arg, 7)
     parseRunOptions(options, Stdlib.List.concat([ "--jobs", value ], rest))
   | ["--seed", value, ...rest] ->
     match Stdlib.Int64.parse(value) with
@@ -451,7 +633,7 @@ let parseRunOptions(options: RunOptions, args: List<String>): Result<RunOptions,
     | Error(_) -> Result.Error("--seed needs a whole number")
   | ["--seed"] -> Result.Error("--seed needs a whole number")
   | [arg, ...rest] when Stdlib.String.startsWith(arg, "--seed=") ->
-    let value = Stdlib.String.slice(arg, 7, Stdlib.String.length(arg))
+    let value = Stdlib.String.dropFirst(arg, 7)
     parseRunOptions(options, Stdlib.List.concat([ "--seed", value ], rest))
   | [arg, ...rest] ->
     if Stdlib.String.startsWith(arg, "-") then
@@ -469,15 +651,14 @@ type FinishedTest =
     outcome: Outcome
     wasCached: Bool
     inProcess: Bool
-    reran: Bool
     ms: Int64 }
 
 
 /// <param filters> pick rows too: one with an argument list, as in
-/// `lengths("a", 1)`, keeps only the row of that name.
+/// `lengths › ("a", 1)`, keeps only the row of that name.
 let finishTest(
   cache: Option<CacheContext>,
-  filters: List<String>,
+  options: RunOptions,
   counts: Counts,
   finished: FinishedTest)
   : Counts =
@@ -490,25 +671,40 @@ let finishTest(
 
   let tests =
     reported(finished.name, finished.outcome)
-    |> Stdlib.List.filter(fun((name, _)) -> rowSelected(filters, finished.name, name))
+    |> Stdlib.List.filter(fun((name, _)) -> rowSelected(options.filters, finished.name, name))
 
-  Stdlib.List.iter(tests, fun((name, outcome)) -> printOutcome(name, outcome, finished.reran))
+  if Stdlib.Bool.not(options.json) then
+    tests
+    |> Stdlib.List.iter(fun((name, outcome)) ->
+      if options.brief && isPassed(outcome) then () else printOutcome(name, outcome))
+
+  let results =
+    if options.json then
+      Stdlib.List.fold(tests, counts.results, fun(acc, (name, outcome)) ->
+        Stdlib.List.prepend(acc, testJson(name, outcome, finished.wasCached)))
+    else
+      counts.results
+
   let n = Stdlib.List.length(tests)
-  let passed = tests |> Stdlib.List.filter(fun((_, o)) -> isPassed(o)) |> Stdlib.List.length
+  let passed =
+    tests
+    |> Stdlib.List.filter(fun((_, o)) -> isPassed(o))
+    |> Stdlib.List.length
+
   Counts
     { passed = counts.passed + passed
       failed = counts.failed + n - passed
       cached = counts.cached + (if finished.wasCached then n else 0)
       ran = counts.ran + (if finished.wasCached then 0 else n)
       isolated = counts.isolated + (if finished.wasCached || finished.inProcess then 0 else n)
-      reran = counts.reran + (if finished.reran then n else 0)
       timings =
         if finished.wasCached then
           counts.timings
         else
           Stdlib.List.prepend(
             counts.timings,
-            Timing { name = finished.name, ms = finished.ms, inProcess = finished.inProcess }) }
+            Timing { name = finished.name, ms = finished.ms, inProcess = finished.inProcess })
+      results = results }
 
 
 /// Run up to `jobs` tests at once. Start the next whenever one finishes.
@@ -551,7 +747,6 @@ let runSelected(
             outcome = outcome
             wasCached = true
             inProcess = false
-            reran = false
             ms = 0 }
 
       runSelected(
@@ -561,10 +756,12 @@ let runSelected(
         cache,
         rest,
         running,
-        finishTest(cache, options.filters, counts, finished))
+        finishTest(cache, options, counts, finished))
     | None ->
       // Progress, not a result: stderr, so the answer on stdout is the PASS/FAIL lines and the verdict.
-      Stdlib.printErrorLine($"Running: {shownName(item)}")
+      if Stdlib.Bool.not(options.brief) then
+        Stdlib.printErrorLine($"Running: {shownName(item)}")
+
       let handle = Stdlib.Exec.spawn(fun () ->
         let started = Stdlib.DateTime.__monotonicMilliseconds()
         let outcome = runFresh(run, branchId, item)
@@ -577,7 +774,6 @@ let runSelected(
             outcome = outcome
             wasCached = false
             inProcess = inProcess
-            reran = LanguageTools.PackageManager.Test.reran(run, item.entity.hash)
             ms = Stdlib.DateTime.__monotonicMilliseconds() - started })
 
       runSelected(run, branchId, options, cache, rest, Stdlib.List.prepend(running, handle), counts)
@@ -594,7 +790,7 @@ let runSelected(
         cache,
         remaining,
         running,
-        finishTest(cache, options.filters, counts, finished))
+        finishTest(cache, options, counts, finished))
 
 
 /// The ten slowest tests that ran, slowest first, so a log says where the time
@@ -727,23 +923,18 @@ let testItemsUnder(
 let runTestsInRun(
   run: LanguageTools.PackageManager.Test.Run,
   state: AppState,
-  options: RunOptions)
+  options: RunOptions,
+  selected:
+    List<
+      LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageTest.PackageTest>>)
   : AppState =
-  let selected = selectedTests(state.currentBranchId, options.filters)
   // One analysis for the whole run: the tests share most of what they call.
   let cacheSafe =
     LanguageTools.PackageManager.Test.areCacheSafe(
       Stdlib.List.map(selected, fun item -> item.entity.hash))
 
   let initial =
-    Counts
-      { passed = 0
-        failed = 0
-        cached = 0
-        ran = 0
-        isolated = 0
-        reran = 0
-        timings = [] }
+    Counts { passed = 0, failed = 0, cached = 0, ran = 0, isolated = 0, timings = [], results = [] }
 
   let counts =
     runSelected(
@@ -756,29 +947,40 @@ let runTestsInRun(
       initial)
 
   let total = counts.passed + counts.failed
-  if total == 0 then
-    printErr("No package tests matched.")
-  else
-    printSlowest(counts.timings)
-    Stdlib.printLine("")
-    // Said only when it happened, so a run where every test started writing
-    // shows up here rather than only as a slower run.
-    let reranNote =
-      if counts.reran == 0 then
-        ""
-      else
-        $"; {Stdlib.display(counts.reran)} wrote to the store and reran on a copy"
-
-    Stdlib.printLine(
-      $"{countLine(total)}: {Stdlib.display(counts.passed)} passed, {Stdlib.display(counts.failed)} failed; {Stdlib.display(counts.ran)} ran, {Stdlib.display(counts.cached)} cached; {Stdlib.display(counts.isolated)} isolated{reranNote}")
-
-    if counts.failed > 0 then
-      let seed = Stdlib.display(run.seed)
-      Stdlib.printLine($"Seed {seed}: rerun with --seed {seed} for the same random values")
+  let printed =
+    if options.json then
+      RunJson
+        { tests = Stdlib.List.reverse(counts.results)
+          passed = counts.passed
+          failed = counts.failed
+          ran = counts.ran
+          cached = counts.cached
+          seed = run.seed }
+      |> Stdlib.Json.checkedSerialize<RunJson>
+      |> printJson
+    else if total == 0 then
+      printErr("No package tests matched.")
+      true
     else
-      ()
+      if Stdlib.Bool.not(options.brief) then
+        printSlowest(counts.timings)
+        Stdlib.printLine("")
 
-  if counts.failed > 0 || total == 0 then { state with exitCode = 1 } else state
+      Stdlib.printLine(
+        $"{countLine(total)}: {Stdlib.display(counts.passed)} passed, {Stdlib.display(counts.failed)} failed; {Stdlib.display(counts.ran)} ran, {Stdlib.display(counts.cached)} cached; {Stdlib.display(counts.isolated)} isolated")
+
+      if counts.failed > 0 then
+        let seed = Stdlib.display(run.seed)
+        Stdlib.printLine($"Seed {seed}: rerun with --seed {seed} for the same random values")
+      else
+        ()
+
+      true
+
+  if Stdlib.Bool.not(printed) || counts.failed > 0 || total == 0 then
+    { state with exitCode = 1 }
+  else
+    state
 
 
 /// One row of `test count`: a submodule with everything beneath it, or one test.
@@ -796,9 +998,7 @@ let countRows(prefix: List<String>, tests: List<(List<String> * Int64)>): List<C
     Stdlib.List.partition(tests, fun((path, _)) -> Stdlib.List.length(path) == depth + 1)
 
   let row(name: String, group: List<(List<String> * Int64)>): CountRow =
-    CountRow
-      { name = name
-        tests = total(group) }
+    CountRow { name = name, tests = total(group) }
 
   let modules =
     nested
@@ -849,10 +1049,23 @@ let deepestShared(prefix: List<String>, tests: List<(List<String> * Int64)>): Li
 
 
 /// Print the total for <param heading>, then a row per entry of `countRows`
-/// below the deepest module all of <param tests> share.
-let printCounts(heading: String, prefix: List<String>, tests: List<(List<String> * Int64)>): Unit =
+/// below the deepest module all of <param tests> share. A row for one of
+/// <param groups>, a `Stdlib.Test.group` or a table, is marked `› name`.
+let printCounts(
+  heading: String,
+  prefix: List<String>,
+  tests: List<(List<String> * Int64)>,
+  groups: List<List<String>>)
+  : Unit =
   let shared = deepestShared(prefix, tests)
-  let rows = countRows(shared, tests)
+  let rows =
+    countRows(shared, tests)
+    |> Stdlib.List.map(fun r ->
+      if Stdlib.List.contains(groups, Stdlib.List.append(shared, r.name)) then
+        { r with name = $"› {r.name}" }
+      else
+        r)
+
   let below = if shared == prefix then "" else $" (all in {Stdlib.String.join(shared, ".")})"
   Stdlib.printLine($"{heading}: {countLine(total(tests))}{below}")
   let width = Stdlib.List.fold(rows, 0, fun(w, r) ->
@@ -862,6 +1075,28 @@ let printCounts(heading: String, prefix: List<String>, tests: List<(List<String>
   rows
   |> Stdlib.List.iter(fun r ->
     Stdlib.printLine($"  {Stdlib.String.padEnd(r.name, ' ', width)}  {countLine(r.tests)}"))
+
+
+/// The full names of the groups among <param items>: each `Stdlib.Test.group`, and
+/// each table, whose rows `test run` shows as a group.
+let countGroups(
+  items:
+    List<
+      (List<String> *
+       LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageTest.PackageTest>)>)
+  : List<List<String>> =
+  items
+  |> Stdlib.List.map(fun((path, item)) ->
+    let body = item.entity.body
+    let group =
+      match LanguageTools.PackageManager.Test.testGroup(body) with
+      | Some(_) -> [ Stdlib.List.dropLast(path) ]
+      | None -> []
+
+    let table = if LanguageTools.PackageManager.Test.isTable(body) then [ path ] else []
+    Stdlib.List.concat(group, table))
+  |> Stdlib.List.flatten
+  |> Stdlib.List.unique
 
 
 /// `test count [--for <item>] [module]`: how many tests are in
@@ -892,11 +1127,13 @@ let countTests(state: AppState, args: List<String>): AppState =
       | _ -> []
 
     let depth = Stdlib.List.length(prefix)
+    let items = testItemsUnder(branchId, prefix)
     let under =
-      testItemsUnder(branchId, prefix)
+      items
       |> Stdlib.List.map(fun((path, item)) ->
         (path, LanguageTools.PackageManager.Test.testCount(item.entity.body)))
 
+    let groups = countGroups(items)
     let place = if depth == 0 then "All tests" else Stdlib.String.join(prefix, ".")
     match forItem with
     | None ->
@@ -904,7 +1141,7 @@ let countTests(state: AppState, args: List<String>): AppState =
         printErr($"No package tests under {place}.")
         { state with exitCode = 1 }
       else
-        printCounts(place, prefix, under)
+        printCounts(place, prefix, under, groups)
         state
     | Some(item) ->
       match Deps.resolvePath(branchId, state.packageData.currentLocation, item) with
@@ -936,7 +1173,7 @@ let countTests(state: AppState, args: List<String>): AppState =
             else
               $"Tests in {place} that use {name}"
 
-          printCounts(heading, prefix, using)
+          printCounts(heading, prefix, using, groups)
           state
 
 
@@ -962,8 +1199,12 @@ let help(_state: AppState): String =
     "Tests run in parallel, one per core, up to 16 at once. A test that analysis"
     "shows is pure (no effect, only pure builtins) runs inside this process;"
     "any other gets a fresh process and its own store copy."
+    "When stdout is not a terminal, only failures and the final counts are printed,"
+    "as with --brief; --verbose prints every test, as at a terminal."
     "Use --jobs <count> to change the limit, or --jobs 1 to run serially."
-    "Tests start in name order; results are printed as they finish."
+    "Tests start in name order; results are printed as they finish. --json prints"
+    "one answer at the end instead: each test's name, status (passed, failed or"
+    "error), messages and whether it was cached, then the totals and the seed."
     ""
     "In a test, Stdlib.Uuid.generate and the Random functions draw from a seed"
     "picked fresh for each run. A failed run prints its seed; --seed <n> reruns"
@@ -973,15 +1214,21 @@ let help(_state: AppState): String =
     "position and source. `test emptyInput = Stdlib.Test.group(\"parsing\", ...)`"
     "puts a test in a group: it shows as `Module › parsing › emptyInput`, and"
     "a filter can name the group, as in `Tests.parsing`. Each row of a"
-    "`Stdlib.Test.table(rows, check)` is its own test, named by its arguments,"
-    "as in `lengths(\"a\", 1)`; a filter written that way runs the table and"
-    "keeps only that row."
+    "`Stdlib.Test.table(rows, check)` is its own test, in a group named after the"
+    "test, as in `lengths › (\"a\", 1)`; a filter written that way runs the table"
+    "and keeps only that row."
     "`test count` shows how many tests a module and each"
-    "module under it hold, without running anything. `--for <item>` keeps only the"
+    "module under it hold, without running anything; a group or table shows as"
+    "`› name`. `--for <item>` keeps only the"
     "tests that use that item, directly or through other code."
+    ""
+    "A path ending in `.dark` runs that script's tests: `test name = ...`"
+    "declarations in the file, which see its functions, types and `val`s but"
+    "none of its top-level statements. `dark run` skips them."
     ""
     "Examples:"
     "  test run"
+    "  test run todo.dark"
     "  test run MyApp.Math"
     "  test run --force MyApp.Math.doubles"
     "  test count Darklang.Stdlib"
@@ -996,7 +1243,8 @@ let help(_state: AppState): String =
     "  test keyLength = Stdlib.Uuid.generate() |> Stdlib.display |> Stdlib.String.length |> Stdlib.Test.equal(36)"
     "  EOF"
     "The body may be given alone or as a whole `test name = ...` declaration;"
-    "it lands in your draft like `fn` and `val`." ]
+    "it lands in your draft like `fn` and `val`. --description <text> documents it:"
+    "  test add MyApp.Math.Tests.doubles 'MyApp.Math.double(4) |> Stdlib.Test.equal(8)' --description \"Doubling four gives eight.\"" ]
   |> Stdlib.String.join("\n")
 
 
@@ -1005,7 +1253,7 @@ let complete(_state: AppState, args: List<String>): List<Completion.CompletionIt
   | [] -> [ "run", "count", "add" ] |> Stdlib.List.map(Completion.simple)
   | ["run", ...runArgs] ->
     let partial = Stdlib.Option.withDefault(Stdlib.List.last(runArgs), "")
-    [ "--force", "--jobs" ]
+    [ "--force", "--brief", "--verbose", "--json", "--jobs" ]
     |> Stdlib.List.filter(fun flag -> Stdlib.String.startsWith(flag, partial))
     |> Stdlib.List.map(Completion.simple)
   | ["add", ...] -> []

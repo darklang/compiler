@@ -1,0 +1,338 @@
+/// CLI tests: `dark view` and its flags.
+module Darklang.Cli.Tests.View
+
+// ---------------------------------------------------------------- compiler views
+// `view --ast` and `view --instructions`. These assert on structure rather than exact text, because
+// register numbers and instruction counts change whenever the compiler does, and a test that pins them
+// fails on every unrelated codegen improvement.
+
+test viewAst = Instance.withInstance(fun i ->
+  let output = Instance.output(i, [ "view", "Stdlib.List.dropLast", "--ast" ])
+
+  // A signature line, then the body tree with its node kinds. `Match`/`Arg` are what `dropLast` is made
+  // of.
+  // Label and detail are coloured separately, so a row's text isn't contiguous in the output. Match on
+  // the pieces rather than on a whole rendered line.
+  if
+    Stdlib.String.contains(output, "dropLast<'a> (list: List<'a>) ->")
+    && Stdlib.String.contains(output, "Match")
+    && Stdlib.String.contains(output, "on Arg #0, 2 cases")
+    && Stdlib.String.contains(output, "[head, ...tail]")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected an AST tree with signature rows and node kinds, got: {output}"))
+
+
+test viewInstructions = Instance.withInstance(fun i ->
+  let output =
+    Instance.output(i, [ "view", "Stdlib.List.prepend", "--instructions" ])
+
+  // `prepend` is a thin wrapper over a builtin, so it must load the builtin and apply it.
+  if
+    Stdlib.String.contains(output, "instructions")
+    && Stdlib.String.contains(output, "registers")
+    && Stdlib.String.contains(output, "LoadVal")
+    && Stdlib.String.contains(output, "Apply")
+    && Stdlib.String.contains(output, "listPrepend")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected an instruction listing for List.prepend, got: {output}"))
+
+
+test viewInstructionsShowsLambdas = Instance.withInstance(fun i ->
+  // A listing that stopped at `CreateLambda` would be a dead end, so a lambda gets its own section
+  // below the function that creates it.
+  //
+  // The subject is authored here rather than borrowed from the stdlib. Whether a given stdlib function
+  // compiles to a lambda is an implementation detail: it can become a direct builtin call, and then a
+  // test pointing at it still runs, still fails, and covers nothing.
+  let name = "Tests.CliLambda.keepBig"
+  let _ =
+    Instance.output(
+      i,
+      [ "fn"
+        "/" + name
+        "(xs: List<Int64>) : List<Int64> = Stdlib.List.filter(xs, fun x -> if x > 2 then true else false)" ])
+
+  let output = Instance.output(i, [ "view", name, "--instructions" ])
+  if
+    Stdlib.String.contains(output, "CreateLambda")
+    && Stdlib.String.contains(output, "lambda#")
+    && Stdlib.String.contains(output, "JumpByIfFalse")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected the lambda's own listing under {name}'s, got: {output}"))
+
+
+test viewCompilerViewsRejectNonFunctions = Instance.withInstance(fun i ->
+  // Both views are function-only, and saying which kind of thing you pointed at beats "not found".
+  let typeOutput =
+    Instance.output(i, [ "view", "Stdlib.Option.Option", "--ast" ])
+
+  let moduleOutput =
+    Instance.output(i, [ "view", "Stdlib.List", "--instructions" ])
+
+  if
+    Stdlib.String.contains(typeOutput, "type")
+    && Stdlib.String.contains(moduleOutput, "module")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected kind-specific refusals, got type: {typeOutput}, module: {moduleOutput}"))
+
+
+test viewFlagBeforePath = Instance.withInstance(fun i ->
+  // Flags are position-independent; this is the ordering people actually type.
+  let output = Instance.output(i, [ "view", "--ast", "Stdlib.List.prepend" ])
+  if
+    Stdlib.String.contains(output, "prepend")
+    && Stdlib.String.contains(output, "->")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected --ast to work before the path, got: {output}"))
+
+
+test viewUnknownFlag = Instance.withInstance(fun i ->
+  let output = Instance.output(i, [ "view", "Stdlib.List.prepend", "--nope" ])
+  if
+    Stdlib.String.contains(output, "does not take `--nope`")
+    && Stdlib.String.contains(output, "dark view --help")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected a refusal naming the flag and pointing to help, got: {output}"))
+
+
+/// `view --raw` prints the declaration and nothing else.
+///
+/// The point of `--raw` is that another program consumes it, so anything decorative
+/// in there is a bug rather than a cosmetic complaint: a colour code or a badge line
+/// ends up in whatever the output was piped into.
+test viewRawIsUndecorated = Instance.withInstance(fun i ->
+  let esc = "\u001b"
+  let raw = Instance.output(i, [ "view", "Stdlib.List.head", "--raw" ])
+  let decorated = Instance.output(i, [ "view", "Stdlib.List.head" ])
+  if
+    Stdlib.String.contains(raw, "let head")
+    && Stdlib.Bool.not(Stdlib.String.contains(raw, esc))
+    && Stdlib.String.contains(decorated, esc)
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail($"Expected an undecorated declaration, got: {raw}"))
+
+
+/// A definition is headed with the name you asked for.
+///
+/// Two items with byte-identical bodies are one stored item, and a stored function
+/// carries no name, so the name in the heading is resolved from the hash. With more
+/// than one candidate that resolution has to prefer the one that was typed;
+/// otherwise `view Zz.alpha` prints a definition headed `Zz.beta`, and `--raw` feeds
+/// that wrong name to whatever writes it back.
+test viewHeadsWithTheNameYouAskedFor = Instance.withInstance(fun i ->
+  let branchName = "cli-sharedbody-test"
+  let alpha = "Tests.CliShared.alpha"
+  let beta = "Tests.CliShared.beta"
+  let _ = Instance.output(i, [ "branch", "create", branchName ])
+
+  // The same body on purpose: that is what makes them one item.
+  let _ =
+    Instance.output(
+      i,
+      [ "--branch", branchName, "fn", "/" + alpha, "let alpha(): Int64 = 7" ])
+
+  let _ =
+    Instance.output(
+      i,
+      [ "--branch", branchName, "fn", "/" + beta, "let beta(): Int64 = 7" ])
+
+  let rawAlpha =
+    Instance.output(i, [ "--branch", branchName, "view", alpha, "--raw" ])
+
+  let rawBeta =
+    Instance.output(i, [ "--branch", branchName, "view", beta, "--raw" ])
+
+  // The decorated view resolves the name the same way, so it needs the same answer.
+  // Only `--raw` gets written back, but a wrong name on screen is wrong either way.
+  let shownAlpha = Instance.output(i, [ "--branch", branchName, "view", alpha ])
+
+  let shownBeta = Instance.output(i, [ "--branch", branchName, "view", beta ])
+  if
+    Stdlib.String.contains(rawAlpha, "let alpha")
+    && Stdlib.Bool.not(Stdlib.String.contains(rawAlpha, "let beta"))
+    && Stdlib.String.contains(rawBeta, "let beta")
+    && Stdlib.Bool.not(Stdlib.String.contains(rawBeta, "let alpha"))
+    && Stdlib.String.contains(shownAlpha, "alpha")
+    && Stdlib.Bool.not(Stdlib.String.contains(shownAlpha, "let beta"))
+    && Stdlib.String.contains(shownBeta, "beta")
+    && Stdlib.Bool.not(Stdlib.String.contains(shownBeta, "let alpha"))
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected each name to head its own declaration; alpha: {rawAlpha}, "
+      + $"beta: {rawBeta}, shown: {shownAlpha} / {shownBeta}"))
+
+
+// An impl's methods are called through its trait, never at the type's module, so `view` and `search`
+// say where: the `Stdlib.display` shortcut beside `Display`, and the trait's own path for one without
+// a shortcut.
+test implListingsSayWhereTheMethodsAreCalled = Instance.withInstance(fun i ->
+  let viewed = Instance.output(i, [ "view", "Stdlib.Int64" ])
+  let searched = Instance.output(i, [ "search", "Int64.display", "--impl" ])
+  Stdlib.Test.all(
+    [ Instance.says(viewed, "Stdlib.display", "view names the display shortcut")
+      Instance.says(viewed, "Stdlib.Add.add", "and the trait path")
+      Instance.doesNotSay(viewed, "Stdlib.Int64.toString", "not a module path")
+      Instance.says(searched, "Stdlib.display(v)", "search shows the call")
+      Instance.says(searched, "impl Display for Int64", "and the impl") ]))
+
+
+/// An unannotated test inherits its access, so `view --raw` prints no effect row for it.
+test viewPrintsNoEffectRowOnAnUnannotatedTest =
+  Instance.withInstance(fun i ->
+    Instance.says(
+      Instance.output(
+        i,
+        [ "view", "Darklang.Stdlib.Bool.Tests.andTruthTable", "--raw" ]),
+      "test andTruthTable =",
+      "the test's header has nothing between its name and `=`"))
+
+
+/// `view --include-tests` ends a function's view with the tests that call it, read from the result
+/// cache and never run. A fresh instance has never run `dark test run`, so this is also the path
+/// where the cache table does not exist yet, which `view` must answer without creating. Without the
+/// flag there is no section.
+test viewIncludeTestsListsTheTestsThatCallAFunction =
+  Instance.withInstance(fun i ->
+    let seen(args: List<String>): String =
+      Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, args))
+
+    let sqrt =
+      seen([ "view", "Darklang.Stdlib.Float64.sqrt", "--include-tests" ])
+
+    let head = seen([ "view", "Darklang.Stdlib.List.head", "--include-tests" ])
+    // A stdlib function can gain tests at any time, so the untested one is authored here, with a
+    // body no tested function shares.
+    let _ =
+      Instance.said(
+        i,
+        [ "fn"
+          "/Tests.ViewTests.unreferenced"
+          "() : String = \"view --include-tests unreferenced fixture\"" ])
+
+    let untested =
+      seen([ "view", "Tests.ViewTests.unreferenced", "--include-tests" ])
+
+    Stdlib.Test.all(
+      [ Instance.says(sqrt, "Tests:", "view lists the function's tests")
+
+        Instance.says(sqrt, "Darklang.Stdlib.Float64.Tests.sqrt", "by name")
+
+        Instance.says(
+          sqrt,
+          "no result for this build",
+          "with no result before any run")
+
+        Instance.says(
+          sqrt,
+          "`dark test run` runs them",
+          "and says how to get one")
+
+        Instance.doesNotSay(
+          seen([ "view", "Darklang.Stdlib.Float64.sqrt" ]),
+          "Tests:",
+          "without the flag, view shows no tests")
+
+        Instance.says(
+          head,
+          "Darklang.Stdlib.List.Tests.head",
+          "List.head's tests are listed")
+
+        Instance.says(untested, "let unreferenced", "the fixture exists")
+        Instance.doesNotSay(
+          untested,
+          "Tests:",
+          "a function no test calls has no tests section") ]))
+
+
+/// `deps` names what an item uses.
+test depsNamesWhatAnItemUses =
+  Instance.withInstance(fun i ->
+    Instance.says(
+      Instance.said(i, [ "deps", "Darklang.Stdlib.List.head" ]),
+      "Option",
+      "head returns an Option, so it depends on one"))
+
+
+/// `hash` resolves a name by traversal, like `view`: `hash Stdlib.List.head` must not read the
+/// first segment as the owner and say "Not found" about a name `view` prints.
+test hashTakesTheNamesViewTakes = Instance.withInstance(fun i ->
+  let short = Instance.output(i, [ "hash", "Stdlib.List.head" ])
+  let full = Instance.output(i, [ "hash", "Darklang.Stdlib.List.head" ])
+  let long = Instance.output(i, [ "hash", "--long", "Stdlib.List.head" ])
+  let digits(s: String): String =
+    Stdlib.String.trim(Stdlib.String.replaceAll(s, "fn ", ""))
+
+  Stdlib.Test.all(
+    [ Instance.says(
+        Instance.output(i, [ "view", "Stdlib.List.head", "--raw" ]),
+        "let head",
+        "view takes the name without its owner")
+
+      Instance.says(short, "fn ", "and so does hash")
+      Instance.doesNotSay(short, "Not found", "the name resolves")
+      Instance.says(full, "fn ", "the fully qualified name too")
+      Stdlib.Test.expect(
+        digits(short) != ""
+        && Stdlib.String.startsWith(digits(long), digits(short)),
+        $"the short hash starts the long one: short={short} long={long}") ]))
+
+
+test hashOfAModuleSaysItIsAModule =
+  Instance.withInstance(fun i ->
+    Stdlib.Test.all(
+      [ Instance.says(
+          Instance.said(i, [ "hash", "Stdlib.Option" ]),
+          "module",
+          "a module is a path, not content")
+
+        Instance.says(
+          Instance.said(i, [ "hash", "Darklang.Nope.nope" ]),
+          "Not found",
+          "and a missing name is missing") ]))
+
+
+/// Same family as `hash`: `find-values` resolves the type name like `view` does.
+test findValuesTakesTheNamesViewTakes = Instance.withInstance(fun i ->
+  let short = Instance.ran(i, [ "find-values", "Stdlib.Option.Option" ])
+  let full = Instance.ran(i, [ "find-values", "Darklang.Stdlib.Option.Option" ])
+  Stdlib.Test.all(
+    [ Instance.exitedWith(
+        Stdlib.Tuple2.first(short),
+        0,
+        Stdlib.Tuple2.second(short))
+
+      Instance.doesNotSay(
+        Stdlib.Tuple2.second(short),
+        "Type not found",
+        "the type resolves without its owner")
+
+      Instance.exitedWith(
+        Stdlib.Tuple2.first(full),
+        0,
+        Stdlib.Tuple2.second(full))
+
+      Instance.doesNotSay(
+        Stdlib.Tuple2.second(full),
+        "Type not found",
+        "and fully qualified") ]))

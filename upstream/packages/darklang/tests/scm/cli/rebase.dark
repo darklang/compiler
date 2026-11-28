@@ -63,6 +63,41 @@ test rebaseThenMergeKeepsTheBranchsLosingVersionRecorded =
         "the branch's version is recorded as the loser on main") ])
 
 
+// Rebase moves onto the parent's committed versions, never its draft, which the parent might still
+// discard: the branch's caller and the name it calls agree.
+test rebaseMovesOntoTheParentsCommitsNotItsDraft =
+  scenario(fun dark ->
+    [ saveNumber(dark, "Tests.App.root", "1")
+      commit(dark, "base")
+      switch(dark, "feat")
+      save(dark, "Tests.App.user", "(): Int64 = Tests.App.root()")
+      commit(dark, "feat adds a caller")
+      switch(dark, "main")
+      saveNumber(dark, "Tests.App.root", "2")
+      draftIsNotEmpty(dark, "main's edit is only a draft")
+      switch(dark, "feat")
+      run(dark, [ "rebase" ])
+      evals(dark, "Tests.App.root()", "1", "the branch sees the committed root")
+      evals(dark, "Tests.App.user()", "1", "and its caller agrees") ])
+
+
+/// `dark rebase` says <param repointed>, and calls it a repoint, not a divergence: nobody on the
+/// branch touched what it repointed.
+let rebaseOnlyRepoints(
+  dark: Cli.Tests.Instance.T,
+  repointed: String)
+  : Stdlib.Test.Result =
+  let (code, _, said) = exec(dark, [ "rebase" ])
+  if code != 0 then
+    Stdlib.Test.fail($"`dark rebase` exited {Stdlib.display(code)}: {said}")
+  else if Stdlib.Bool.not(Stdlib.String.contains(said, repointed)) then
+    Stdlib.Test.fail($"the rebase should say '{repointed}'. It said: {said}")
+  else if Stdlib.String.contains(said, "you also touched") then
+    Stdlib.Test.fail($"a repoint is not a divergence. The rebase said: {said}")
+  else
+    Stdlib.Test.Result.Pass
+
+
 test rebaseRepointsTheBranchsCallersOfANameMainChanged =
   scenario(fun dark ->
     [ saveNumber(dark, "Tests.App.helper", "1")
@@ -88,10 +123,11 @@ test rebaseRepointsTheBranchsCallersOfANameMainChanged =
 
       says(
         dark,
-        [ "rebase" ],
-        "1 caller(s) now point at the parent's version",
-        "the rebase repoints the caller")
+        [ "constraints" ],
+        "Tests.App.caller",
+        "the branch reports the caller left on the old helper")
 
+      rebaseOnlyRepoints(dark, "1 caller(s) now point at the parent's version")
       evals(dark, "Tests.App.caller()", "12", "which now runs main's helper")
       same(
         draft(dark),

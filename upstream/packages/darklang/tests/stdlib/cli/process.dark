@@ -10,10 +10,20 @@ test shellQuote =
 
       Stdlib.Cli.Process.shellQuote("") |> Stdlib.Test.equal("''")
 
-      Stdlib.Cli.Process.shellQuote("it's") |> Stdlib.Test.equal("'it'\\''s'")
+      Stdlib.Cli.Process.shellQuote("it's") |> Stdlib.Test.equal("\"it's\"")
 
-      Stdlib.Cli.Process.shellQuote("a'b'c")
-      |> Stdlib.Test.equal("'a'\\''b'\\''c'")
+      Stdlib.Cli.Process.shellQuote("a'b'c") |> Stdlib.Test.equal("\"a'b'c\"")
+
+      Stdlib.Cli.Process.shellQuote("it's $HOME")
+      |> Stdlib.Test.equal("'it'\\''s $HOME'")
+
+      Stdlib.Cli.Process.shellQuote("say \"it's\"")
+      |> Stdlib.Test.equal("'say \"it'\\''s\"'")
+
+      Stdlib.Cli.Process.shellQuote("it's!") |> Stdlib.Test.equal("'it'\\''s!'")
+
+      Stdlib.Cli.Process.shellQuote("it's\\n")
+      |> Stdlib.Test.equal("'it'\\''s\\n'")
 
       Stdlib.Cli.Process.shellQuote("no-special")
       |> Stdlib.Test.equal("'no-special'")
@@ -34,6 +44,31 @@ test shellQuote =
 
       Stdlib.Cli.Process.shellQuote("`backtick`")
       |> Stdlib.Test.equal("'`backtick`'") ])
+
+
+// whichever quotes it picks, the shell reads the word back unchanged
+test shellQuoteRoundTrips =
+  let words =
+    [ "plain"
+      "it's"
+      "file read '/x/y.json'"
+      "a'b'c"
+      "it's $HOME"
+      "say \"it's\""
+      "it's!"
+      "back\\slash's"
+      "`cmd`'s"
+      ""
+      "two  spaces"
+      "'" ]
+
+  words
+  |> Stdlib.List.map(fun w ->
+    let script = "printf %s " + Stdlib.Cli.Process.shellQuote(w)
+    match Stdlib.Cli.Process.run("/bin/sh", [ "-c", script ]) with
+    | Ok(output) -> output.stdout
+    | Error(_) -> "<failed>")
+  |> Stdlib.Test.equal(words)
 
 
 // A child on this process's own terminal still hands back its exit code.
@@ -106,28 +141,28 @@ test closesStdin =
 
 test missingExecutable =
   (match Stdlib.Cli.Process.run("/definitely/not/a/dark/executable", []) with
-   | Error(error) -> error.errno
-   | Ok(_) -> 0)
-  |> Stdlib.Test.equal(2)
+   | Error(error) -> Stdlib.Cli.Posix.Error.kind(error)
+   | Ok(_) -> Stdlib.Cli.Posix.ErrorKind.Other)
+  |> Stdlib.Test.equal(Stdlib.Cli.Posix.ErrorKind.NotFound)
 
 
 // A name PATH does not hold, a relative path, or no name at all is an Error, not a raise.
 test missingProgramsAreErrors =
   Stdlib.Test.all(
     [ (match Stdlib.Cli.Process.run("dark-no-such-program-xyz", []) with
-       | Error(error) -> error.errno
-       | Ok(_) -> 0)
-      |> Stdlib.Test.equal(2)
+       | Error(error) -> Stdlib.Cli.Posix.Error.kind(error)
+       | Ok(_) -> Stdlib.Cli.Posix.ErrorKind.Other)
+      |> Stdlib.Test.equal(Stdlib.Cli.Posix.ErrorKind.NotFound)
 
       (match Stdlib.Cli.Process.run("./dark-no-such-program-xyz", []) with
-       | Error(error) -> error.errno
-       | Ok(_) -> 0)
-      |> Stdlib.Test.equal(2)
+       | Error(error) -> Stdlib.Cli.Posix.Error.kind(error)
+       | Ok(_) -> Stdlib.Cli.Posix.ErrorKind.Other)
+      |> Stdlib.Test.equal(Stdlib.Cli.Posix.ErrorKind.NotFound)
 
       (match Stdlib.Cli.Process.run("", []) with
-       | Error(error) -> error.errno
-       | Ok(_) -> 0)
-      |> Stdlib.Test.equal(2) ])
+       | Error(error) -> Stdlib.Cli.Posix.Error.kind(error)
+       | Ok(_) -> Stdlib.Cli.Posix.ErrorKind.Other)
+      |> Stdlib.Test.equal(Stdlib.Cli.Posix.ErrorKind.NotFound) ])
 
 
 test nonExecutableFileIsEacces =
@@ -135,9 +170,10 @@ test nonExecutableFileIsEacces =
     let path = $"{dir}/script"
     let _ = Stdlib.Cli.File.writeText(path, "#!/bin/sh\nexit 0\n")
     match Stdlib.Cli.Process.run(path, []) with
-    | Error(error) -> error.errno
-    | Ok(_) -> 0)
-  |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(13))
+    | Error(error) -> Stdlib.Cli.Posix.Error.kind(error)
+    | Ok(_) -> Stdlib.Cli.Posix.ErrorKind.Other)
+  |> Stdlib.Test.equal(
+    Stdlib.Result.Result.Ok(Stdlib.Cli.Posix.ErrorKind.PermissionDenied))
 
 
 test rejectsInvalidTimeout =
@@ -208,7 +244,11 @@ test reportsRuntimeHost =
 
 
 /// Read <param handle>'s output until it has printed "ready", for at most <param turns> 10 ms turns.
-let readUntilReady(handle: Stdlib.Cli.Process.ProcessHandle, seen: String, turns: Int64): String =
+let readUntilReady(
+  handle: Stdlib.Cli.Process.ProcessHandle,
+  seen: String,
+  turns: Int64)
+  : String =
   if turns <= 0 || Stdlib.String.contains(seen, "ready") then
     seen
   else

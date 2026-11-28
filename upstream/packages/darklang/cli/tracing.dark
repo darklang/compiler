@@ -177,11 +177,11 @@ let confirmDestructive(confirm: Confirm, action: String): Bool =
 
 /// What a no from <fn confirmDestructive> says, and the exit it hands back. With nobody there to
 /// answer, "Cancelled." alone reads as if someone said no; it names the flag that gets past it.
-let cancelled(state: AppState): AppState =
+let cancelled(state: AppState, cmd: String): AppState =
   if Stdlib.Cli.UI.Prompt.canAsk() then
     Stderr.line("Cancelled.")
   else
-    Stderr.line("Cancelled. (`--yes` deletes without the prompt -- a piped stdin can't answer it.)")
+    printErr(Prompt.refuseWithoutTerminal("Delete", cmd))
 
   failed(state)
 
@@ -391,8 +391,11 @@ let execute(state: AppState, args: List<String>): AppState =
     else
       match args with
       | [] ->
-        printMatches("", Tracing.Store.list(50))
-        state
+        if wantsJson then
+          executeListJson(state, 50)
+        else
+          printMatches("", Tracing.Store.list(50))
+          state
       | ["list"] -> if wantsJson then executeListJson(state, 20) else executeList(state, 20)
       | ["list", "--fn"] -> refuse(state, "Usage: traces list --fn <name> [limit] [--json]")
       | ["list", "--route"] ->
@@ -652,12 +655,12 @@ let execute(state: AppState, args: List<String>): AppState =
         if confirmDestructive(confirm, "Delete all traces?") then
           executeClear(state)
         else
-          cancelled(state)
+          cancelled(state, "dark traces delete --all")
       | ["delete", "--before", durationStr] ->
         if confirmDestructive(confirm, $"Delete traces older than {durationStr}?") then
           executeClearBefore(state, durationStr)
         else
-          cancelled(state)
+          cancelled(state, $"dark traces delete --before {durationStr}")
       | ["delete", "--keep", nStr] ->
         match Stdlib.Int64.parse(nStr) with
         | Ok(n) ->
@@ -668,7 +671,7 @@ let execute(state: AppState, args: List<String>): AppState =
           then
             executePruneKeep(state, n)
           else
-            cancelled(state)
+            cancelled(state, $"dark traces delete --keep {nStr}")
         | Error(_) -> refuse(state, parsePositionalErr(nStr, "--keep N"))
       | ["delete", traceID] ->
         match resolveTraceID(traceID) with
@@ -676,15 +679,12 @@ let execute(state: AppState, args: List<String>): AppState =
           if confirmDestructive(confirm, $"Delete trace {full}?") then
             executeDelete(state, full)
           else
-            cancelled(state)
+            cancelled(state, $"dark traces delete {traceID}")
         | None -> failed(state)
       // Focused usage messages for the remaining "flag without arg" cases
       // that don't conflict with positional-catching arms higher up
       // (the list/tail variants are handled inline above).
       | ["follow", "--route"] -> refuse(state, "Usage: traces follow --route <substring> [--json]")
-      | ["delete", "--keep"] -> refuse(state, "Usage: traces delete --keep <N>")
-      | ["delete", "--before"] ->
-        refuse(state, "Usage: traces delete --before <duration> (e.g. 30s, 5m, 1h, 2d)")
       // Focused usage messages for arity-1 commands when invoked with no
       // argument. Better than dumping the full multi-page help — the user
       // ran a known command, just forgot the id/path.
@@ -852,7 +852,7 @@ let executeFnCounts(state: AppState, traceLimit: Int64, showAll: Bool): AppState
     let rows = fnCountRows(all, showAll)
     let hidden = Stdlib.List.length(all) - Stdlib.List.length(rows)
     let display(name: String): String =
-      if isGone(name) then $"(gone) {Stdlib.String.slice(name, 0, 8)}" else name
+      if isGone(name) then $"(gone) {Stdlib.String.first(name, 8)}" else name
 
     match rows with
     | [] ->
@@ -1327,7 +1327,7 @@ let formatFnCalls(opts: ViewOptions, branchId: Uuid, fnCalls: List<FnCall>): Str
           match Stdlib.List.findFirstIndex(processes, fun p -> p == Stdlib.display(pid)) with
           | Some(i) ->
             let letter = Stdlib.Int64.checkedMod(i, 26) |> Stdlib.Result.withDefault(0)
-            $" {Stdlib.String.slice("ABCDEFGHIJKLMNOPQRSTUVWXYZ", letter, letter + 1)} "
+            $" {Stdlib.String.slice("ABCDEFGHIJKLMNOPQRSTUVWXYZ", letter, letter + 1) |> Stdlib.Result.withDefault(" ")} "
           | None -> "   "
 
     let lines =
@@ -1554,11 +1554,14 @@ let executeClearBefore(state: AppState, durationStr: String): AppState =
   match parseDuration(durationStr) with
   | Error(msg) -> refuse(state, msg)
   | Ok(duration) ->
-    let now = Stdlib.DateTime.now()
-    // cleanup
-    let cutoffDt = Stdlib.DateTime.subtractSeconds(now, Stdlib.Duration.toSeconds(duration))
-    let cutoff = Stdlib.display(cutoffDt)
-    let count = Tracing.Store.clearBefore(cutoff)
+    // A cutoff before the earliest DateTime has no trace older than it.
+    let count =
+      match Stdlib.DateTime.checkedSubtractSeconds(
+              Stdlib.DateTime.now(),
+              Stdlib.Duration.toSeconds(duration)) with
+      | Ok(cutoff) -> Tracing.Store.clearBefore(Stdlib.display(cutoff))
+      | Error(_) -> 0
+
     match count with
     | 0 ->
       Stderr.line($"no kept trace is older than {durationStr}")
@@ -1708,6 +1711,7 @@ let help(_state: AppState): String =
     "Throw some away"
     "  delete <trace>                one trace"
     "  delete --all | --keep <n> | --before <duration>   (duration: 30s, 10m, 2h, 7d)"
+    "  -y, --yes                     delete without the question"
     ""
     "A <trace> is any unambiguous prefix of its id: `inspect fe62`, `resume fe6219e9-4705`."
     "`--json` works on every verb that prints something: list, inspect, show, calls, find, stats,"

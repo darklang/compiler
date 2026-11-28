@@ -129,7 +129,9 @@ let sourceOf(file: File, d: Declaration): String =
 
 /// <param d>'s lines of <param file>, exactly as written.
 let linesOf(file: File, d: Declaration): List<String> =
-  Stdlib.String.slice(file.text, d.startOffset, d.endOffset) |> Stdlib.String.split("\n")
+  Stdlib.String.dropFirst(file.text, d.startOffset)
+  |> Stdlib.String.first(d.endOffset - d.startOffset)
+  |> Stdlib.String.split("\n")
 
 
 /// <param line> of <param d> less <param d>'s own indentation and any trailing spaces.
@@ -284,7 +286,7 @@ let declarationName(file: File, d: Declaration): String =
 
 /// <param s> with every line that has text indented by <param n> spaces.
 let indentLines(s: String, n: Int64): String =
-  let pad = Stdlib.String.repeat(" ", n)
+  let pad = Stdlib.String.checkedRepeat(" ", n) |> Stdlib.Result.withDefault("")
   s
   |> Stdlib.String.split("\n")
   |> Stdlib.List.map(fun l -> if l == "" then l else pad + l)

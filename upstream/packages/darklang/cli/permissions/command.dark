@@ -63,11 +63,14 @@ let editInstancePolicy(
   commitInstancePolicy(expected, applyInstanceEdit(policy, allow, deny, remove))
 
 
-/// The effects a policy decides on: all but `Raise`, which no rule grants or denies.
+/// The effects a policy decides on: all but `Raise` and `Concurrency`, which no rule grants or denies.
 let permissionEffects(
   effects: List<LanguageTools.Permissions.Effect>)
   : List<LanguageTools.Permissions.Effect> =
-  effects |> Stdlib.List.filter(fun e -> e != LanguageTools.Permissions.Effect.Raise)
+  effects
+  |> Stdlib.List.filter(fun e ->
+    e != LanguageTools.Permissions.Effect.Raise
+    && e != LanguageTools.Permissions.Effect.Concurrency)
 
 
 /// The transitive permission requirements and whether analysis was complete.
@@ -283,7 +286,7 @@ let removeNamedApprovalFor(accountID: Option<Uuid>, expected: String, name: Stri
 // Requirements display.
 
 let shortVersion(hash: String): String =
-  Stdlib.String.slice(hash, 0, 8)
+  Stdlib.String.first(hash, 8)
 
 
 let requirementSummary(requirements: List<LanguageTools.Permissions.Effect>): String =
@@ -453,9 +456,7 @@ let editPolicy(
 /// One rule, or several separated by `;` like `set`. Error is the first rule that did not parse.
 let parseRuleList(args: List<String>): Result<List<LanguageTools.Permissions.Rule>, String> =
   if Stdlib.List.any(args, fun arg -> Stdlib.String.contains(arg, ";")) then
-    Stdlib.String.split(Stdlib.String.join(args, " "), ";")
-    |> Stdlib.List.map(Stdlib.String.trim)
-    |> Stdlib.List.filter(fun spec -> spec != "")
+    LanguageTools.Permissions.splitRuleSpecs(Stdlib.String.join(args, " "))
     |> Stdlib.List.fold(Result.Ok([]), fun(result, spec) ->
       match result with
       | Error(bad) -> Result.Error(bad)
@@ -493,11 +494,7 @@ let editRules(
 
 /// `set a; deny b; c` replaces the whole policy.
 let replacePolicy(specs: List<String>): Result<LanguageTools.Permissions.Policy, String> =
-  let specs =
-    Stdlib.String.split(Stdlib.String.join(specs, " "), ";")
-    |> Stdlib.List.map(Stdlib.String.trim)
-    |> Stdlib.List.filter(fun spec -> spec != "")
-
+  let specs = LanguageTools.Permissions.splitRuleSpecs(Stdlib.String.join(specs, " "))
   match LanguageTools.Permissions.parse(specs) with
   | Ok(policy) -> Result.Ok(policy)
   | Error(bad) -> Result.Error(invalidRuleText(bad))
@@ -525,6 +522,55 @@ let approvedVersionOf(accountID: Option<Uuid>, name: String): Option<String> =
   |> Stdlib.Option.map(fun pair ->
     let (_name, hash) = pair
     hash)
+
+
+/// Whether two versions need the same permissions: the same effects, in any order.
+let sameRequirements(
+  a: (List<LanguageTools.Permissions.Effect> * Bool),
+  b: (List<LanguageTools.Permissions.Effect> * Bool))
+  : Bool =
+  let (aEffects, aComplete) = a
+  let (bEffects, bComplete) = b
+  aComplete == bComplete
+  && Stdlib.List.all(aEffects, fun e -> Stdlib.List.contains(bEffects, e))
+  && Stdlib.List.all(bEffects, fun e -> Stdlib.List.contains(aEffects, e))
+
+
+/// After an edit, keep the function's approval if the new version needs the same permissions.
+/// It still allows only what you approved before. Returns the message to show if kept.
+let carryApprovalForward(accountID: Option<Uuid>, branchId: Uuid, name: String): Option<String> =
+  let (expected, named) = approvalSnapshot(accountID)
+  let previous = named |> Stdlib.List.findFirst(fun approval -> approval.name == Option.Some(name))
+  match previous, latestVersion(branchId, name) with
+  | Some(approval), Some(latest) when approval.hash != latest ->
+    let rules = approval.explicitRules
+    let unchanged(reason: LanguageTools.Permissions.ApprovalReviewReason): Bool =
+      match reason with
+      // Incomplete analysis is no difference when both versions are incomplete in the same way.
+      | PermissionAnalysisIncomplete ->
+        sameRequirements(
+          permissionRequirementsForHash(approval.hash),
+          permissionRequirementsForHash(latest))
+      | _ -> false
+
+    match reviewVersionFor(accountID, name, expected, latest, rules, Incomplete.Acknowledge) with
+    | Ok((_, reasons)) when Stdlib.List.all(reasons, unchanged) ->
+      let saved =
+        approveVersionFor(
+          accountID,
+          name,
+          expected,
+          latest,
+          rules,
+          Incomplete.Acknowledge,
+          ContractChange.Acknowledge)
+
+      match saved with
+      | Ok(_) ->
+        Option.Some($"Kept the approval for {name}: the edited version needs the same permissions.")
+      | Error(_) -> Option.None
+    | _ -> Option.None
+  | _ -> Option.None
 
 
 /// `requirements`/`show` accept a logical name (resolved to its latest version)
@@ -639,11 +685,6 @@ let parseApprovalRules(
       Result.Ok(
         Option.Some({ policy with allow = normalize(policy.allow), deny = normalize(policy.deny) }))
     | Error(message) -> Result.Error(message)
-
-
-/// Refuse to remember access with nobody at a terminal to confirm it.
-let needsYes(): String =
-  "no terminal to confirm at; add --yes to remember this access"
 
 
 /// Adding access keeps both saved grants and explicit denies.
@@ -779,7 +820,8 @@ let reviewAndApprove(
   requirements: (List<LanguageTools.Permissions.Effect> * Bool),
   previous: Option<LanguageTools.Permissions.Approval>,
   acceptWithoutPrompt: Bool,
-  kept: String)
+  kept: String,
+  command: String)
   : Bool =
   let (_effects, complete) = requirements
   let incomplete = if complete then Incomplete.Refuse else Incomplete.Acknowledge
@@ -800,7 +842,7 @@ let reviewAndApprove(
 
     showApprovalReview(previous, policyForReview(rules, requirements))
     if Stdlib.Bool.not(acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.canAsk()) then
-      printErr(needsYes())
+      printErr(Prompt.refuseWithoutTerminal("Approval", command))
       false
     else if acceptWithoutPrompt || Stdlib.Cli.UI.Prompt.confirm("Save these permissions?") then
       match approveVersionFor(
@@ -884,7 +926,8 @@ let approveNamed(
           requirements,
           previous,
           acceptWithoutPrompt,
-          "not approved")
+          "not approved",
+          $"dark permissions approve --for {name} '<rule>'")
 
 
 /// Show the complete update, then ask once. Declining keeps the saved approval.
@@ -940,7 +983,8 @@ let updateNamed(
           requirements,
           previous,
           acceptWithoutPrompt,
-          "Approval unchanged.")
+          "Approval unchanged.",
+          $"dark permissions update {name}")
 
 
 /// Run <param show> against the version <param target> names, or report an
@@ -976,7 +1020,7 @@ val subcommands =
     ("set", Option.Some("set <rule>;… (or `clear`)"))
     ("clear", Option.None)
     ("approve", Option.Some("approve --for <fn> <rules>"))
-    ("update", Option.Some("update <fn> [rule,…]"))
+    ("update", Option.Some("update <fn> [<rule>;…]"))
     ("unapprove", Option.Some("unapprove <fn>"))
     ("approved", Option.None)
     ("requirements", Option.Some("requirements <fn|hash>"))
@@ -998,7 +1042,7 @@ let permissionArgs(args: List<String>): FlagParser.Parsed =
     args
     |> Stdlib.List.map(fun arg ->
       if Stdlib.String.startsWith(arg, "--for=") then
-        [ "--for", Stdlib.String.slice(arg, 6, Stdlib.String.length(arg)) ]
+        [ "--for", Stdlib.String.dropFirst(arg, 6) ]
       else
         [ arg ])
     |> Stdlib.List.flatten

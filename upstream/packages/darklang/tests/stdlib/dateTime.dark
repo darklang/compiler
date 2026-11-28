@@ -304,10 +304,6 @@ test parseFailInBoth =
       |> Stdlib.Test.equal(
         Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidFormat))
 
-      p("20061204T10:20:54.67am")
-      |> Stdlib.Test.equal(
-        Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidFormat))
-
       p("20061204T1020am")
       |> Stdlib.Test.equal(
         Stdlib.Result.Result.Error(Stdlib.DateTime.ParseError.InvalidFormat))
@@ -1029,6 +1025,133 @@ test fromTicksPastInstantRangeRaises =
   => raises "Ticks out of DateTime range (-9998-01-01 to 9999-12-31): 9223372036854775807"
 
 
+// The first and last DateTimes: -9998-01-01T00:00:00Z and 9999-12-31T23:59:59.9999999Z
+let first(): DateTime =
+  Stdlib.DateTime.__fromTicks(-3776735808000000000)
+
+
+let last(): DateTime =
+  Stdlib.DateTime.__fromTicks(2534023007999999999)
+
+
+let ok(date: DateTime): Stdlib.Result.Result<DateTime, Stdlib.Math.Overflow> =
+  Stdlib.Result.Result.Ok(date)
+
+
+/// The checked fns return what the unchecked ones do, inside the DateTime range
+test checkedInRange =
+  let date = d("2020-11-26T04:37:46Z")
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.checkedAddSeconds(date, 1000000)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.addSeconds(date, 1000000)))
+
+      Stdlib.DateTime.checkedAddSeconds(date, -10)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.addSeconds(date, -10)))
+
+      Stdlib.DateTime.checkedSubtractSeconds(date, 1000000)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.subtractSeconds(date, 1000000)))
+
+      Stdlib.DateTime.checkedFromSeconds(1095379198)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.fromSeconds(1095379198)))
+
+      Stdlib.DateTime.checkedFromSeconds(-1)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.fromSeconds(-1)))
+
+      Stdlib.DateTime.checkedAddMilliseconds(date, 1500)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.addMilliseconds(date, 1500)))
+
+      Stdlib.DateTime.checkedSubtractMilliseconds(date, 1500)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.subtractMilliseconds(date, 1500)))
+
+      Stdlib.DateTime.checkedFromMilliseconds(1095379198123)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.fromMilliseconds(1095379198123)))
+
+      // the edges themselves
+      Stdlib.DateTime.checkedFromSeconds(-377673580800)
+      |> Stdlib.Test.equal(ok(first()))
+
+      Stdlib.DateTime.checkedFromSeconds(253402300799)
+      |> Stdlib.Test.equal(ok(Stdlib.DateTime.fromSeconds(253402300799)))
+
+      Stdlib.DateTime.checkedFromMilliseconds(-377673580800000)
+      |> Stdlib.Test.equal(ok(first()))
+
+      Stdlib.DateTime.checkedFromMilliseconds(253402300799999)
+      |> Stdlib.Test.equal(
+        ok(Stdlib.DateTime.fromMilliseconds(253402300799999)))
+
+      Stdlib.DateTime.checkedAddSeconds(first(), 0)
+      |> Stdlib.Test.equal(ok(first()))
+
+      Stdlib.DateTime.checkedSubtractMilliseconds(last(), 0)
+      |> Stdlib.Test.equal(ok(last())) ])
+
+
+/// ... and {{Error Overflow}} past either end, where the unchecked ones raise
+test checkedPastTheRange =
+  let overflow = Stdlib.Result.Result.Error(Stdlib.Math.Overflow.Overflow)
+  let biggest = 9223372036854775807
+  let smallest = -9223372036854775808
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.checkedFromSeconds(-377673580801)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromSeconds(253402300800)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromSeconds(2 ** 62) |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromSeconds(biggest) |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromSeconds(smallest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromMilliseconds(-377673580800001)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromMilliseconds(253402300800000)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromMilliseconds(biggest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedFromMilliseconds(smallest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddSeconds(last(), 1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddSeconds(first(), -1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddSeconds(Stdlib.DateTime.fromSeconds(0), biggest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddSeconds(last(), smallest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedSubtractSeconds(first(), 1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedSubtractSeconds(last(), -1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedSubtractSeconds(first(), smallest)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddMilliseconds(last(), 1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedAddMilliseconds(first(), -1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedSubtractMilliseconds(first(), 1)
+      |> Stdlib.Test.equal(overflow)
+
+      Stdlib.DateTime.checkedSubtractMilliseconds(last(), smallest)
+      |> Stdlib.Test.equal(overflow) ])
+
+
 test todayIsCurrentUtcMidnight =
   let before = Stdlib.DateTime.atStartOfDay(Stdlib.DateTime.now())
   let today = Stdlib.DateTime.today()
@@ -1072,6 +1195,13 @@ test subtractSeconds =
 
       sub("2020-11-26T04:37:46Z", -10)
       |> Stdlib.Test.equal(d("2020-11-26T04:37:56Z")) ])
+
+
+test sleepMillisecondsReturnsAtOnceForNoWait =
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.__sleepMilliseconds(-5.0) |> Stdlib.Test.equal(())
+      Stdlib.DateTime.__sleepMilliseconds(0.0 / 0.0) |> Stdlib.Test.equal(())
+      Stdlib.DateTime.__sleepMilliseconds(0.5) |> Stdlib.Test.equal(()) ])
 
 
 test subtract =
@@ -1444,7 +1574,8 @@ test clockSyscalls =
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok())
 
       Stdlib.DateTime.__sleepNanoseconds(0, -1)
-      |> Stdlib.Test.equal(Stdlib.Result.Result.Error(22))
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.Cli.Posix.__fromErrno(22)))
 
       Stdlib.DateTime.__realtimeNanoseconds()
       |> Stdlib.Result.map(fun pair ->
@@ -1455,6 +1586,15 @@ test clockSyscalls =
       // EINTR (-4) on the first call resumes with the remaining time
       Stdlib.DateTime.__sleepWith(interruptedOnce, 1, 0)
       |> Stdlib.Test.equal(Stdlib.Result.Result.Ok()) ])
+
+
+// a delay of zero or less on the real clock returns at once
+test realDelayNotPositive =
+  Stdlib.Test.onRealClock(fun () ->
+    [ Builtin.runtimeDelayTicks(0)
+      Builtin.runtimeDelayTicks(-10000000)
+      Builtin.runtimeDelayTicks(-9223372036854775808) ])
+  |> Stdlib.Test.equal([ (), (), () ])
 
 
 test weekdayAndMonthDisplay =
@@ -1473,3 +1613,394 @@ test weekdayAndMonthDisplay =
 
       $"{Stdlib.DateTime.Weekday.Friday}, {Stdlib.DateTime.Month.March}"
       |> Stdlib.Test.equal("Friday, March") ])
+
+
+let parts(
+  year: Int64,
+  month: Int64,
+  day: Int64,
+  hour: Int64,
+  minute: Int64,
+  second: Int64)
+  : Stdlib.Result.Result<String, Stdlib.DateTime.FromPartsError> =
+  Stdlib.DateTime.fromParts(year, month, day, hour, minute, second)
+  |> Stdlib.Result.map(fun value -> Stdlib.display(value))
+
+
+let outOfRange(
+  part: Stdlib.DateTime.Part,
+  value: Int64,
+  min: Int64,
+  max: Int64)
+  : Stdlib.Result.Result<String, Stdlib.DateTime.FromPartsError> =
+  Stdlib.Result.Result.Error(
+    Stdlib.DateTime.FromPartsError.OutOfRange(part, value, min, max))
+
+
+test fromParts =
+  Stdlib.Test.all(
+    [ parts(2019, 7, 28, 22, 42, 36)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("2019-07-28T22:42:36Z"))
+
+      parts(1969, 12, 31, 23, 59, 59)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("1969-12-31T23:59:59Z"))
+
+      parts(2024, 2, 29, 0, 0, 0)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("2024-02-29T00:00:00Z"))
+
+      parts(2000, 2, 29, 0, 0, 0)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("2000-02-29T00:00:00Z"))
+
+      parts(2023, 2, 29, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Day, 29, 1, 28))
+
+      parts(1900, 2, 29, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Day, 29, 1, 28))
+
+      parts(2024, 4, 31, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Day, 31, 1, 30))
+
+      parts(2024, 13, 1, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Month, 13, 1, 12))
+
+      parts(2024, 0, 1, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Month, 0, 1, 12))
+
+      parts(2024, 1, 0, 0, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Day, 0, 1, 31))
+
+      parts(2024, 1, 1, 24, 0, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Hour, 24, 0, 23))
+
+      parts(2024, 1, 1, 0, 60, 0)
+      |> Stdlib.Test.equal(outOfRange(Stdlib.DateTime.Part.Minute, 60, 0, 59))
+
+      parts(2024, 1, 1, 0, 0, -1)
+      |> Stdlib.Test.equal(
+        outOfRange(Stdlib.DateTime.Part.Second, -1, 0, 59)) ])
+
+
+test fromPartsAtTheEndsOfTheRange =
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.fromParts(-9998, 1, 1, 0, 0, 0)
+      |> Stdlib.Test.equal(ok(first()))
+
+      parts(9999, 12, 31, 23, 59, 59)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("9999-12-31T23:59:59Z"))
+
+      parts(-9999, 12, 31, 23, 59, 59)
+      |> Stdlib.Test.equal(
+        outOfRange(Stdlib.DateTime.Part.Year, -9999, -9998, 9999))
+
+      parts(10000, 1, 1, 0, 0, 0)
+      |> Stdlib.Test.equal(
+        outOfRange(Stdlib.DateTime.Part.Year, 10000, -9998, 9999)) ])
+
+
+test fromPartsErrorDisplay =
+  Stdlib.DateTime.fromParts(2023, 2, 29, 0, 0, 0)
+  |> Stdlib.Result.mapError(fun e -> Stdlib.display(e))
+  |> Stdlib.Test.equal(
+    Stdlib.Result.Result.Error("day 29 is out of range; it must be 1 to 28"))
+
+
+test isLeapYear =
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.isLeapYear(1900) |> Stdlib.Test.equal(false)
+      Stdlib.DateTime.isLeapYear(2000) |> Stdlib.Test.equal(true)
+      Stdlib.DateTime.isLeapYear(2023) |> Stdlib.Test.equal(false)
+      Stdlib.DateTime.isLeapYear(2024) |> Stdlib.Test.equal(true) ])
+
+
+test daysInMonth =
+  Stdlib.Test.all(
+    [ Stdlib.List.range(1, 12)
+      |> Stdlib.List.map(fun month ->
+        Stdlib.DateTime.daysInMonth(2023, month) |> Builtin.unwrap)
+      |> Stdlib.Test.equal([ 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 ])
+
+      Stdlib.DateTime.daysInMonth(2024, 2)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(29))
+
+      Stdlib.DateTime.daysInMonth(1900, 2)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(28))
+
+      Stdlib.DateTime.daysInMonth(2024, 13)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.FromPartsError.OutOfRange(
+            Stdlib.DateTime.Part.Month,
+            13,
+            1,
+            12)))
+
+      Stdlib.DateTime.daysInMonth(2024, 0)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.FromPartsError.OutOfRange(
+            Stdlib.DateTime.Part.Month,
+            0,
+            1,
+            12))) ])
+
+
+test addDays =
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.addDays(d("2024-02-28T10:30:00Z"), 1)
+      |> Stdlib.Test.equal(d("2024-02-29T10:30:00Z"))
+
+      Stdlib.DateTime.addDays(d("2023-12-25T00:00:00Z"), 14)
+      |> Stdlib.Test.equal(d("2024-01-08T00:00:00Z"))
+
+      Stdlib.DateTime.addDays(d("1970-01-01T00:00:00Z"), -1)
+      |> Stdlib.Test.equal(d("1969-12-31T00:00:00Z")) ])
+
+
+test addMonths =
+  Stdlib.Test.all(
+    [ Stdlib.DateTime.addMonths(d("2024-01-31T09:15:00Z"), 1)
+      |> Stdlib.Test.equal(d("2024-02-29T09:15:00Z"))
+
+      Stdlib.DateTime.addMonths(d("2023-01-31T00:00:00Z"), 1)
+      |> Stdlib.Test.equal(d("2023-02-28T00:00:00Z"))
+
+      Stdlib.DateTime.addMonths(d("2024-11-15T00:00:00Z"), 3)
+      |> Stdlib.Test.equal(d("2025-02-15T00:00:00Z"))
+
+      Stdlib.DateTime.addMonths(d("2024-03-31T00:00:00Z"), -1)
+      |> Stdlib.Test.equal(d("2024-02-29T00:00:00Z"))
+
+      Stdlib.DateTime.addMonths(d("1970-01-15T00:00:00Z"), -13)
+      |> Stdlib.Test.equal(d("1968-12-15T00:00:00Z"))
+
+      Stdlib.DateTime.addMonths(d("2024-05-10T00:00:00Z"), 0)
+      |> Stdlib.Test.equal(d("2024-05-10T00:00:00Z")) ])
+
+
+let pw(
+  text: String,
+  pattern: String)
+  : Stdlib.Result.Result<DateTime, Stdlib.DateTime.PatternParseError> =
+  Stdlib.DateTime.parseWith(text, pattern)
+
+
+let parsedAs(
+  datestr: String)
+  : Stdlib.Result.Result<DateTime, Stdlib.DateTime.PatternParseError> =
+  Stdlib.Result.Result.Ok(d(datestr))
+
+
+let mismatchAt(
+  position: Int64,
+  mismatch: Stdlib.DateTime.PatternMismatch)
+  : Stdlib.Result.Result<DateTime, Stdlib.DateTime.PatternParseError> =
+  Stdlib.Result.Result.Error(
+    Stdlib.DateTime.PatternParseError.Mismatch(position, mismatch))
+
+
+let invalidDate()
+  : Stdlib.Result.Result<DateTime, Stdlib.DateTime.PatternParseError> =
+  Stdlib.Result.Result.Error(Stdlib.DateTime.PatternParseError.InvalidDate)
+
+
+test parseWith =
+  Stdlib.Test.all(
+    [ pw("2019-07-28T22:42:36Z", "%Y-%m-%dT%H:%M:%SZ")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T22:42:36Z"))
+
+      pw("28/07/2019 at 2242", "%d/%m/%Y at %H%M")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T22:42:00Z"))
+
+      pw("2019-7-8", "%Y-%m-%d") |> Stdlib.Test.equal(parsedAs("2019-07-08"))
+
+      pw("100% 2019", "100%% %Y") |> Stdlib.Test.equal(parsedAs("2019-01-01"))
+
+      // fields the pattern does not name come from the epoch
+      pw("22:42", "%H:%M")
+      |> Stdlib.Test.equal(parsedAs("1970-01-01T22:42:00Z"))
+
+      pw("", "") |> Stdlib.Test.equal(parsedAs("1970-01-01T00:00:00Z")) ])
+
+
+test parseWithOffset =
+  Stdlib.Test.all(
+    [ pw("2019-07-28T22:42:36+0200", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T20:42:36Z"))
+
+      pw("2019-07-28T22:42:36-05:30", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(parsedAs("2019-07-29T04:12:36Z"))
+
+      pw("2019-07-28T22:42:36Z", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T22:42:36Z"))
+
+      // an offset can move the date across midnight and a year end
+      pw("2020-01-01T01:00:00+0200", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(parsedAs("2019-12-31T23:00:00Z"))
+
+      pw("2019-07-28T22:42:36+2", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(
+        mismatchAt(19, Stdlib.DateTime.PatternMismatch.Field('z')))
+
+      pw("2019-07-28T22:42:36+2500", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(invalidDate()) ])
+
+
+test parseWithFraction =
+  Stdlib.Test.all(
+    [ pw("2019-07-28T22:42:36.5Z", "%Y-%m-%dT%H:%M:%S.%fZ")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T22:42:36.500Z"))
+
+      pw("22:42:36.123456789", "%H:%M:%S.%f")
+      |> Stdlib.Result.map(fun date ->
+        Stdlib.DateTime.__mod(
+          Stdlib.DateTime.__ticks(date),
+          Stdlib.DateTime.__ticksPerSecond()))
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(1234567)) ])
+
+
+test parseWithRoundTripsFormat =
+  Stdlib.Test.all(
+    [ pw(f(d("2019-07-28T22:42:36.250Z")), "%Y-%m-%d %H:%M:%S.%f")
+      |> Stdlib.Test.equal(parsedAs("2019-07-28T22:42:36.250Z"))
+
+      // format writes years before 1 with a leading -
+      pw(
+        Stdlib.DateTime.format(civil(-5, 3, 1), "%Y-%m-%d") |> Builtin.unwrap,
+        "%Y-%m-%d")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(civil(-5, 3, 1))) ])
+
+
+test parseWithErrors =
+  Stdlib.Test.all(
+    [ pw("2019", "%Y-%q")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.PatternParseError.UnknownDirective("%q")))
+
+      pw("2019", "%Y%")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.PatternParseError.UnknownDirective("%")))
+
+      // the pattern is checked before the text, so its error wins
+      pw("nope", "%Y-%q")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.PatternParseError.UnknownDirective("%q")))
+
+      // a second %d could hide an impossible first one
+      pw("2024-02-30/28", "%Y-%m-%d/%d")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.PatternParseError.RepeatedDirective("%d")))
+
+      pw("2024-02-28/28", "%Y-%m-%d/%d")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.DateTime.PatternParseError.RepeatedDirective("%d")))
+
+      // %% is a literal, not a field, so it may repeat
+      pw("%2019%", "%%%Y%%")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(civil(2019, 1, 1)))
+
+      // fields read as many digits as they can: %d takes "21", leaving nothing for the 1
+      pw("04-21", "%m-%d1")
+      |> Stdlib.Test.equal(
+        mismatchAt(
+          5,
+          Stdlib.DateTime.PatternMismatch.Literal(
+            '1',
+            Stdlib.Option.Option.None)))
+
+      pw("0415", "%m%d")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(civil(1970, 4, 15)))
+
+      // but stop before a digit that would make the field too large: 91 is no hour
+      pw("915", "%H%M")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(d("1970-01-01T09:15:00Z")))
+
+      pw("45", "%m%d")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(civil(1970, 4, 5)))
+
+      // At the boundary: 2 could start an hour from 20 to 23, so %H reads the next digit
+      // whatever it is, as C's strptime does. 23 is an hour; 24 is not, and is not 02.
+      pw("235", "%H%M")
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(d("1970-01-01T23:05:00Z")))
+
+      pw("245", "%H%M") |> Stdlib.Test.equal(invalidDate())
+
+      pw("2019/07/28", "%Y-%m-%d")
+      |> Stdlib.Test.equal(
+        mismatchAt(
+          4,
+          Stdlib.DateTime.PatternMismatch.Literal(
+            '-',
+            Stdlib.Option.Option.Some('/'))))
+
+      pw("2019--28", "%Y-%m-%d")
+      |> Stdlib.Test.equal(
+        mismatchAt(5, Stdlib.DateTime.PatternMismatch.Field('m')))
+
+      pw("2019-07-28x", "%Y-%m-%d")
+      |> Stdlib.Test.equal(
+        mismatchAt(10, Stdlib.DateTime.PatternMismatch.TrailingText('x')))
+
+      pw("2019-07", "%Y-%m-%d")
+      |> Stdlib.Test.equal(
+        mismatchAt(
+          7,
+          Stdlib.DateTime.PatternMismatch.Literal(
+            '-',
+            Stdlib.Option.Option.None)))
+
+      pw("2019-02-30", "%Y-%m-%d") |> Stdlib.Test.equal(invalidDate())
+
+      pw("2019-13-01", "%Y-%m-%d") |> Stdlib.Test.equal(invalidDate())
+
+      pw("2019-07-28 24:00", "%Y-%m-%d %H:%M")
+      |> Stdlib.Test.equal(invalidDate())
+
+      // %M stops at 6, since 60 is no minute, leaving the 0 unmatched
+      pw("2019-07-28 23:60", "%Y-%m-%d %H:%M")
+      |> Stdlib.Test.equal(
+        mismatchAt(15, Stdlib.DateTime.PatternMismatch.TrailingText('0')))
+
+      // in range as written, past 9999-12-31 once the offset is applied
+      pw("9999-12-31T23:00:00-0200", "%Y-%m-%dT%H:%M:%S%z")
+      |> Stdlib.Test.equal(invalidDate())
+
+      pw("-9999-12-31", "%Y-%m-%d") |> Stdlib.Test.equal(invalidDate())
+
+      Stdlib.display(Stdlib.DateTime.PatternParseError.RepeatedDirective("%d"))
+      |> Stdlib.Test.equal("The pattern uses %d more than once") ])
+
+
+test parseWithMismatchMessages =
+  Stdlib.Test.all(
+    [ pw("2019/07/28", "%Y-%m-%d")
+      |> Stdlib.Result.mapError(Stdlib.display)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error("Expected '-' at character 5, found '/'"))
+
+      pw("2019-07", "%Y-%m-%d")
+      |> Stdlib.Result.mapError(Stdlib.display)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          "Expected '-' at character 8, found end of text"))
+
+      pw("2019-07-28x", "%Y-%m-%d")
+      |> Stdlib.Result.mapError(Stdlib.display)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          "Expected end of text at character 11, found 'x'"))
+
+      pw("2019--28", "%Y-%m-%d")
+      |> Stdlib.Result.mapError(Stdlib.display)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error("Could not read %m starting at character 6"))
+
+      pw("100\n", "100%%")
+      |> Stdlib.Result.mapError(Stdlib.display)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          "Expected '%' at character 4, found '\\n'")) ])

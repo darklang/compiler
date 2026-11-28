@@ -13,7 +13,7 @@ A name is Owner.name, or Owner.Module.name to put it in a module. Use an owner
 of your own, such as `Me`: `Darklang` is reserved for the standard library and
 refuses a save.
 
-Create several declarations atomically:
+Create several declarations in one batch:
 
   module /Me.Example - <<'EOF'
   type State = { count: Int64 }
@@ -21,12 +21,22 @@ Create several declarations atomically:
   let main(n: Int64): Int64 = double(n)
   EOF
 
+A module save reports parse errors and exits 1. Declarations the parser can
+recover and validate are still saved as WIP. Send a corrected declaration with
+`edit` for an existing item, `fn` for a new function, or `module` for any subset.
+
 For one function, stdin accepts a complete declaration; the shorter signature
 and body fragment remains valid:
 
   fn /Me.Example.double - <<'EOF'
   let double(n: Int64): Int64 = n * 2
   EOF
+
+`--description <text>` documents what `fn`, `type`, `val`, `trait` or `test add`
+saves; in a full declaration a `///` above it does the same, and one above a
+parameter documents that parameter:
+
+  fn /Me.Example.twice '(x: Int64): Int64 = x * 2' --description "Twice <param x>."
 
 At module scope values use `val name = value` or `val name: Type = value` (the
 type is checked); `let` declares functions. Inside a function, local values use
@@ -171,7 +181,8 @@ To group tests inside a module, wrap a body in `Stdlib.Test.group("parsing", ...
 `Tests.parsing` runs the group.
 
 For many cases of one check, use a table; each row is its own test, named by
-its arguments, as in `Me.Example.Tests.doubles(4, 8)`:
+its arguments in a group named after the test, as in
+`Me.Example.Tests.doubles › (4, 8)`:
 
   test doubles =
     [ (4, 8), (0, 0) ]
@@ -196,10 +207,8 @@ Every test execution runs in its own disposable process with an isolated store.
 Ordinary `test name = ...` declarations provide isolation automatically, including
 for tests that change the local store, branches, or environment. Safe cached
 passes can still be reused. One starting snapshot per `test run` command is
-shared read-only; a test that writes to it reruns on a private copy and is marked
-`(reran on a copy)`, so anything it does outside its own home and temporary
-directory happens twice. A command answered entirely from cache creates no
-snapshot. Nested workers start from their calling test's current store.
+shared: each worker's store is a layer over it, with its own writes kept apart.
+A command answered entirely from cache creates no snapshot. Nested workers start from their calling test's current store.
 Use `Stdlib.Test.Process.run` only when a test needs custom process options or
 must inspect a child's output, result, or exit status.
 
@@ -396,7 +405,7 @@ Every run is a process: reads run at once with no code change, writes keep order
 waits here; `Exec.spawn`/`await`/`cancel` when you want control;
 `ps` shows what is running on the machine, `traces resume <id>` picks a Ctrl-C'd
 run back up, `traces fork` branches one. `docs processes` and `docs live` have the
-short versions; `docs/processes.md` and `docs/live.md` in the repo have the design.
+details.
 """
 
 
@@ -457,10 +466,11 @@ Ops are content-addressed and the log is append-only, so nothing you have
 committed can be rewritten, only superseded.
   (see: docs scm)
 
-## Deprecation (mark items as unused / dangerous / obsolete)
-  deprecate <fn|type|value> <name> --kind <k> [options]
-    kinds: superseded-by (requires --replacement), harmful, obsolete
-  delete <fn|type|value> <name> [options]     # sugar for --kind obsolete
+## Deprecation
+  deprecate <name> [options]                  # the name still resolves
+    options: --replacement <name> or --block-execution (functions only)
+  delete <name> [options]                     # deprecate with a live-dependents check;
+                                              # never-committed items are discarded
     options: --ignore-dependents; --force = --ignore-dependents + --yes
   deprecate/delete ... --json                 # one object; without --yes, a dry run
   undeprecate <name>                          # clear it, any kind, harmful included

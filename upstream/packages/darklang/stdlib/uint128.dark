@@ -5,6 +5,18 @@ type ParseError =
   | OutOfRange
 
 
+/// The smallest <type UInt128>: {{0}}
+val minValue = 0u128
+
+
+/// The largest <type UInt128>: {{340282366920938463463374607431768211455}}
+val maxValue = 340282366920938463463374607431768211455u128
+
+
+/// How many bits a <type UInt128> holds: {{128}}
+val bitWidth = 128
+
+
 impl Modulo for UInt128 =
   /// Returns the result of wrapping <param a> around so that {{0 <= res < b}}.
   /// The modulus <param b> must be greater than 0.
@@ -103,6 +115,86 @@ let fromUInt32(i: UInt32): UInt128 =
 /// Converts a <type UInt64> to an <type UInt128>.
 let fromUInt64(i: UInt64): UInt128 =
   BigInt.toUInt128(BigInt.fromUInt64(i)) |> Builtin.unwrap
+
+
+/// Converts an <type Int8> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromInt8(i: Int8): Option<UInt128> =
+  BigInt.toUInt128(BigInt.fromInt8(i))
+
+
+/// Converts an <type Int16> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromInt16(i: Int16): Option<UInt128> =
+  BigInt.toUInt128(BigInt.fromInt16(i))
+
+
+/// Converts an <type Int32> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromInt32(i: Int32): Option<UInt128> =
+  BigInt.toUInt128(BigInt.fromInt32(i))
+
+
+/// Converts an <type Int64> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromInt64(i: Int64): Option<UInt128> =
+  BigInt.toUInt128(BigInt.fromInt64(i))
+
+
+/// Converts an <type Int128> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromInt128(i: Int128): Option<UInt128> =
+  BigInt.toUInt128(BigInt.fromInt128(i))
+
+
+/// Converts a <type UInt128> to an <type Int8>. Returns {{None}} if it doesn't fit.
+let toInt8(a: UInt128): Option<Int8> =
+  Int8.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to a <type UInt8>. Returns {{None}} if it doesn't fit.
+let toUInt8(a: UInt128): Option<UInt8> =
+  UInt8.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to an <type Int16>. Returns {{None}} if it doesn't fit.
+let toInt16(a: UInt128): Option<Int16> =
+  Int16.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to a <type UInt16>. Returns {{None}} if it doesn't fit.
+let toUInt16(a: UInt128): Option<UInt16> =
+  UInt16.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to an <type Int32>. Returns {{None}} if it doesn't fit.
+let toInt32(a: UInt128): Option<Int32> =
+  Int32.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to a <type UInt32>. Returns {{None}} if it doesn't fit.
+let toUInt32(a: UInt128): Option<UInt32> =
+  UInt32.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to an <type Int64>. Returns {{None}} if it doesn't fit.
+let toInt64(a: UInt128): Option<Int64> =
+  Int64.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to a <type UInt64>. Returns {{None}} if it doesn't fit.
+let toUInt64(a: UInt128): Option<UInt64> =
+  UInt64.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to an <type Int128>. Returns {{None}} if it doesn't fit.
+let toInt128(a: UInt128): Option<Int128> =
+  Int128.fromUInt128(a)
+
+
+/// Converts a <type UInt128> to a <type BigInt>.
+let toBigInt(a: UInt128): BigInt =
+  BigInt.fromUInt128(a)
+
+
+/// Converts a <type BigInt> to a <type UInt128>. Returns {{None}} if it doesn't fit.
+let fromBigInt(a: BigInt): Option<UInt128> =
+  BigInt.toUInt128(a)
 
 
 impl BitwiseAnd for UInt128 =
@@ -209,8 +301,6 @@ let checkedPower(base: UInt128, exponent: UInt128): Result<UInt128, Math.PowerEr
 
 // Division. `/` raises on a zero divisor and `%` on a modulus that is not positive;
 // these return the reason instead.
-// TODO: make `/` and `%` themselves checked by default; see the TODO on the `divide`
-// builtin in NoModule.fs.
 
 /// Divides <param a> by <param b>, rounding towards zero, or
 /// {{Error DivisionByZero}} where `/` raises.

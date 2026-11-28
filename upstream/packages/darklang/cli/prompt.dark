@@ -18,6 +18,12 @@ let confirmExplicit(confirm: Confirm, question: String): Bool =
       | _ -> false
 
 
+/// What a command says when its prompt has nobody at a terminal to answer it: what didn't happen,
+/// and the `-y` that does it without asking. One wording for every prompt.
+let refuseWithoutTerminal(what: String, cmd: String): String =
+  $"{what} not done: no terminal to confirm at. `{cmd} -y` does it without asking."
+
+
 /// State for prompt-specific fields (text, cursor, history)
 type State =
   { text: String
@@ -34,7 +40,7 @@ let initState(): State =
 module Editing =
   /// Insert text at cursor position
   let insertAtCursor(state: State, char: String): State =
-    let beforeCursor = Stdlib.String.slice(state.text, 0, state.cursorPosition)
+    let beforeCursor = Stdlib.String.first(state.text, state.cursorPosition)
     let afterCursor = Stdlib.String.dropFirst(state.text, state.cursorPosition)
     let newText = beforeCursor + char + afterCursor
     { state with
@@ -47,7 +53,7 @@ module Editing =
   /// Delete character before cursor (backspace)
   let deleteBeforeCursor(state: State): State =
     if state.cursorPosition > 0 then
-      let beforeCursor = Stdlib.String.slice(state.text, 0, state.cursorPosition - 1)
+      let beforeCursor = Stdlib.String.first(state.text, state.cursorPosition - 1)
       let afterCursor = Stdlib.String.dropFirst(state.text, state.cursorPosition)
       let newText = beforeCursor + afterCursor
       { state with text = newText, cursorPosition = state.cursorPosition - 1, historyIndex = -1 }
@@ -59,7 +65,7 @@ module Editing =
   let deleteAtCursor(state: State): State =
     let textLength = Stdlib.String.length(state.text)
     if state.cursorPosition < textLength then
-      let beforeCursor = Stdlib.String.slice(state.text, 0, state.cursorPosition)
+      let beforeCursor = Stdlib.String.first(state.text, state.cursorPosition)
       let afterCursor = Stdlib.String.dropFirst(state.text, state.cursorPosition + 1)
       let newText = beforeCursor + afterCursor
       { state with text = newText, historyIndex = -1 }
@@ -182,7 +188,7 @@ module Display =
     : Stdlib.Cli.Tui.View =
     let width = Stdlib.max(1, size.width)
     let beforeCursor =
-      styledPrefix(locationStr) + Stdlib.String.slice(state.text, 0, state.cursorPosition)
+      styledPrefix(locationStr) + Stdlib.String.first(state.text, state.cursorPosition)
 
     let rest = Stdlib.String.dropFirst(state.text, state.cursorPosition)
     let afterCursor =

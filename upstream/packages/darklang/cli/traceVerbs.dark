@@ -50,7 +50,7 @@ let whyEmpty(doing: String): List<String> =
 /// width on nothing. Git shortens commit ids the same way, for the same reason.
 let idWidth(ids: List<String>): Int64 =
   let distinct(w: Int64): Bool =
-    let prefixes = ids |> Stdlib.List.map(fun id -> Stdlib.String.slice(id, 0, w))
+    let prefixes = ids |> Stdlib.List.map(fun id -> Stdlib.String.first(id, w))
     Stdlib.List.length(Stdlib.List.unique(prefixes)) == Stdlib.List.length(ids)
 
   match Stdlib.List.findFirst([ 8, 12, 16, 24 ], fun w -> distinct(w)) with
@@ -64,6 +64,7 @@ let statusText(status: Tracing.Status): String =
   | Done -> "done"
   | Failed -> "failed"
   | Suspended -> "suspended"
+  | Lost -> "lost"
 
 
 /// The trace whose id starts with `prefix`, when exactly one does.
@@ -98,9 +99,9 @@ let row(width: Int64, e: Tracing.Trace): List<String> =
   // every row for a flag almost no row has, and `input` is the column that truncates.
   let id =
     if e.pinned then
-      $"*{Stdlib.String.slice(e.id, 0, width)}"
+      $"*{Stdlib.String.first(e.id, width)}"
     else
-      $" {Stdlib.String.slice(e.id, 0, width)}"
+      $" {Stdlib.String.first(e.id, width)}"
 
   [ id
     statusText(e.status)
@@ -142,7 +143,7 @@ type TraceJson =
     answered: Option<String>
     status: String
     pinned: Bool
-    /// Wall clock for the whole trace. Absent for one still going.
+    /// Wall clock for the whole trace, once it has finished. A run under a millisecond is 0.
     durationMs: Option<Int64>
     forkedFrom: Option<ForkJson>
     created: String
@@ -275,7 +276,10 @@ let traceJson(branchId: Uuid, trace: Tracing.Trace): TraceJson =
         trace.result |> Stdlib.Option.map(fun dv -> Tracing.Format.compactDval(branchId, dv))
       status = statusText(trace.status)
       pinned = trace.pinned
-      durationMs = if trace.durationMs > 0 then Option.Some(trace.durationMs) else Option.None
+      durationMs =
+        match trace.status with
+        | Done | Failed -> Option.Some(trace.durationMs)
+        | Running | Suspended | Lost -> Option.None
       forkedFrom =
         trace.parent
         |> Stdlib.Option.map(fun p ->

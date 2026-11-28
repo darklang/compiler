@@ -68,12 +68,7 @@ let evaluateRawUnder(
       let (width, _rows) = Terminal.getSize()
       let color = Stdlib.Cli.Sys.isTerminal(1)
       Result.Ok(Option.Some(Terminal.renderValue(branchId, width, color, currentModule, dv)))
-  | Error(error) ->
-    match error with
-    | Runtime(_, _, _) -> ExecutionError.printCallStack(branchId, "expression", error)
-    | _ -> ()
-
-    Result.Error(error)
+  | Error(error) -> Result.Error(error)
 
 
 /// Evaluate `expr` and hand back what it produced: `Ok (Some printed)` for a value, `Ok None` for something
@@ -101,7 +96,9 @@ let evaluateUnder(
           grants) with
   | Ok(result) -> Result.Ok(result)
   | Error(err) ->
-    Result.Error(ExecutionError.formatForTerminal(state.accountID, state.currentBranchId, err))
+    let message = ExecutionError.formatForTerminal(state.accountID, state.currentBranchId, err)
+    let lines = ExecutionError.whereLines(state.currentBranchId, err, ExecutionError.Entry.Call)
+    Result.Error(Stdlib.String.join(Stdlib.List.prepend(lines, message), "\n"))
 
 
 let execute(state: AppState, args: List<String>): AppState =
@@ -125,11 +122,15 @@ let execute(state: AppState, args: List<String>): AppState =
   | Ok(grants) -> executeUnder(state, args, harmful, wantStats, grants)
 
 
-/// The `--allow <rules>` at the front of <param args>, and what follows them.
+/// Every `--allow <rules>` in <param args>, before or after the expression, and the rest in order.
 let allowRules(rules: List<String>, args: List<String>): (List<String> * List<String>) =
   match args with
   | ["--allow", rule, ...rest] -> allowRules(Stdlib.List.append(rules, rule), rest)
-  | _ -> (rules, args)
+  | ["--", ...rest] -> (rules, rest)
+  | [arg, ...rest] ->
+    let (allRules, others) = allowRules(rules, rest)
+    (allRules, [ arg, ...others ])
+  | [] -> (rules, [])
 
 
 let executeUnder(
@@ -178,15 +179,16 @@ let executeUnder(
 
       match stats with
       | Some(m) ->
-        let _ = Stdlib.printLine("")
+        // stderr, so stdout carries only the value
+        let _ = Stdlib.printErrorLine("")
 
-        let _ = Stdlib.printLine(LanguageTools.Perf.render(m))
+        let _ = Stdlib.printErrorLine(LanguageTools.Perf.render(m))
 
         // TODO: report the phases instead of warning about them. `cliEvaluateExpression` already
         // splits `parseCliExpr` from `execute`, so bracketing each would turn this line into two
         // rows. F# on the eval path, so it wants its own change and its own measurement.
         let _ =
-          Stdlib.printLine(
+          Stdlib.printErrorLine(
             "  (includes parsing and name resolution; Perf.measure in a script brackets execution alone)")
 
         newState

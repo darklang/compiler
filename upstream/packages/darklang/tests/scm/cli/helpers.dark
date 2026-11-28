@@ -84,9 +84,13 @@ let commit(dark: Cli.Tests.Instance.T, message: String): Stdlib.Test.Result =
   run(dark, [ "commit", message, "-y" ])
 
 
-/// `dark switch <branch>`: move onto a branch, starting it if it is new.
+/// `dark switch <branch>`: move onto a branch, or `dark switch -c <branch>` when it is new.
 let switch(dark: Cli.Tests.Instance.T, branch: String): Stdlib.Test.Result =
-  run(dark, [ "switch", branch ])
+  let (code, _, _) = exec(dark, [ "switch", branch ])
+  if code == 0 then
+    Stdlib.Test.Result.Pass
+  else
+    run(dark, [ "switch", "-c", branch ])
 
 
 /// `dark merge <branch> -y`: merge a branch into its parent without asking.
@@ -126,6 +130,22 @@ let says(
   else
     Stdlib.Test.fail(
       $"{why}: `{shown(args)}` should say '{needle}'. It said (exit {Stdlib.display(code)}): {said}")
+
+
+/// `dark <args>` prints every one of <param needles>, from one run.
+let saysAll(
+  dark: Cli.Tests.Instance.T,
+  args: List<String>,
+  needles: List<String>,
+  why: String)
+  : Stdlib.Test.Result =
+  let (code, _, said) = exec(dark, args)
+  match Stdlib.List.filter(needles, fun n ->
+          Stdlib.Bool.not(Stdlib.String.contains(said, n))) with
+  | [] -> Stdlib.Test.Result.Pass
+  | missing ->
+    Stdlib.Test.fail(
+      $"{why}: `{shown(args)}` should say {Stdlib.inspect(missing)}. It said (exit {Stdlib.display(code)}): {said}")
 
 
 /// `dark <args>` prints something, and it does not include <param needle>.

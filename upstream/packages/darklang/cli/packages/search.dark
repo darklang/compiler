@@ -99,24 +99,22 @@ let itemQuery(query: String): String =
 // out loud: `read file` is asking for `readFile`. For a one-word query this is
 // the word itself, so it changes nothing there.
 let joinedQuery(query: String): String =
+  queryTokens(query) |> Stdlib.String.join("")
+
+
+/// Split the query into lowercase words at spaces and dots.
+let queryTokens(query: String): List<String> =
   query
   |> Stdlib.String.toLowercase
   |> Stdlib.String.replaceAll(".", " ")
   |> Stdlib.String.split(" ")
   |> Stdlib.List.filter(fun token -> Stdlib.Bool.not(Stdlib.String.isEmpty(token)))
-  |> Stdlib.String.join("")
 
 
 // The query's words, lowercased, the way the store matched them: split on spaces
 // and dots, and short filler like `of` and `to` dropped unless every word is short.
 let queryWords(query: String): List<String> =
-  let words =
-    query
-    |> Stdlib.String.toLowercase
-    |> Stdlib.String.replaceAll(".", " ")
-    |> Stdlib.String.split(" ")
-    |> Stdlib.List.filter(fun token -> Stdlib.Bool.not(Stdlib.String.isEmpty(token)))
-
+  let words = queryTokens(query)
   let kept = words |> Stdlib.List.filter(fun w -> Stdlib.String.length(w) > 2)
   if Stdlib.List.isEmpty(kept) then words else kept
 
@@ -139,7 +137,22 @@ let wordSynonyms(word: String): List<String> =
   | "tostring" -> [ "display" ]
   | "torepr" -> [ "inspect" ]
   | "repr" -> [ "inspect" ]
+  | "async" | "task" | "promise" | "future" | "coroutine" | "goroutine" ->
+    [ "Exec.spawn", "Exec.await" ]
+  | "thread" | "parallel" | "concurrent" | "concurrency" -> [ "List.parallelMap", "Exec.spawn" ]
+  | "mutex" | "lock" | "semaphore" -> [ "Cli.File.withLock" ]
+  | "channel" | "channels" | "mailbox" -> [ "Exec.spawn", "Exec.await" ]
   | _ -> []
+
+
+/// What a query reaching for something Dark does not have should read instead.
+let conceptNote(query: String): Option<String> =
+  let words = queryTokens(query)
+  if Stdlib.List.any(words, fun w -> w == "channel" || w == "channels" || w == "mailbox") then
+    Option.Some(
+      "  (Dark has no channels: `Exec.spawn` runs a function beside yours and `Exec.await` takes its result; `dark docs processes` has more)")
+  else
+    Option.None
 
 
 // What a whole query may also mean, for words that mean something only together.
@@ -154,6 +167,24 @@ let phraseSynonyms(words: List<String>): List<String> =
   | _ -> []
 
 
+/// Search for `dict.remove` when someone asks to remove a key from a dictionary.
+/// For JSON queries, also look for `Json.serialize` when someone says `encode`.
+let moduleQueries(tokens: List<String>): List<String> =
+  let words = tokens |> Stdlib.List.filter(fun word -> word != "a" && word != "an" && word != "the")
+  let moduleHint =
+    match words, Stdlib.List.reverse(words) with
+    | [operation, _, _, ...], [moduleWord, relation, ...]
+      when relation == "from" || relation == "in" ->
+      let moduleName = if moduleWord == "dictionary" then "dict" else moduleWord
+      [ moduleName + "." + operation ]
+    | _ -> []
+
+  if Stdlib.List.contains(tokens, "json") && Stdlib.List.contains(tokens, "encode") then
+    Stdlib.List.prepend(moduleHint, "Json.serialize")
+  else
+    moduleHint
+
+
 // The other queries <param query> is searched as, and the names they stand for:
 // `size of string` is also `length string`, for `length`. None for a dotted query,
 // which names what it wants.
@@ -162,16 +193,22 @@ let synonymQueries(query: String): List<(String * String)> =
     []
   else
     let words = queryWords(query)
-    match phraseSynonyms(words) with
-    | [] ->
-      words
-      |> Stdlib.List.map(fun word ->
-        wordSynonyms(word)
-        |> Stdlib.List.map(fun target ->
-          let swapped = words |> Stdlib.List.map(fun w -> if w == word then target else w)
-          (Stdlib.String.join(swapped, " "), target)))
-      |> Stdlib.List.flatten
-    | targets -> targets |> Stdlib.List.map(fun target -> (target, target))
+    let synonyms =
+      match phraseSynonyms(words) with
+      | [] ->
+        words
+        |> Stdlib.List.map(fun word ->
+          wordSynonyms(word)
+          |> Stdlib.List.map(fun target ->
+            let swapped = words |> Stdlib.List.map(fun w -> if w == word then target else w)
+            (Stdlib.String.join(swapped, " "), target)))
+        |> Stdlib.List.flatten
+      | targets -> targets |> Stdlib.List.map(fun target -> (target, target))
+
+    let qualified =
+      moduleQueries(queryTokens(query)) |> Stdlib.List.map(fun target -> (target, target))
+
+    Stdlib.List.concat(synonyms, qualified)
 
 
 // A query read once for ranking, since a search ranks every result against it.
@@ -300,13 +337,24 @@ let usageKey(uses: Dict<String, Int64>, path: String): String =
   Stdlib.String.padStart(Stdlib.display(999999 - capped), '0', 6)
 
 
+// A match rank as one sort key digit: Darklang's own code (the CLI, the tools) after every
+// other name match, though before what matches only in its docs.
+let matchKey(rank: Int64, owner: String, modules: List<String>): Int64 =
+  if rank == 4 then
+    8
+  else if tier(owner, modules) == "2" then
+    rank + 4
+  else
+    rank
+
+
 // Sort key: match quality first, then whether the module is named by the query,
 // then the tier, then how many items call it, and finally the full path for
 // deterministic ordering. Each part is fixed-width, so plain string ordering under
 // `sortBy` gives the intended result.
 let rankKey(ranker: Ranker, owner: String, modules: List<String>, name: String): String =
   let lowerName = Stdlib.String.toLowercase(name)
-  let mr = Stdlib.display(rankInModule(ranker, modules, lowerName))
+  let mr = Stdlib.display(matchKey(rankInModule(ranker, modules, lowerName), owner, modules))
   let mh = Stdlib.display(moduleHit(ranker, modules, lowerName))
   let path =
     [ [ owner ], modules, [ name ] ]
@@ -649,16 +697,93 @@ let namesUnder(branchId: Uuid, currentModule: List<String>): List<String> =
   Query.withoutInternalNames(Stdlib.List.flatten([ fns, types, values ]))
 
 
+/// The word dropped from the search and the names found without it.
+type FallbackSuggestions =
+  { dropped: String
+    names: List<String> }
+
+
 // What to try when a query found nothing.
 type NothingFound =
   { // Each word of a several-word query, and how many items it finds alone. Empty
     // for a one-word query.
     wordCounts: List<(String * Int64)>
     // Each word that finds nothing, and the names it may be a typo of.
-    didYouMean: List<(String * List<String>)> }
+    didYouMean: List<(String * List<String>)>
+    fallback: Option<FallbackSuggestions>
+    // Closest matches when nothing has every word: each name, with the words it matched.
+    partial: List<(String * List<String>)> }
 
 
-val nothingToTry = NothingFound { wordCounts = [], didYouMean = [] }
+val nothingToTry =
+  NothingFound { wordCounts = [], didYouMean = [], fallback = Option.None, partial = [] }
+
+
+// TODO: this only helps when nothing has every word. Searches like "parse json text" or
+// "convert string to integer" still miss the function people want. Ideas, cheapest first:
+// 1. Add the words people type to the docs of the functions missed (`Int64.parse`,
+//    `DateTime.now`, `Json.parse`, `List.any`...), and add those questions to the test
+//    `plainQuestionsFindTheFunctionNeeded`.
+// 2. Score every search the same way (e.g. BM25): rarer words count more, the name more than
+//    the docs. This function does a rough version of that for misses only.
+// 3. A few synonyms, like integer -> Int64 and directory -> Dir. It's a list to maintain,
+//    so keep it short.
+/// The closest matches when nothing has every word: items matching two or more of the words,
+/// best first. Rarer words count for more, so `shell` (26 matches) outweighs `and` (1,372).
+let bestPartialMatches(
+  ranker: Ranker,
+  perWord: List<(String * LanguageTools.ProgramTypes.Search.SearchResults)>,
+  limit: Int64)
+  : List<(String * List<String>)> =
+  // The commonest word in the query weighs 1, a word matching a quarter as many items 2.
+  let commonest =
+    perWord
+    |> Stdlib.List.map(fun((_, results)) -> itemCount(results))
+    |> Stdlib.List.fold(1, fun(acc, n) -> Stdlib.max(acc, n))
+    |> Stdlib.Int64.toFloat64
+
+  // Each match: the item's tier, its sort key, its name, the word, and what the word scores.
+  // A word in the item's name, not just its docs, counts double.
+  let scored(
+    word: String,
+    weight: Float64,
+    item: LanguageTools.ProgramTypes.LocatedItem<'a>)
+    : (String * (String * String * String * Float64)) =
+    let loc = item.location
+    let (key, name) = suggestionWithSortKey(ranker, item)
+    let inName =
+      Stdlib.String.contains(Stdlib.String.toLowercase(loc.name), Stdlib.String.toLowercase(word))
+
+    (name, (tier(loc.owner, loc.modules), key, word, if inName then weight * 2.0 else weight))
+
+  let matches =
+    perWord
+    |> Stdlib.List.map(fun((word, results)) ->
+      let count = Stdlib.Int64.toFloat64(Stdlib.max(itemCount(results), 1))
+      let weight = Stdlib.Float64.sqrt(commonest / count)
+      Stdlib.List.flatten(
+        [ results.fns |> Stdlib.List.map(fun item -> scored(word, weight, item))
+          results.types |> Stdlib.List.map(fun item -> scored(word, weight, item))
+          results.values |> Stdlib.List.map(fun item -> scored(word, weight, item)) ]))
+    |> Stdlib.List.flatten
+
+  matches
+  |> Stdlib.List.fold(Dict {}, fun(acc, entry) ->
+    let (name, (itemTier, key, word, weight)) = entry
+    let (_, _, words, score) =
+      Stdlib.Dict.get(acc, name) |> Stdlib.Option.withDefault((itemTier, key, [], 0.0))
+
+    if Stdlib.List.contains(words, word) then
+      acc
+    else
+      Stdlib.Dict.set(acc, name, (itemTier, key, Stdlib.List.append(words, word), score + weight)))
+  |> Stdlib.Dict.toList
+  |> Stdlib.List.filter(fun((_, (_, _, words, _))) -> Stdlib.List.length(words) >= 2)
+  // The standard library first, as in an ordinary search, then the best score.
+  |> Stdlib.List.sortBy(fun((name, (itemTier, key, _, score))) ->
+    (itemTier, 0.0 - score, key, name))
+  |> Stdlib.List.take(limit)
+  |> Stdlib.List.map(fun((name, (_, _, words, _))) -> (name, words))
 
 
 // What to try when <param query> found nothing. Each word of a several-word query
@@ -669,33 +794,81 @@ let nothingFound(
   query: LanguageTools.ProgramTypes.Search.SearchQuery)
   : NothingFound =
   let words = queryWords(query.text)
-  let countFor = fun word ->
+  let dotted = Stdlib.String.contains(query.text, ".")
+  let resultsFor = fun word ->
     let found =
       LanguageTools.PackageManager.Search.search(branchId, { query with text = word })
       |> Query.withoutInternal
 
     let (kept, _) = withoutTestHelpers(found)
-    itemCount(kept)
+    kept
 
-  let several = Stdlib.List.length(words) > 1
+  let several = Stdlib.Bool.not(dotted) && Stdlib.List.length(words) > 1
+  let perWord = if several then words |> Stdlib.List.map(fun w -> (w, resultsFor(w))) else []
+
   let counts =
     if several then
-      words |> Stdlib.List.map(fun w -> (w, countFor(w)))
+      perWord |> Stdlib.List.map(fun((w, results)) -> (w, itemCount(results)))
     else
       [ (query.text, 0) ]
 
-  let didYouMean =
-    match Stdlib.List.filter(counts, fun((_, n)) -> n == 0) with
-    | [] -> []
-    | missing ->
-      let names = namesUnder(branchId, query.currentModule)
-      missing
-      |> Stdlib.List.filterMap(fun((w, _)) ->
-        match nearNames(w, names) with
-        | [] -> Option.None
-        | near -> Option.Some((w, near)))
+  let partial = if several then bestPartialMatches(rankerFor(query.text), perWord, 5) else []
 
-  NothingFound { wordCounts = if several then counts else [], didYouMean = didYouMean }
+  let didYouMean =
+    if dotted then
+      match nearestFullNames(branchId, query) with
+      | [] -> []
+      | near -> [ (query.text, near) ]
+    else
+      match Stdlib.List.filter(counts, fun((_, n)) -> n == 0) with
+      | [] -> []
+      | missing ->
+        let names = namesUnder(branchId, query.currentModule)
+        missing
+        |> Stdlib.List.filterMap(fun((w, _)) ->
+          match nearNames(w, names) with
+          | [] -> Option.None
+          | near -> Option.Some((w, near)))
+
+  NothingFound
+    { wordCounts = if several then counts else []
+      didYouMean = didYouMean
+      fallback = Option.None
+      partial = partial }
+
+
+/// Real names near a dotted <param query> that found nothing: what <fn Errors.didYouMean> makes of
+/// it, or else the best matches for its last part. Its other parts are module names, and taken a
+/// word at a time they only matched words: `Stdio` for `Stdlib`.
+let nearestFullNames(
+  branchId: Uuid,
+  query: LanguageTools.ProgramTypes.Search.SearchQuery)
+  : List<String> =
+  let parts =
+    query.text
+    |> Stdlib.String.split(".")
+    |> Stdlib.List.filter(fun p -> Stdlib.Bool.not(Stdlib.String.isEmpty(p)))
+
+  match Errors.didYouMean(branchId, parts) with
+  | [] ->
+    match Stdlib.List.last(parts) with
+    | None -> []
+    | Some(item) ->
+      let found =
+        LanguageTools.PackageManager.Search.search(branchId, { query with text = item })
+        |> Query.withoutInternal
+
+      let (kept, _) = withoutTestHelpers(found)
+      let ranker = rankerFor(item)
+      Stdlib.List.flatten(
+        [ kept.fns |> Stdlib.List.map(fun i -> suggestionWithSortKey(ranker, i))
+          kept.types |> Stdlib.List.map(fun i -> suggestionWithSortKey(ranker, i))
+          kept.values |> Stdlib.List.map(fun i -> suggestionWithSortKey(ranker, i)) ])
+      |> Stdlib.List.sortBy(fun((key, _)) -> key)
+      |> Stdlib.List.map(Stdlib.Tuple2.second)
+      |> Stdlib.List.unique
+      |> Stdlib.List.take(3)
+  | names -> names
 
 
 // <type NothingFound> as hint lines.
@@ -723,7 +896,26 @@ let nothingFoundLines(found: NothingFound): List<String> =
       let forWord = if several then $" (for `{w}`)" else ""
       $"  Did you mean {shown}?{forWord}")
 
-  Stdlib.List.flatten([ alone, typos ])
+  let partial =
+    match found.partial with
+    | [] -> []
+    | matches ->
+      let rows =
+        matches
+        |> Stdlib.List.map(fun((name, words)) ->
+          $"    {name}  (matches {Stdlib.String.join(words, ", ")})")
+
+      Stdlib.List.prepend(rows, "  Closest, matching some of the words:")
+
+  match found.fallback with
+  | Some(matches) ->
+    let names =
+      matches.names
+      |> Stdlib.List.map(fun name -> $"`{name}`")
+      |> Stdlib.String.join(", ")
+
+    [ $"  Without `{matches.dropped}`: {names}" ]
+  | None -> Stdlib.List.flatten([ partial, alone, typos ])
 
 
 let docBlock(desc: String, indent: String): String =
@@ -775,11 +967,15 @@ let contextFor(
   Signatures.rootContext(branchId, modulePath)
 
 
-// Renders one result section (types/values/fns): header, the ranked hits capped
-// (one line each via `renderItem`), and an overflow footer. Nothing is printed
-// for an empty section. `renderItem` does the per-entity formatting at the call
-// site, so this stays generic over the entity type.
+/// Controls how much context appears around text search results.
+type DisplayMode =
+  | Detailed
+  | Brief
+
+
+/// Print the top <param cap> results in one search section.
 let renderSection(
+  mode: DisplayMode,
   header: String,
   cap: Int64,
   items: List<LanguageTools.ProgramTypes.LocatedItem<'a>>,
@@ -788,11 +984,14 @@ let renderSection(
   if Stdlib.List.isEmpty(items) then
     ()
   else
-    Stdlib.printLine(Display.getSectionHeader(header))
+    if mode == DisplayMode.Detailed then
+      Stdlib.printLine(Display.getSectionHeader(header))
+
     let shown = Stdlib.List.take(items, cap)
     shown |> Stdlib.List.iter(fun item -> Stdlib.printLine(renderItem(item)))
-    overflowNote(Stdlib.List.length(items), Stdlib.List.length(shown))
-    Stdlib.printLine("")
+    if mode == DisplayMode.Detailed then
+      overflowNote(Stdlib.List.length(items), Stdlib.List.length(shown))
+      Stdlib.printLine("")
 
 
 type ParsedArgs =
@@ -807,6 +1006,7 @@ type ParsedArgs =
     internal: Query.Internal
     includeTests: Bool
     asJson: Bool
+    mode: DisplayMode
     parseErrors: List<FlagParser.ParseError> }
 
 
@@ -823,6 +1023,7 @@ val argSpec =
           ("--exact", [])
           ("--shallow", [])
           ("--with-docs", [])
+          ("--brief", [])
           ("--include-deprecated", [])
           ("--include-internal", [])
           ("--include-tests", [])
@@ -858,6 +1059,11 @@ let parseArgs(args: List<String>): ParsedArgs =
       batch = FlagParser.hasFlag(p, "--batch")
       exactMatch = FlagParser.hasFlag(p, "--exact")
       withDocs = FlagParser.hasFlag(p, "--with-docs")
+      mode =
+        if FlagParser.hasFlag(p, "--brief") then
+          DisplayMode.Brief
+        else
+          DisplayMode.Detailed
       shallow = FlagParser.hasFlag(p, "--shallow")
       deprecated = Query.Deprecated.showIf(FlagParser.hasFlag(p, "--include-deprecated"))
       internal = Query.Internal.showIf(FlagParser.hasFlag(p, "--include-internal"))
@@ -867,28 +1073,34 @@ let parseArgs(args: List<String>): ParsedArgs =
 
 
 val usage =
-  "Usage: search <query> [--batch] [--limit N] [--type] [--fn] [--val] [--trait] [--impl] [--test] [--exact] [--shallow] [--with-docs] [--include-deprecated] [--include-internal] [--include-tests]"
+  "Usage: search <query> [--batch] [--limit N] [--type] [--fn] [--val] [--trait] [--impl] [--test] [--exact] [--shallow] [--with-docs] [--brief] [--include-deprecated] [--include-internal] [--include-tests]"
 
 
 // The --json rendering. Typed results for the command an agent runs most; the signatures are the
 // same rendering the human view shows, minus color. `alsoSearched` is the synonym queries that ran
 // too; `wordCounts` and `didYouMean` are what the human view hints when nothing matched, and are
-// empty otherwise.
+// empty otherwise. The sections come in `order`, each ranked and capped the way the text view
+// shows them.
 let jsonOutput(
   branchId: Uuid,
   queryText: String,
   alsoSearched: List<String>,
   found: NothingFound,
+  order: List<String>,
+  typed:
+    List<LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>>,
   results: LanguageTools.ProgramTypes.Search.SearchResults)
   : String =
-  let fnRows =
-    results.fns
-    |> Stdlib.List.map(fun item ->
-      let ctx = contextFor(branchId, item)
-      Stdlib.AltJson.Json.Object(
-        [ ("name", Stdlib.AltJson.Json.String(fullPathOf(item)))
-          ("kind", Stdlib.AltJson.Json.String("fn"))
-          ("signature", Stdlib.AltJson.Json.String(Signatures.formatFn(ctx, item.entity))) ]))
+  let fnRow(
+    item: LanguageTools.ProgramTypes.LocatedItem<LanguageTools.ProgramTypes.PackageFn.PackageFn>)
+    : Stdlib.AltJson.Json =
+    let ctx = contextFor(branchId, item)
+    Stdlib.AltJson.Json.Object(
+      [ ("name", Stdlib.AltJson.Json.String(fullPathOf(item)))
+        ("kind", Stdlib.AltJson.Json.String("fn"))
+        ("signature", Stdlib.AltJson.Json.String(Signatures.formatFn(ctx, item.entity))) ])
+
+  let fnRows = results.fns |> Stdlib.List.map(fnRow)
 
   let typeRows =
     results.types
@@ -958,22 +1170,57 @@ let jsonOutput(
             Stdlib.AltJson.Json.Array(
               names |> Stdlib.List.map(fun n -> Stdlib.AltJson.Json.String(n)))) ]))
 
-  Stdlib.AltJson.format(
-    Stdlib.AltJson.Json.Object(
-      [ ("query", Stdlib.AltJson.Json.String(queryText))
-        (
-          "results",
-          Stdlib.AltJson.Json.Array(
-            Stdlib.List.flatten(
-              [ fnRows, typeRows, valueRows, traitRows, implRows, testRows, moduleRows ])))
+  let fallbackFields =
+    match found.fallback with
+    | None -> []
+    | Some(matches) ->
+      let names = matches.names |> Stdlib.List.map(fun name -> Stdlib.AltJson.Json.String(name))
+      [ (
+          "relaxed",
+          Stdlib.AltJson.Json.Object(
+            [ ("dropped", Stdlib.AltJson.Json.String(matches.dropped))
+              ("names", Stdlib.AltJson.Json.Array(names)) ])) ]
 
-        (
-          "alsoSearched",
-          Stdlib.AltJson.Json.Array(
-            alsoSearched |> Stdlib.List.map(fun q -> Stdlib.AltJson.Json.String(q))))
+  let fields =
+    [ ("query", Stdlib.AltJson.Json.String(queryText))
+      (
+        "results",
+        Stdlib.AltJson.Json.Array(
+          Stdlib.List.flatten(
+            Stdlib.List.prepend(
+              order
+              |> Stdlib.List.map(fun tag ->
+                match tag with
+                | "function" -> fnRows
+                | "type" -> typeRows
+                | "value" -> valueRows
+                | "trait" -> traitRows
+                | "impl" -> implRows
+                | "test" -> testRows
+                | "module" -> moduleRows
+                | _ -> []),
+              typed |> Stdlib.List.map(fnRow)))))
 
-        ("wordCounts", Stdlib.AltJson.Json.Array(wordCountRows))
-        ("didYouMean", Stdlib.AltJson.Json.Array(didYouMeanRows)) ]))
+      (
+        "alsoSearched",
+        Stdlib.AltJson.Json.Array(
+          alsoSearched |> Stdlib.List.map(fun q -> Stdlib.AltJson.Json.String(q))))
+
+      ("wordCounts", Stdlib.AltJson.Json.Array(wordCountRows))
+      ("didYouMean", Stdlib.AltJson.Json.Array(didYouMeanRows))
+      (
+        "partial",
+        Stdlib.AltJson.Json.Array(
+          found.partial
+          |> Stdlib.List.map(fun((name, words)) ->
+            Stdlib.AltJson.Json.Object(
+              [ ("name", Stdlib.AltJson.Json.String(name))
+                (
+                  "matched",
+                  Stdlib.AltJson.Json.Array(
+                    words |> Stdlib.List.map(fun w -> Stdlib.AltJson.Json.String(w)))) ])))) ]
+
+  Stdlib.AltJson.format(Stdlib.AltJson.Json.Object(Stdlib.List.concat(fields, fallbackFields)))
 
 
 // Execute one query. `execute` below fans batch arguments out through this
@@ -1122,6 +1369,61 @@ let callerUses(
           results.tests |> Stdlib.List.filterMap(fun i -> calledPath(byHash, i.entity.hash, i)) ]))
 
 
+/// Pair each name with a sort key that puts standard library results first.
+let suggestionWithSortKey(
+  ranker: Ranker,
+  item: LanguageTools.ProgramTypes.LocatedItem<'a>)
+  : (String * String) =
+  let loc = item.location
+  (
+    tier(loc.owner, loc.modules) + rankKey(ranker, loc.owner, loc.modules, loc.name),
+    fullPathOf(item))
+
+
+/// For a phrase with no matches, try dropping each of its first three search terms in order.
+/// Stop at the first query with matches, and always keep at least two terms.
+let fallbackSuggestions(
+  query: LanguageTools.ProgramTypes.Search.SearchQuery,
+  cap: Int64,
+  search: String -> LanguageTools.ProgramTypes.Search.SearchResults)
+  : Option<FallbackSuggestions> =
+  let words = queryWords(query.text) |> Stdlib.List.unique
+  if
+    query.exactMatch || Stdlib.String.contains(query.text, ".") || Stdlib.List.length(words) < 3
+  then
+    Option.None
+  else
+    words
+    |> Stdlib.List.take(3)
+    |> Stdlib.List.fold(Option.None, fun(found, droppedWord) ->
+      match found with
+      | Some(_) -> found
+      | None ->
+        let shorterQuery =
+          words
+          |> Stdlib.List.filter(fun word -> word != droppedWord)
+          |> Stdlib.String.join(" ")
+
+        let results = search(shorterQuery)
+        let ranker = rankerFor(shorterQuery)
+        let names =
+          Stdlib.List.flatten(
+            [ results.fns |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item))
+              results.types |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item))
+              results.values |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item))
+              results.traits |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item))
+              results.impls |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item))
+              results.tests |> Stdlib.List.map(fun item -> suggestionWithSortKey(ranker, item)) ])
+          |> Stdlib.List.sortBy(fun((key, _)) -> key)
+          |> Stdlib.List.map(Stdlib.Tuple2.second)
+          |> Stdlib.List.unique
+          |> Stdlib.List.take(Stdlib.min(3, cap))
+
+        match names with
+        | [] -> Option.None
+        | _ -> Option.Some(FallbackSuggestions { dropped = droppedWord, names = names }))
+
+
 let executeQuery(state: AppState, args: List<String>): AppState =
   match args with
   | [] ->
@@ -1203,7 +1505,6 @@ let executeQuery(state: AppState, args: List<String>): AppState =
                   { query with text = q })))
 
         let depSets = Query.loadDeprecationSets(state.currentBranchId)
-        let results = Query.filterHidden(rawResults, depSets, parsed.deprecated, parsed.internal)
 
         // An implementation is one result. Its method fns live under it and its path reads as a
         // module, so without this each one was listed three times. A method matches on its own
@@ -1215,16 +1516,6 @@ let executeQuery(state: AppState, args: List<String>): AppState =
           |> Stdlib.Dict.fromList
 
         let isImpl = fun path -> Stdlib.Dict.containsKey(implPaths, Stdlib.String.join(path, "."))
-        let results =
-          { results with
-              fns =
-                results.fns
-                |> Stdlib.List.filter(fun f ->
-                  Stdlib.Bool.not(
-                    isImpl(Stdlib.List.prepend(f.location.modules, f.location.owner))))
-              submodules =
-                results.submodules |> Stdlib.List.filter(fun m -> Stdlib.Bool.not(isImpl(m))) }
-
         // Tests are left out unless asked for. A test is usually named after what
         // it tests, so every search for a function would also list its tests;
         // `dark test run <filter>` and `view --include-tests` are where to find them.
@@ -1235,17 +1526,60 @@ let executeQuery(state: AppState, args: List<String>): AppState =
             parsed.entityTypes,
             LanguageTools.ProgramTypes.Search.EntityType.Test)
 
-        let hiddenTests = if showTests then 0 else Stdlib.List.length(results.tests)
+        let visibleResults = fun raw ->
+          let results = Query.filterHidden(raw, depSets, parsed.deprecated, parsed.internal)
+          let results =
+            { results with
+                fns =
+                  results.fns
+                  |> Stdlib.List.filter(fun f ->
+                    Stdlib.Bool.not(
+                      isImpl(Stdlib.List.prepend(f.location.modules, f.location.owner))))
+                submodules =
+                  results.submodules |> Stdlib.List.filter(fun m -> Stdlib.Bool.not(isImpl(m))) }
 
-        let results = if showTests then results else { results with tests = [] }
+          let hiddenTests = if showTests then 0 else Stdlib.List.length(results.tests)
 
-        // Test helpers go with the tests, unless the search is about tests.
-        let (results, hiddenHelpers) =
-          if showTests || showsTestHelpers(searchText, currentModule) then
-            (results, 0)
+          let results = if showTests then results else { results with tests = [] }
+
+          // Test helpers go with the tests, unless the search is about tests.
+          let (results, hiddenHelpers) =
+            if showTests || showsTestHelpers(searchText, currentModule) then
+              (results, 0)
+            else
+              withoutTestHelpers(results)
+
+          (results, hiddenTests, hiddenHelpers)
+
+        let (results, hiddenTests, hiddenHelpers) = visibleResults(rawResults)
+        let (visibleModules, hiddenModules) =
+          if parsed.deprecated == Query.Deprecated.Hide && parsed.entityTypes == [] then
+            Stdlib.List.partition(results.submodules, fun path ->
+              Query.moduleHasVisibleItems(
+                state.currentBranchId,
+                path,
+                depSets,
+                parsed.deprecated,
+                parsed.internal))
           else
-            withoutTestHelpers(results)
+            (results.submodules, [])
 
+        let hiddenDeprecatedModules =
+          Stdlib.Bool.not(parsed.asJson)
+          && Stdlib.List.any(hiddenModules, fun path ->
+            Query.moduleHasVisibleItems(
+              state.currentBranchId,
+              path,
+              depSets,
+              Query.Deprecated.Show,
+              parsed.internal))
+
+        let printHiddenModulesHint(): Unit =
+          if hiddenDeprecatedModules then
+            Stderr.line(
+              "Matching deprecated modules are hidden. Use --include-deprecated to show them.")
+
+        let results = { results with submodules = visibleModules }
         // `bytes to string`: the Stdlib functions by what they take and return. They
         // print in a section of their own, so they leave the name matches.
         let wantsFns =
@@ -1292,12 +1626,78 @@ let executeQuery(state: AppState, args: List<String>): AppState =
         let ranker =
           rankerWith(searchText, synonyms |> Stdlib.List.map(fun((_, target)) -> target), uses)
 
-        if parsed.asJson then
-          let found =
-            if totalResults == 0 then
-              nothingFound(state.currentBranchId, query)
+        let resultCap = Stdlib.Option.withDefault(parsed.limit, displayCap)
+        let moduleRank =
+          if Stdlib.List.isEmpty(parsed.entityTypes) then
+            bestModuleRank(searchText, results.submodules)
+          else
+            9
+
+        let results =
+          { results with
+              types = ranked(ranker, results.types)
+              values = ranked(ranker, results.values)
+              fns = ranked(ranker, results.fns)
+              traits = ranked(ranker, results.traits)
+              impls = ranked(ranker, results.impls)
+              tests = ranked(ranker, results.tests)
+              submodules =
+                if Stdlib.List.isEmpty(parsed.entityTypes) then
+                  results.submodules
+                  |> Stdlib.List.sortBy(fun modulePath ->
+                    let modName = Stdlib.Option.withDefault(Stdlib.List.last(modulePath), "")
+                    let owner = Stdlib.Option.withDefault(Stdlib.List.head(modulePath), "")
+                    let mods = Stdlib.Option.withDefault(Stdlib.List.tail(modulePath), [])
+                    rankKey(ranker, owner, mods, modName))
+                else
+                  [] }
+
+        // Suffix orders sections on a rank tie. Modules are navigation, not the
+        // usual discovery target, so they sort last - a wall of namespace
+        // matches shouldn't precede an equally-ranked fn/type/value hit.
+        let moduleKey = Stdlib.String.padEnd($"{Stdlib.display(moduleRank)}1", '9', rankKeyHead)
+        let sectionKeys =
+          [ ($"{moduleKey}4", "module")
+            ($"{bestItemKey(ranker, results.types)}1", "type")
+            ($"{bestItemKey(ranker, results.values)}2", "value")
+            ($"{bestItemKey(ranker, results.fns)}3", "function")
+            ($"{bestItemKey(ranker, results.traits)}0", "trait")
+            ($"{bestItemKey(ranker, results.impls)}5", "impl")
+            ($"{bestItemKey(ranker, results.tests)}6", "test") ]
+
+        let order =
+          sectionKeys
+          |> Stdlib.List.sortBy(fun((key, _)) -> key)
+          |> Stdlib.List.map(fun((_, tag)) -> tag)
+
+        let found =
+          if totalResults > 0 then
+            nothingToTry
+          else
+            // The closest matches weigh every word; dropping one word at a time is the older
+            // fallback, used when they find nothing.
+            let missed = nothingFound(state.currentBranchId, query)
+            if Stdlib.Bool.not(Stdlib.List.isEmpty(missed.partial)) then
+              missed
             else
-              nothingToTry
+              let fallback = fallbackSuggestions(query, resultCap, fun text ->
+                let (visible, _, _) =
+                  visibleResults(
+                    LanguageTools.PackageManager.Search.search(
+                      state.currentBranchId,
+                      { query with text = text }))
+
+                visible)
+
+              match fallback with
+              | Some(_) -> { nothingToTry with fallback = fallback }
+              | None -> missed
+
+        if parsed.asJson then
+          let shownTyped =
+            match typeQuery(searchText) with
+            | Some(_) -> Stdlib.List.take(typed, resultCap)
+            | None -> []
 
           Stdlib.printLine(
             jsonOutput(
@@ -1305,18 +1705,35 @@ let executeQuery(state: AppState, args: List<String>): AppState =
               queryText,
               alsoSearched,
               found,
-              { results with fns = Stdlib.List.flatten([ typed, results.fns ]) }))
+              order,
+              shownTyped,
+              { results with
+                  types = Stdlib.List.take(results.types, resultCap)
+                  values = Stdlib.List.take(results.values, resultCap)
+                  fns = Stdlib.List.take(results.fns, resultCap)
+                  traits = Stdlib.List.take(results.traits, resultCap)
+                  impls = Stdlib.List.take(results.impls, resultCap)
+                  tests = Stdlib.List.take(results.tests, resultCap)
+                  submodules = Stdlib.List.take(results.submodules, resultCap) }))
         else if totalResults == 0 then
           Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.dimText($"No results found for: {queryText}"))
+          printHiddenModulesHint()
           operatorHint(state.currentBranchId, rawQueryText)
           hiddenTestsHint(hiddenTests)
           hiddenHelpersHint(hiddenHelpers)
-          nothingFoundLines(nothingFound(state.currentBranchId, query))
+          match conceptNote(queryText) with
+          | Some(note) -> Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(note))
+          | None -> ()
+
+          nothingFoundLines(found)
           |> Stdlib.List.iter(fun line -> Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(line)))
 
           Stdlib.printErrorLine("")
         else
-          Stdlib.printLine(Stdlib.Cli.UI.Colors.boldText($"Search results for: {queryText}"))
+          if parsed.mode == DisplayMode.Detailed then
+            Stdlib.printLine(Stdlib.Cli.UI.Colors.boldText($"Search results for: {queryText}"))
+
+          printHiddenModulesHint()
           match aliasKeyword with
           | Some(kw) ->
             Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint($"  ({rawQueryText} is {kw})"))
@@ -1333,14 +1750,16 @@ let executeQuery(state: AppState, args: List<String>): AppState =
 
             Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint($"  (also searched {shown})"))
 
-          Stdlib.printLine("")
+          match conceptNote(queryText) with
+          | Some(note) -> Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(note))
+          | None -> ()
 
-          // Key format: match rank followed by the fixed section order.
-          let resultCap = Stdlib.Option.withDefault(parsed.limit, displayCap)
+          if parsed.mode == DisplayMode.Detailed then Stdlib.printLine("")
           match typeQuery(searchText) with
           | Some((source, target)) when Stdlib.Bool.not(Stdlib.List.isEmpty(typed)) ->
-            Stdlib.printLine(
-              $"{Glyphs.forKind("fn")} Functions from {typeLabel(source)} to {typeLabel(target)}:")
+            if parsed.mode == DisplayMode.Detailed then
+              Stdlib.printLine(
+                $"{Glyphs.forKind("fn")} Functions from {typeLabel(source)} to {typeLabel(target)}:")
 
             let shownTyped = Stdlib.List.take(typed, resultCap)
             shownTyped
@@ -1350,61 +1769,38 @@ let executeQuery(state: AppState, args: List<String>): AppState =
               let line = $"{fullPathOf(item)} {Stdlib.Cli.UI.Colors.dimText(sigBody)}"
               Stdlib.printLine(withOptionalDoc(parsed.withDocs, line, item.entity.description)))
 
-            overflowNote(Stdlib.List.length(typed), Stdlib.List.length(shownTyped))
-            Stdlib.printLine("")
+            if parsed.mode == DisplayMode.Detailed then
+              overflowNote(Stdlib.List.length(typed), Stdlib.List.length(shownTyped))
+              Stdlib.printLine("")
           | _ -> ()
-
-          let moduleRank =
-            if Stdlib.List.isEmpty(parsed.entityTypes) then
-              bestModuleRank(searchText, results.submodules)
-            else
-              9
-
-          let results =
-            { results with
-                types = ranked(ranker, results.types)
-                values = ranked(ranker, results.values)
-                fns = ranked(ranker, results.fns)
-                traits = ranked(ranker, results.traits)
-                impls = ranked(ranker, results.impls)
-                tests = ranked(ranker, results.tests) }
 
           let named =
             Stdlib.List.flatten(
               [ results.types |> Stdlib.List.map(fun i -> i.location)
                 results.values |> Stdlib.List.map(fun i -> i.location)
-                results.fns |> Stdlib.List.map(fun i -> i.location) ])
+                results.fns |> Stdlib.List.map(fun i -> i.location)
+                results.traits |> Stdlib.List.map(fun i -> i.location)
+                results.impls |> Stdlib.List.map(fun i -> i.location)
+                results.tests |> Stdlib.List.map(fun i -> i.location) ])
 
-          if Stdlib.List.isEmpty(typed) && onlyDocMatches(ranker, named) then
-            Stdlib.printErrorLine(
-              Stdlib.Cli.UI.Colors.hint(
-                $"  (no name matches `{queryText}`; these mention it in their docs)"))
+          if
+            typed == [] && submodulesCount == 0 && named != [] && onlyDocMatches(ranker, named)
+          then
+            let hint =
+              if hiddenDeprecatedModules then
+                $"  (the results below mention `{queryText}` in their docs)"
+              else
+                $"  (no name matches `{queryText}`; these mention it in their docs)"
+
+            Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint(hint))
           else
             ()
-
-          // Suffix orders sections on a rank tie. Modules are navigation, not the
-          // usual discovery target, so they sort last - a wall of namespace
-          // matches shouldn't precede an equally-ranked fn/type/value hit.
-          let moduleKey = Stdlib.String.padEnd($"{Stdlib.display(moduleRank)}1", '9', rankKeyHead)
-          let sectionKeys =
-            [ ($"{moduleKey}4", "module")
-              ($"{bestItemKey(ranker, results.types)}1", "type")
-              ($"{bestItemKey(ranker, results.values)}2", "value")
-              ($"{bestItemKey(ranker, results.fns)}3", "function")
-              ($"{bestItemKey(ranker, results.traits)}0", "trait")
-              ($"{bestItemKey(ranker, results.impls)}5", "impl")
-              ($"{bestItemKey(ranker, results.tests)}6", "test") ]
-
-          let order =
-            sectionKeys
-            |> Stdlib.List.sortBy(fun((key, _)) -> key)
-            |> Stdlib.List.map(fun((_, tag)) -> tag)
 
           order
           |> Stdlib.List.iter(fun tag ->
             match tag with
             | "function" ->
-              renderSection("function", resultCap, results.fns, fun item ->
+              renderSection(parsed.mode, "function", resultCap, results.fns, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 let ctx = contextFor(state.currentBranchId, item)
                 let sigBody = Signatures.formatFn(ctx, item.entity)
@@ -1417,27 +1813,27 @@ let executeQuery(state: AppState, args: List<String>): AppState =
 
                 withOptionalDoc(parsed.withDocs, line, item.entity.description))
             | "value" ->
-              renderSection("value", resultCap, results.values, fun item ->
+              renderSection(parsed.mode, "value", resultCap, results.values, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 withOptionalDoc(
                   parsed.withDocs,
                   $"{fullPathOf(item)}{mark}",
                   item.entity.description))
             | "type" ->
-              renderSection("type", resultCap, results.types, fun item ->
+              renderSection(parsed.mode, "type", resultCap, results.types, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 let ctx = contextFor(state.currentBranchId, item)
                 let defn = Signatures.formatType(ctx, fullPathOf(item), item.entity)
                 withOptionalDoc(parsed.withDocs, $"{defn}{mark}", item.entity.description))
             | "trait" ->
-              renderSection("trait", resultCap, results.traits, fun item ->
+              renderSection(parsed.mode, "trait", resultCap, results.traits, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 withOptionalDoc(
                   parsed.withDocs,
                   $"{fullPathOf(item)}{mark}",
                   item.entity.description))
             | "impl" ->
-              renderSection("impl", resultCap, results.impls, fun item ->
+              renderSection(parsed.mode, "impl", resultCap, results.impls, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 let ctx = contextFor(state.currentBranchId, item)
                 // The call first, as it is written (`a % b`, `Stdlib.display(v)`): the impl's own
@@ -1453,41 +1849,48 @@ let executeQuery(state: AppState, args: List<String>): AppState =
 
                 withOptionalDoc(parsed.withDocs, line, item.entity.description))
             | "test" ->
-              renderSection("test", resultCap, results.tests, fun item ->
+              renderSection(parsed.mode, "test", resultCap, results.tests, fun item ->
                 let mark = Query.deprecationMarkerAt(depSets, item.location, item.entity.hash)
                 withOptionalDoc(
                   parsed.withDocs,
                   $"{fullPathOf(item)}{mark}",
                   item.entity.description))
             | "module" ->
-              if
-                Stdlib.List.isEmpty(parsed.entityTypes)
-                && Stdlib.Bool.not(Stdlib.List.isEmpty(results.submodules))
-              then
-                Stdlib.printLine(Display.getSectionHeader("module"))
-                let sortedMods =
-                  results.submodules
-                  |> Stdlib.List.sortBy(fun modulePath ->
-                    let modName = Stdlib.Option.withDefault(Stdlib.List.last(modulePath), "")
-                    let owner = Stdlib.Option.withDefault(Stdlib.List.head(modulePath), "")
-                    let mods = Stdlib.Option.withDefault(Stdlib.List.tail(modulePath), [])
-                    rankKey(ranker, owner, mods, modName))
+              if Stdlib.Bool.not(Stdlib.List.isEmpty(results.submodules)) then
+                if parsed.mode == DisplayMode.Detailed then
+                  Stdlib.printLine(Display.getSectionHeader("module"))
 
+                let sortedMods = results.submodules
                 let shownMods = Stdlib.List.take(sortedMods, resultCap)
                 shownMods
                 |> Stdlib.List.iter(fun modulePath ->
                   let moduleStr = Stdlib.String.join(modulePath, ".")
-                  Stdlib.printLine(moduleStr))
+                  let mark =
+                    if
+                      parsed.deprecated == Query.Deprecated.Show
+                      && Stdlib.Bool.not(
+                        Query.moduleHasActiveItems(state.currentBranchId, modulePath, depSets))
+                    then
+                      " (deprecated)"
+                    else
+                      ""
 
-                overflowNote(Stdlib.List.length(sortedMods), Stdlib.List.length(shownMods))
-                Stdlib.printLine("")
+                  Stdlib.printLine(moduleStr + mark))
+
+                if parsed.mode == DisplayMode.Detailed then
+                  overflowNote(Stdlib.List.length(sortedMods), Stdlib.List.length(shownMods))
+                  Stdlib.printLine("")
               else
                 ()
             | _ -> ())
 
           hiddenTestsHint(hiddenTests)
           hiddenHelpersHint(hiddenHelpers)
-          if Stdlib.Bool.not(parsed.withDocs) && Stdlib.Bool.not(parsed.batch) then
+          if
+            parsed.mode == DisplayMode.Detailed
+            && Stdlib.Bool.not(parsed.withDocs)
+            && Stdlib.Bool.not(parsed.batch)
+          then
             Stdlib.printErrorLine(
               Stdlib.Cli.UI.Colors.hint("  (add --with-docs to show doc comments)"))
           else
@@ -1529,11 +1932,11 @@ let execute(state: AppState, args: List<String>): AppState =
 
       parsed.queryParts
       |> Stdlib.List.iter(fun query ->
-        let queryArgs = Stdlib.List.prepend(flags, query)
+        let queryArgs = Stdlib.List.concat(flags, [ "--", query ])
         let _ = executeQuery(state, queryArgs)
         ())
 
-      if Stdlib.Bool.not(parsed.withDocs) then
+      if parsed.mode == DisplayMode.Detailed && Stdlib.Bool.not(parsed.withDocs) then
         Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.hint("  (add --with-docs to show doc comments)"))
       else
         ()
@@ -1553,8 +1956,8 @@ let help(state: AppState): String =
     "  --batch                Treat each quoted query as an independent search"
     "  --limit N              Maximum results per entity section (default: 20)"
     "  --type                 Search only types"
-    "  --fn                   Search only functions"
-    "  --val                  Search only values"
+    "  --fn, --function       Search only functions"
+    "  --val, --value         Search only values"
     "  --trait                Search only traits"
     "  --impl                 Search only implementations of traits"
     "  --test                 Search only tests"
@@ -1563,6 +1966,7 @@ let help(state: AppState): String =
     "                         are looked up one by one"
     "  --shallow              Search only direct children (default: all descendants);"
     "                         a qualified query searches inside the module it names"
+    "  --brief                Print matching items without section headings"
     "  --with-docs            Also show doc comments"
     "  --include-deprecated   Include items deprecated with no live callers"
     "  --include-internal     Include internal helpers (names starting with __)"
@@ -1610,6 +2014,7 @@ let complete(_state: AppState, args: List<String>): List<Completion.CompletionIt
         "--test"
         "--exact"
         "--shallow"
+        "--brief"
         "--with-docs"
         "--include-deprecated"
         "--include-internal"

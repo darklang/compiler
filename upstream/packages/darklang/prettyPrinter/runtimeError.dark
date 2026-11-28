@@ -152,7 +152,6 @@ module RuntimeError =
           |> Stdlib.String.join("")
         | FullValue(dv) -> dval(branchId, dv)
         | LetPattern(p) -> letPattern(p)
-        | segment -> $"(RTETODO segmentsToString parts {__json<ErrorSegment>(segment)})"
 
       Stdlib.List.prepend(prevSegments, newSegment))
 
@@ -773,6 +772,18 @@ module RuntimeError =
           ES.FullValue(returnedValue)
           ES.String(". A main function is not called automatically: finish with `main(args)` to call it. See `dark docs scripts`.") ]
 
+    | TrustedCommandOnly(action) ->
+      let text =
+        match action with
+        | RunApprovals -> "run approvals require the trusted `dark run` command"
+        | EvalApprovals -> "eval approvals require the trusted `dark eval` command"
+        | PolicyChanges -> "policy changes require the trusted `dark permissions` command"
+        | StoreBackups -> "store backups require the trusted `dark backups` command"
+        | PersonOnlySetting(key) ->
+          $"code cannot change `{key}`, which decides what code may reach or what traces record. To change it yourself: `dark config set {key} on|off`"
+
+      [ ES.String($"permission denied: {text}") ]
+
     | UncaughtException(msg, metadata) ->
       let withMetadata =
         match metadata with
@@ -790,11 +801,6 @@ module RuntimeError =
 
     // Its own sentence and nothing else: it is a refusal, written for whoever ran the command.
     | Condition(message) -> [ ES.String(message) ]
-
-    // Every case above has a message, so this only fires for a case added without one.
-    | unhandled ->
-      let serialized = __json<LanguageTools.RuntimeTypes.RuntimeError.Error>(unhandled)
-      [ ES.String($"A runtime error with no message written for it yet: {serialized}") ]
 
 
   let toString(branchId: Uuid, e: LanguageTools.RuntimeTypes.RuntimeError.Error): String =

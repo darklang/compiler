@@ -22,9 +22,10 @@ let readConfig(key: String): Stdlib.Option.Option<String> =
 test snapshotScopeKeepsTestCounter =
   let _ = Stdlib.Test.incrementCounter()
   let branch = SCM.PackageOps.currentBranch()
-  let _ = LanguageTools.PackageManager.Test.withStoreSnapshot(branch, 0, fun _ ->
-    Stdlib.Cli.Posix.sleep(25.0)
-    Stdlib.Test.incrementCounter())
+  let _ =
+    LanguageTools.PackageManager.Test.withStoreSnapshot(branch, 0, fun _ ->
+      Stdlib.Cli.Posix.sleep(25.0)
+      Stdlib.Test.incrementCounter())
 
   Stdlib.Test.counterValue() |> Stdlib.Test.equal(2)
 
@@ -104,7 +105,7 @@ test runtimeFailureStillRemovesSnapshot =
         Stdlib.String.contains(output.stderr, "Cannot divide by 0")
         |> Stdlib.Test.equal(true)
 
-        Stdlib.String.startsWith(childDb, "/tmp/dark-test-")
+        Stdlib.String.contains(childDb, "/dark-test-")
         |> Stdlib.Test.equal(true)
 
         Stdlib.Cli.FileSystem.pathExists(childDb) |> Stdlib.Test.equal(false) ])
@@ -132,9 +133,13 @@ test assertionFailureIsPreserved =
         output.exitCode |> Stdlib.Test.equal(0) ])
 
 
-let createBranch(): String =
-  Cli.Tests.TestSuite.runWithCommand(
-    [ "branch", "create", "isolated-child-branch" ])
+/// Start a branch and move onto it, as `dark branch create` does.
+let createBranch(): Uuid =
+  match SCM.Branch.create(
+          "isolated-child-branch",
+          SCM.PackageOps.currentBranch()) with
+  | Some(b) -> SCM.PackageOps.selectBranch(b.id)
+  | None -> SCM.PackageOps.currentBranch()
 
 
 test branchChangesStayIsolated =
@@ -147,6 +152,9 @@ test branchChangesStayIsolated =
   | Ok(output) ->
     Stdlib.Test.all(
       [ output.exitCode |> Stdlib.Test.equal(0)
+        output.result
+        |> Stdlib.Test.notEqual(Stdlib.Result.Result.Ok(parentBranch))
+
         SCM.PackageOps.currentBranch() |> Stdlib.Test.equal(parentBranch) ])
 
 
@@ -178,10 +186,10 @@ let checkInheritedBranch(expected: Uuid): Stdlib.Test.Result =
 // Uses an actual non-main branch, then a nested worker with default options.
 test explicitBranchBecomesTheNestedWorkersDefault =
   let name = "isolated-selection-" + Stdlib.display(Stdlib.Uuid.generate())
-  let _ = Cli.Tests.TestSuite.runWithCommand([ "branch", "create", name ])
-  match Cli.Branch.lookupRef(name) with
+  match SCM.Branch.create(name, SCM.PackageOps.currentBranch()) with
   | None -> Stdlib.Test.fail("Could not create the test branch")
-  | Some(branch) ->
+  | Some(created) ->
+    let branch = created.id
     let defaults = Stdlib.Test.Process.defaults()
     let options = { defaults with branch = Stdlib.Option.Option.Some(branch) }
     match Stdlib.Test.Process.run(options, checkInheritedBranch, branch) with

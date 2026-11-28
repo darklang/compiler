@@ -1,0 +1,146 @@
+/// CLI tests: `dark search`, each in its own instance.
+module Darklang.Cli.Tests.Search
+
+test searchMatchesModuleAndCamelCaseName = Instance.withInstance(fun i ->
+  let output = Instance.output(i, [ "search", "string toList", "--fn" ])
+  if Stdlib.String.contains(output, "Darklang.Stdlib.String.toList") then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected `string toList` to find Stdlib.String.toList, got: {output}"))
+
+
+test searchMatchesModuleAndOperationName = Instance.withInstance(fun i ->
+  let output = Instance.output(i, [ "search", "json parse", "--fn" ])
+  if Stdlib.String.contains(output, "Darklang.Stdlib.Json.parse") then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected `json parse` to find Stdlib.Json.parse, got: {output}"))
+
+
+test searchFindsNestedHelpersFromParentModule = Instance.withInstance(fun i ->
+  let output = Instance.output(i, [ "search", "AltJson.get", "--fn" ])
+  if
+    Stdlib.String.contains(
+      output,
+      "Darklang.Stdlib.AltJson.Helpers.getInt64Result")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected `AltJson.get` to find nested AltJson helpers, got: {output}"))
+
+
+test batchSearchKeepsQueriesIndependent = Instance.withInstance(fun i ->
+  let output =
+    Instance.output(
+      i,
+      [ "search"
+        "--batch"
+        "string toList"
+        "json parse"
+        "list map"
+        "--fn" ])
+
+  if
+    Stdlib.String.contains(output, "Search results for: string toList")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.String.toList")
+    && Stdlib.String.contains(output, "Search results for: json parse")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.Json.parse")
+    && Stdlib.String.contains(output, "Search results for: list map")
+    && Stdlib.String.contains(output, "Darklang.Stdlib.List.map")
+  then
+    Stdlib.Test.Result.Pass
+  else
+    Stdlib.Test.fail(
+      $"Expected three independent batch search results, got: {output}"))
+
+
+/// A test is usually named after what it tests, so a plain search leaves tests out. Left out is not
+/// hidden: the output counts them, so a search with only test hits never reads as empty.
+test searchLeavesTestsOutUnlessAsked = Instance.withInstance(fun i ->
+  let seen(args: List<String>): String =
+    Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, args))
+
+  let nanTest = "Darklang.Stdlib.Float64.Tests.ceilingRejectsNan"
+  Stdlib.Test.all(
+    [ Instance.doesNotSay(
+        seen([ "search", "ceiling" ]),
+        "Float64.Tests.ceiling",
+        "a plain search lists no tests")
+
+      Instance.says(
+        seen([ "search", "ceilingRejectsNan" ]),
+        "1 test matched; --include-tests shows them",
+        "and says what it left out")
+
+      Instance.says(
+        seen([ "search", "ceiling", "--include-tests" ]),
+        nanTest,
+        "--include-tests lists them")
+
+      Instance.says(
+        seen([ "search", "ceiling", "--test" ]),
+        nanTest,
+        "and --test asks for them by itself") ]))
+
+
+/// Other languages' words for concurrency find what Dark has instead.
+test concurrencyWordsFindWhatDarkHas = Instance.withInstance(fun i ->
+  let async =
+    Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "search", "async" ]))
+
+  let mutex =
+    Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "search", "mutex" ]))
+
+  let channel =
+    Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "search", "channel" ]))
+
+  Stdlib.Test.all(
+    [ Instance.says(
+        async,
+        "Darklang.Stdlib.Exec.spawn",
+        "async finds Exec.spawn")
+
+      Instance.says(
+        mutex,
+        "Darklang.Stdlib.Cli.File.withLock",
+        "mutex finds withLock")
+
+      Instance.says(
+        channel,
+        "dark docs processes",
+        "channel points at the docs") ]))
+
+
+/// A dotted name that finds nothing suggests real names, not a word per part.
+test dottedMissSuggestsFullNames = Instance.withInstance(fun i ->
+  let output =
+    Stdlib.Cli.Tui.Text.stripSgr(
+      Instance.said(i, [ "search", "--exact", "Stdlib.Cli.Stderr.printLine" ]))
+
+  Stdlib.Test.all(
+    [ Instance.says(output, "`Stdlib.printLine`", "the real name")
+      Instance.doesNotSay(output, "Stdio", "no word-at-a-time typo")
+      Instance.doesNotSay(
+        output,
+        "One word at a time",
+        "no per-word counts") ]))
+
+
+/// Darklang's own tools still show, after the Stdlib matches.
+test toolsRankAfterStdlib = Instance.withInstance(fun i ->
+  let out =
+    Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "search", "json escape" ]))
+
+  let at = fun name ->
+    Stdlib.String.indexOf(out, name) |> Stdlib.Option.withDefault(-1)
+
+  let stdlib = at("Darklang.Stdlib.AltJson.Format.escapeBytes")
+  let cli = at("Darklang.Cli.jsonEscape")
+  Stdlib.Test.all(
+    [ Instance.says(out, "Darklang.Cli.jsonEscape", "the CLI's own fn shows")
+      Stdlib.Test.expect(
+        stdlib >= 0 && stdlib < cli,
+        $"Stdlib ranks first:\n{out}") ]))

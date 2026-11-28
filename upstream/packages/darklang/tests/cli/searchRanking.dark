@@ -1,9 +1,8 @@
 module Darklang.Cli.Tests.SearchRanking
 
 // How `dark search` orders what the store matched. A person types words, not camelCase: `read file`
-// used to rank by "file" alone, so `overwriteFile` came before `readFile` and the Types section,
-// holding `ReadFileParams`, printed before any function. The plain-words cases are the fix; the
-// one-word and dotted cases are the ones that already worked and must not move.
+// must rank on both words, so `readFile` comes before `overwriteFile` and functions print before
+// the Types section. The one-word and dotted cases must not move.
 
 module Rank =
   /// The names in the order search shows them, from a fixed set of candidates, so the answer does
@@ -23,9 +22,8 @@ module Rank =
 
 
   // A fixture, not a reading of the store: these are the (module, name) pairs the ranker is
-  // asked to order. `fromFile` no longer exists; it is kept because the case it carries is "a
-  // name the query spells only partly, in a module whose path does not spell it either", which
-  // is what puts it last. The module must not contain "file" or it scores on the path.
+  // asked to order. `fromFile` is "a name the query spells only partly, in a module whose path
+  // does not spell it either", which is what puts it last. The module must not contain "file" or it scores on the path.
   let fileFns(): List<(String * String)> =
     [ ("Stdlib.Cli.FileSystem", "overwriteFile")
       ("Stdlib.Cli.FileSystem", "readFile")
@@ -194,6 +192,24 @@ test synonyms =
 
       Cli.Packages.Search.synonymQueries("random number")
       |> Stdlib.Test.equal([ ("Int64.random", "Int64.random") ])
+
+      Cli.Packages.Search.synonymQueries("get a value from a dictionary")
+      |> Stdlib.Test.equal([ ("dict.get", "dict.get") ])
+
+      Cli.Packages.Search.synonymQueries("remove key from dict")
+      |> Stdlib.Test.equal([ ("dict.remove", "dict.remove") ])
+
+      Cli.Packages.Search.synonymQueries("find an item in list")
+      |> Stdlib.Test.equal([ ("list.find", "list.find") ])
+
+      Cli.Packages.Search.synonymQueries("encode a value as JSON")
+      |> Stdlib.Test.equal([ ("Json.serialize", "Json.serialize") ])
+
+      Cli.Packages.Search.synonymQueries("encode utf8") |> Stdlib.Test.equal([])
+
+      Cli.Packages.Search.synonymQueries("count items in list")
+      |> Stdlib.Test.equal(
+        [ ("length items list", "length"), ("list.count", "list.count") ])
 
       Cli.Packages.Search.synonymQueries("String.size") |> Stdlib.Test.equal([])
 
@@ -395,3 +411,75 @@ test docOnlyMatchesAreFlagged =
         Cli.Packages.Search.rankerFor("table"),
         [ loc([ "Stdlib", "Cli", "UI", "Table" ], "print") ])
       |> Stdlib.Test.equal(false) ])
+
+
+test searchSuggestsClosestMatchesForAMiss = Instance.withInstance(fun i ->
+  let query = "read environment variable"
+  let (code, out) = Instance.ran(i, [ "search", "--fn", "--brief", query ])
+
+  let (_, exact) = Instance.ran(i, [ "search", "--fn", "--exact", query ])
+
+  let (_, nonsense) =
+    Instance.ran(i, [ "search", "zzzunknown zzmissing zzvoid" ])
+
+  Stdlib.Test.all(
+    [ Instance.exitedWith(code, 0, "a miss can suggest alternatives")
+      Instance.says(
+        out,
+        "Closest, matching some of the words",
+        "says what it shows")
+
+      Instance.says(
+        out,
+        "Stdlib.Cli.Posix.getenv",
+        "suggests the environment reader")
+
+      Instance.doesNotSay(exact, "Closest", "exact search stays exact")
+
+      Instance.doesNotSay(
+        nonsense,
+        "Closest",
+        "a nonsense query has no alternatives") ]))
+
+
+/// Questions asked while building small tools, and the function each one needed.
+/// Search must show that function in its first three results.
+test plainQuestionsFindTheFunctionNeeded = Instance.withInstance(fun i ->
+  [ (
+      "run a shell command and get its output",
+      "Darklang.Stdlib.Cli.Process.run")
+
+    ("run an external program", "Darklang.Stdlib.Cli.Process.run")
+    ("read environment variable", "Darklang.Stdlib.Cli.Env.get")
+    ("round a number to decimal places", "Darklang.Stdlib.Decimal.round")
+    ("round to 2 decimals", "Darklang.Stdlib.Decimal.round")
+    ("list files in a directory", "Darklang.Stdlib.Cli.Dir.list")
+    ("read a text file", "Darklang.Stdlib.Cli.File.readText")
+    ("write text to a file", "Darklang.Stdlib.Cli.File.writeText")
+    ("parse csv", "Darklang.Stdlib.Csv.parse")
+    ("escape html", "Darklang.Stdlib.Html.escapeHtml")
+    ("format a date as text", "Darklang.Stdlib.DateTime.format")
+    ("parse a date using a pattern", "Darklang.Stdlib.DateTime.parseWith")
+    ("split a string into lines", "Darklang.Stdlib.String.split")
+    ("sleep for some milliseconds", "Darklang.Stdlib.Cli.Posix.sleep")
+    ("base64 encode bytes", "Darklang.Stdlib.Base64.encode")
+    ("get a value from a dictionary", "Darklang.Stdlib.Dict.get")
+    ("sort a list", "Darklang.Stdlib.List.sort") ]
+  |> Stdlib.List.map(fun((question, wanted)) ->
+    let out =
+      Instance.said(
+        i,
+        [ "search", "--fn", "--brief", "--limit", "3", question ])
+
+    let shown =
+      Stdlib.String.split(out, "\n")
+      |> Stdlib.List.filter(fun line ->
+        Stdlib.String.contains(line, "Darklang."))
+      |> Stdlib.List.take(3)
+
+    Stdlib.Test.expect(
+      Stdlib.List.any(shown, fun line ->
+        Stdlib.String.contains(line, wanted + " ")
+        || Stdlib.String.endsWith(line, wanted)),
+      $"`search {question}` should show {wanted} in the first three:\n{out}"))
+  |> Stdlib.Test.all)

@@ -111,55 +111,10 @@ let draftEntries(): List<DraftEntry> =
   draftEntriesFor(currentBranch())
 
 
-/// The per-location key the two decision folds below group on. A string built here rather than through
+/// The per-location key the binding fold below groups on. A string built here rather than through
 /// `Constraints.fqnOf`: this silo owns the op log and must not depend on the one that reports findings.
 let decisionKey(loc: LanguageTools.ProgramTypes.PackageLocation): String =
   loc.owner + "|" + Stdlib.String.join(loc.modules, ".") + "|" + loc.name
-
-
-/// Where a human's OVERRIDE was later undone by an ordinary edit.
-///
-/// Returns (location, the hash the override chose, the hash bound now) per name.
-///
-/// Last-writer-wins is working as designed here; what is missing is that the losing side goes silently.
-/// `SCM.Constraints` turns these into standing findings.
-///
-/// Only an override counts: an ordinary edit can replace it without another explicit decision.
-///
-/// Guarded on the `conflicts` projection first, which is small and usually empty of overrides, so the
-/// op-log decode below costs nothing on the common path.
-/// A failed read of the op log is reported rather than mistaken for no findings.
-let supersededOverrides()
-  : Result<List<(LanguageTools.ProgramTypes.PackageLocation * String * String)>, String> =
-  match Conflicts.query(Conflicts.ConflictFilter.AnyOverridden) with
-  | [] -> Result.Ok([])
-  | _ ->
-    // Fold the log in order, remembering per location: the hash the last LOCAL override chose, and
-    // the hash bound now. Order is the fold's own (origin_ts, rowid), so "later" means what the fold
-    // means. Only YOUR override can be superseded
-    // (a peer's is theirs to watch), and a later edit of YOURS is a change of mind, which closes the
-    // record rather than reporting you to yourself.
-    let hashOf = fun target ->
-      LanguageTools.ProgramTypes.hashToString(LanguageTools.ProgramTypes.Reference.hash(target))
-
-    // Only main's binding and decision ops: decoding every fn body in the log took seconds.
-    historyOps(Branch.mainBranchId, Edits.Own, Option.None)
-    |> Stdlib.List.fold(Stdlib.Dict.empty, fun(acc, revision) ->
-      let (_, _, op) = revision
-      match op with
-      | Decision(_, loc, _, Override(target)) ->
-        let h = hashOf(target)
-        Stdlib.Dict.set(acc, decisionKey(loc), (loc, h, h))
-      | SetName(loc, _target, _) ->
-        match Stdlib.Dict.get(acc, decisionKey(loc)) with
-        | None -> acc
-        | Some(_entry) -> Stdlib.Dict.remove(acc, decisionKey(loc))
-      | _ -> acc)
-    |> Stdlib.Dict.values
-    |> Stdlib.List.filter(fun entry ->
-      let (_loc, chosen, live) = entry
-      chosen != live)
-    |> Result.Ok
 
 
 /// The at-rest check over any set of ops, with the same live-items rule the draft gate uses:
@@ -298,13 +253,54 @@ let discardOn(branchId: Uuid, what: Actions.DiscardWhat): Result<Int64, String> 
 /// item has no previous version, so `undo` refuses it, and without this one typo in a reference blocks
 /// `commit` until the entire draft goes.
 ///
-/// Only the NAME's bindings go -- `SetName`s, and the overrides an `undo` writes. That reverts the name to
-/// its last committed binding, or to not existing at all if it never had one. Its content stays.
+/// The name's bindings go -- `SetName`s, and the overrides an `undo` writes. That reverts the name to
+/// its last committed binding, or to not existing at all if it never had one. The content they bound
+/// goes too unless another name holds it or a caller uses it, or it would still be checked at commit.
+/// A name that no longer exists also loses its draft deprecations and docs.
 let discardDraftName(owner: String, modules: List<String>, name: String): Result<Int64, String> =
-  discardOn(
-    currentBranch(),
-    Actions.DiscardWhat.Name(
-      LanguageTools.ProgramTypes.PackageLocation { owner = owner, modules = modules, name = name }))
+  let branchId = currentBranch()
+  let loc =
+    LanguageTools.ProgramTypes.PackageLocation { owner = owner, modules = modules, name = name }
+
+  let bound =
+    draftEntriesFor(branchId)
+    |> Stdlib.List.map(fun e -> LanguageTools.ProgramTypes.PackageOp.bindingOps(e.op))
+    |> Stdlib.List.flatten
+    |> Stdlib.List.filterMap(fun op ->
+      match op with
+      | SetName(l, target, _) when l == loc ->
+        Option.Some(
+          LanguageTools.ProgramTypes.hashToString(
+            LanguageTools.ProgramTypes.Reference.hash(target)))
+      | _ -> Option.None)
+
+  let called =
+    match liveBindingFor(branchId, loc) with
+    | Some(b) ->
+      Deps.dependentsFor(branchId, [ (loc, Deps.kindOf(b.itemType)) ])
+      |> Stdlib.List.any(fun((_, caller, _)) -> caller != loc)
+    | None -> true
+
+  match discardOn(branchId, Actions.DiscardWhat.Name(loc)) with
+  | Error(e) -> Result.Error(e)
+  | Ok(n) ->
+    let named = draftBindingsFor(branchId) |> Stdlib.List.map(fun b -> b.hash)
+    let orphaned =
+      if called then
+        []
+      else
+        bound |> Stdlib.List.filter(fun h -> Stdlib.Bool.not(Stdlib.List.contains(named, h)))
+
+    let gone = liveBindingFor(branchId, loc) == Option.None
+    let ids =
+      draftEntriesFor(branchId)
+      |> Stdlib.List.filterMap(fun e ->
+        match e.op with
+        | Deprecate(l, _, _, _, _) when gone && l == loc -> Option.Some(e.id)
+        | UpdateDoc(l, _, _, _, _) when gone && l == loc -> Option.Some(e.id)
+        | _ -> PartialCommit.contentIdIfWanted(orphaned, e))
+
+    dropBranchOps(branchId, ids) |> Stdlib.Result.map(fun m -> n + m)
 
 
 /// Drop these ops from <param branchId>'s draft. Returns how many went.

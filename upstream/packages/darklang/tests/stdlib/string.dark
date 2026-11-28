@@ -158,16 +158,6 @@ test mapReplacesEveryCharacter =
       |> Stdlib.Test.equal("cccc") ])
 
 
-// test mapRejectsNonCharResult =
-//   Stdlib.String.map "👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷" (fun x -> 5)
-//   => raises
-//     """Darklang.Stdlib.String.fromList's 1st argument (`lst`) should be a List<Char>. However, a List<Int64> ([  5, 5, ...) was passed instead.
-//
-// Expected: (lst: List<Char>)
-// Actual: a List<Int64>: [
-//   5, 5, 5, 5
-// ]"""
-
 test appendOperator =
   Stdlib.Test.all(
     [ "" + "" |> Stdlib.Test.equal("")
@@ -372,21 +362,18 @@ test endsWith =
 test randomLength =
   Stdlib.Test.all(
     [ Stdlib.String.random(10)
-      |> Stdlib.Result.map(Stdlib.String.length)
-      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(10))
+      |> Stdlib.String.length
+      |> Stdlib.Test.equal(10)
 
       Stdlib.String.random(5)
-      |> Stdlib.Result.map(Stdlib.String.length)
-      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(5))
+      |> Stdlib.String.length
+      |> Stdlib.Test.equal(5)
 
-      Stdlib.String.random(0)
-      |> Stdlib.Result.map(Stdlib.String.length)
-      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(0))
+      Stdlib.String.random(0) |> Stdlib.Test.equal("")
 
-      Stdlib.String.random(-1)
-      |> Stdlib.Test.equal(
-        Stdlib.Result.Result.Error(
-          "Expected `length` to be positive, but it was `-1`")) ])
+      Stdlib.String.random(-1) |> Stdlib.Test.equal("")
+
+      Stdlib.String.random(-9223372036854775807) |> Stdlib.Test.equal("") ])
 
 
 test isEmpty =
@@ -451,7 +438,9 @@ test lengthCountsClusters =
 test lengthOfLongStringsReadTwice =
   let piece = "é👍🏽ｱ"
   let repeated = Stdlib.String.repeat(piece, 20)
-  let joined = Stdlib.List.fold(Stdlib.List.range(1, 20), "", fun(acc, _) -> acc + piece)
+  let joined =
+    Stdlib.List.fold(Stdlib.List.range(1, 20), "", fun(acc, _) -> acc + piece)
+
   let longer = joined + "x"
   Stdlib.Test.all(
     [ Stdlib.String.length(repeated) |> Stdlib.Test.equal(60)
@@ -1528,40 +1517,74 @@ test contains =
 
 test slice =
   Stdlib.Test.all(
-    [ Stdlib.String.slice("abcd", -2, 4) |> Stdlib.Test.equal("cd")
+    [ Stdlib.String.slice("abcd", -2, 4)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("a\r\nb", 1, 2) |> Stdlib.Test.equal("\r\n")
+      Stdlib.String.slice("a\r\nb", 1, 2)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("\r\n"))
 
       Stdlib.String.last("a\r\n", 1) |> Stdlib.Test.equal("\r\n")
 
-      Stdlib.String.slice("abcd", -5, -6) |> Stdlib.Test.equal("")
+      Stdlib.String.slice("abcd", -5, -6)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("abcd", -5, 1) |> Stdlib.Test.equal("a")
+      Stdlib.String.slice("abcd", -5, 1)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("abcd", 0, -1) |> Stdlib.Test.equal("abc")
+      Stdlib.String.slice("abcd", 0, -1)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("abcd", 2, 3) |> Stdlib.Test.equal("c")
+      Stdlib.String.slice("abcd", 2, 3)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("c"))
 
-      Stdlib.String.slice("abcd", 2, 6) |> Stdlib.Test.equal("cd")
+      Stdlib.String.slice("abcd", 0, 4)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("abcd"))
 
-      Stdlib.String.slice("abcd", 3, 2) |> Stdlib.Test.equal("")
+      Stdlib.String.slice("abcd", 4, 4)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(""))
 
-      Stdlib.String.slice("abcd", 5, 6) |> Stdlib.Test.equal("")
+      Stdlib.String.slice("", 0, 0)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok(""))
 
-      Stdlib.String.slice("🧑🏽‍🦰🧑🏻‍🍼✋✋🏻✋🏿", 2, 10) |> Stdlib.Test.equal("✋✋🏻✋🏿")
+      Stdlib.String.slice("abcd", 2, 6)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇", 1, 3) |> Stdlib.Test.equal("ä͖̭̈̇lͮ̒ͫ")
+      Stdlib.String.slice("abcd", 3, 2)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽", 2, 6) |> Stdlib.Test.equal("﷽﷽﷽﷽")
+      Stdlib.String.slice("abcd", 5, 6)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
 
-      Stdlib.String.slice("👱👱🏻👱🏼👱🏽👱🏾👱🏿", 2, 6) |> Stdlib.Test.equal("👱🏼👱🏽👱🏾👱🏿")
+      Stdlib.String.slice("🧑🏽‍🦰🧑🏻‍🍼✋✋🏻✋🏿", 2, 5)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("✋✋🏻✋🏿"))
 
-      Stdlib.String.slice("🧟‍♀️🧟‍♂️", 2, 4) |> Stdlib.Test.equal("")
+      Stdlib.String.slice("Z̤͔ͧ̑̓ä͖̭̈̇lͮ̒ͫǧ̗͚̚o̙̔ͮ̇͐̇", 1, 3)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("ä͖̭̈̇lͮ̒ͫ"))
 
-      Stdlib.String.slice("👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷", 2, 10) |> Stdlib.Test.equal("🏳️‍⚧️‍️🇵🇷")
+      Stdlib.String.slice("﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽﷽", 2, 6)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("﷽﷽﷽﷽"))
+
+      Stdlib.String.slice("👱👱🏻👱🏼👱🏽👱🏾👱🏿", 2, 6)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("👱🏼👱🏽👱🏾👱🏿"))
+
+      Stdlib.String.slice("🧟‍♀️🧟‍♂️", 2, 4)
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(Stdlib.String.IndexError.IndexOutOfBounds))
+
+      Stdlib.String.slice("👨‍❤️‍💋‍👨👩‍👩‍👧‍👦🏳️‍⚧️‍️🇵🇷", 2, 4)
+      |> Stdlib.Test.equal(Stdlib.Result.Result.Ok("🏳️‍⚧️‍️🇵🇷"))
 
       Stdlib.String.slice("abc", 0, 4503599627370498)
-      |> Stdlib.Test.equal("abc") ])
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error(
+          Stdlib.String.IndexError.IndexOutOfBounds)) ])
 
 
 test first =
@@ -2019,7 +2042,9 @@ test getByteAt =
 test getByteAtMatchesToBytes =
   // Match the full UTF-8 encoding.
   Stdlib.String.getByteAt("héllo", 2)
-  |> Stdlib.Test.equal(Stdlib.Bytes.getAt(Stdlib.Utf8.encode("héllo"), 2))
+  |> Stdlib.Test.equal(
+    Stdlib.Bytes.getAt(Stdlib.Utf8.encode("héllo"), 2)
+    |> Stdlib.Result.toOption)
 
 
 test slugify =
@@ -2079,13 +2104,9 @@ test randomProducesDifferentStrings =
   let samples =
     Stdlib.List.range(1, 16)
     |> Stdlib.List.map(fun _ -> Stdlib.String.random(5))
-    |> Stdlib.Result.collect
 
-  match samples with
-  | Error(message) -> Stdlib.Test.fail(message)
-  | Ok(values) ->
-    Stdlib.List.length(Stdlib.List.unique(values)) > 1
-    |> Stdlib.Test.expect("random returned the same string for all 16 samples")
+  Stdlib.List.length(Stdlib.List.unique(samples)) > 1
+  |> Stdlib.Test.expect("random returned the same string for all 16 samples")
 
 
 // Check that map calls its callback once per character.

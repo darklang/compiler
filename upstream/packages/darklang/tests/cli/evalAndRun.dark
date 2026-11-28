@@ -244,9 +244,7 @@ test scriptArgumentsAndExitCodes = Instance.withInstance(fun i ->
       help ]))
 
 
-/// `run --stats` reports what the run cost after the script's own output. After the path,
-/// `--stats` is the script's argument like any other flag, and reports nothing.
-/// Runner options end at the script path or at `--`; `--branch` and `--entry-point` take the next
+/// Runner options end at the script path or at `--`; `--branch` and `--allow` take the next
 /// argument whatever it is; everything from the path on is the script's.
 test splitArgumentsLikeTheHost =
   let split(args: List<String>): (List<String> * List<String>) =
@@ -266,9 +264,6 @@ test splitArgumentsLikeTheHost =
       split([ "--branch", "-v", "s.dark" ])
       |> Stdlib.Test.equal(([ "--branch", "-v" ], [ "s.dark" ]))
 
-      split([ "--entry-point", "--", "s.dark" ])
-      |> Stdlib.Test.equal(([ "--entry-point", "--" ], [ "s.dark" ]))
-
       split([ "--branch" ]) |> Stdlib.Test.equal(([ "--branch" ], []))
 
       split([ "--branch=main", "s.dark" ])
@@ -277,7 +272,8 @@ test splitArgumentsLikeTheHost =
       split([ "-v", "--", "--sandbox" ])
       |> Stdlib.Test.equal(([ "-v", "--" ], [ "--sandbox" ]))
 
-      split([ "-", "s.dark" ]) |> Stdlib.Test.equal(([ "-" ], [ "s.dark" ]))
+      // a lone `-` is the script, read from stdin
+      split([ "-", "x" ]) |> Stdlib.Test.equal(([], [ "-", "x" ]))
 
       split([ "", "-v" ]) |> Stdlib.Test.equal(([], [ "", "-v" ]))
 
@@ -288,28 +284,44 @@ test splitArgumentsLikeTheHost =
       |> Stdlib.Test.equal(([], [ "–v", "s.dark" ])) ])
 
 
-test runStatsReportsTheCost = Instance.withInstance(fun i ->
+/// `run --stats` and `eval --stats` report what the run cost on stderr, so stdout carries only
+/// what the script printed or the value. After the path, `--stats` is the script's argument like
+/// any other flag, and reports nothing.
+test statsReportTheCostOnStderr = Instance.withInstance(fun i ->
   let path =
     script(
       i,
       "stats.dark",
       "Stdlib.printLine(Stdlib.String.join(args, \",\"))\nStdlib.printLine(\"SCRIPT_RAN\")")
 
-  let (code, out) = Instance.ran(i, [ "run", "--stats", path ])
-  let (afterCode, after) = Instance.ran(i, [ "run", path, "--stats" ])
+  let streams = fun args ->
+    match Instance.run(i, args) with
+    | Ok(out) -> (out.exitCode, out.stdout, out.stderr)
+    | Error(e) -> (-1, "", e)
+
+  let (code, out, err) = streams([ "run", "--stats", path ])
+  let (evalCode, value, evalErr) = streams([ "eval", "--stats", "1 + 2" ])
+  let (afterCode, after, afterErr) = streams([ "run", path, "--stats" ])
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 0, "run --stats succeeds")
       Instance.says(out, "SCRIPT_RAN", "the script still runs")
-      Instance.says(out, "build ", "the build the numbers came from")
-      Instance.says(out, "allocated ", "the allocation")
-      Instance.says(out, "instructions ", "the interpreter's counters")
+      Instance.doesNotSay(out, "allocated ", "stdout is the script's alone")
+      Instance.says(err, "build ", "the build the numbers came from")
+      Instance.says(err, "allocated ", "the allocation")
+      Instance.says(err, "instructions ", "the interpreter's counters")
+      Instance.exitedWith(evalCode, 0, "eval --stats succeeds")
+      Stdlib.String.trim(value) |> Stdlib.Test.equal("3")
+      Instance.says(evalErr, "allocated ", "eval reports on stderr")
       Instance.exitedWith(
         afterCode,
         0,
         "--stats after the path is a script argument")
 
       Instance.says(after, "--stats", "the script received it")
-      Instance.doesNotSay(after, "allocated ", "and nothing was measured") ]))
+      Instance.doesNotSay(
+        after + afterErr,
+        "allocated ",
+        "and nothing was measured") ]))
 
 
 /// Remembering missing access continues the same run without replaying earlier
@@ -508,7 +520,7 @@ test runtimeChecksUseTheSelectedBranch = Instance.withInstance(fun i ->
             "(value: Int64) : Int64 = value" ])
 
         ok([ "commit", "script checker branch fixture", "-y" ])
-        ok([ "switch", "script-check" ])
+        ok([ "switch", "-c", "script-check" ])
         ok(
           [ "fn"
             "Tests.ScriptChecking.accept"
@@ -526,8 +538,11 @@ test runtimeChecksUseTheSelectedBranch = Instance.withInstance(fun i ->
     [ onMain
       main
       switched
-      Instance.says(rejected, "Error", "runtime checks use the selected branch")
-      Instance.says(rejected, "String", "the branch's declaration is used")
+      // `text`: the branch's body is stored once with `String.Display.display`'s.
+      Stdlib.String.trim(rejected)
+      |> Stdlib.Test.equal(
+        "Error: ScriptChecking.accept's 1st parameter `text` expects String, but got Int64 (7). Try wrapping it with `Stdlib.display`.")
+
       accepted ]))
 
 
@@ -538,8 +553,10 @@ test runtimeErrorsDescribePackageArguments = Instance.withInstance(fun i ->
 
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 1, "a runtime error exits nonzero")
-      Instance.says(out, "List", "the expected type is named")
-      Instance.says(out, "String", "the actual type is named")
+      Stdlib.String.trim(out)
+      |> Stdlib.Test.equal(
+        "Error: Darklang.Stdlib.List.length's 1st parameter `list` expects List<_>, but got String (\"not a list\")")
+
       Instance.doesNotSay(out, "Static type check failed", "no static gate") ]))
 
 
@@ -570,23 +587,26 @@ test lsViewAndHelpAnswer = Instance.withInstance(fun i ->
   let helpLs = Instance.said(i, [ "help", "ls" ])
   Stdlib.Test.all(
     [ Instance.says(lsList, "Functions", "ls: the section")
-      Instance.says(lsList, "head", "ls: a fn")
-      Instance.says(view, "head", "view: the fn's name")
-      Instance.says(view, "Option", "view: Option in the signature")
-      Instance.says(view, "->", "view: the signature's arrow")
-      Instance.says(lsOption, "Types", "ls: the types section")
-      Instance.says(lsOption, "Option", "ls: the Option type")
-      Instance.says(helpRun, "run", "help run: the command")
-      Stdlib.Test.expect(
-        Stdlib.String.contains(helpRun, "function")
-        || Stdlib.String.contains(helpRun, "execute"),
-        $"help run describes it: {helpRun}")
 
-      Instance.says(helpLs, "ls", "help ls: the command")
-      Stdlib.Test.expect(
-        Stdlib.String.contains(helpLs, "list")
-        || Stdlib.String.contains(helpLs, "List"),
-        $"help ls describes it: {helpLs}") ]))
+      Instance.says(lsList, "head", "ls: a fn")
+
+      Instance.says(view, "head", "view: the fn's name")
+
+      Instance.says(view, "Option", "view: Option in the signature")
+
+      Instance.says(view, "->", "view: the signature's arrow")
+
+      Instance.says(lsOption, "Types", "ls: the types section")
+
+      Instance.says(lsOption, "Option", "ls: the Option type")
+
+      // the usage line only the real topic prints; for `run` it also shows the alias resolved
+      Instance.says(
+        helpRun,
+        "Usage: run-script",
+        "help run: run-script's usage")
+
+      Instance.says(helpLs, "Usage: ls", "help ls: ls's usage") ]))
 
 
 /// A `__` name is an internal helper: listings and search leave it out unless asked, and naming it
@@ -683,7 +703,10 @@ test misplacedAllowNoteOnlyOnFailure = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "run", path, "--allow", "env-read HOME" ])
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 0, "succeeds")
-      Instance.doesNotSay(out, "Flags for `run` go before the name", "no note") ]))
+      Instance.doesNotSay(
+        out,
+        "Flags for `run` go before the name",
+        "no note") ]))
 
 
 /// The `dark run --allow` rules a function's process denial offers, pasted into a
@@ -693,7 +716,7 @@ test processDenialHintsPasteIntoRun = Instance.withInstance(fun i ->
     script(
       i,
       "hints.dark",
-      "let echo(arg: String): String =\n  match Stdlib.Cli.Process.run(\"echo\", [ \"it's\", arg ]) with\n  | Ok(out) -> out.stdout\n  | Error(e) -> e.message\n")
+      "let echo(arg: String): String =\n  match Stdlib.Cli.Process.run(\"echo\", [ \"it's\", arg ]) with\n  | Ok(out) -> out.stdout\n  | Error(e) -> Stdlib.display(e)\n")
 
   let authored = Instance.ran(i, [ "module", "Tests.ProcHints", source ])
   let denied =
@@ -716,7 +739,7 @@ test processDenialHintsPasteIntoRun = Instance.withInstance(fun i ->
       let printf = "printf '%s' " + quoted
       match Stdlib.Cli.Process.run("/bin/sh", [ "-c", printf ]) with
       | Ok(out) -> out.stdout
-      | Error(e) -> e.message
+      | Error(e) -> Stdlib.display(e)
 
   let exact = pasted("For one run:")
   let wider = pasted("this program with any arguments:")
@@ -751,7 +774,27 @@ test processDenialHintsPasteIntoRun = Instance.withInstance(fun i ->
       Instance.says(widerOut, "it's a c", "and the program ran") ]))
 
 
-/// Two nested lambdas in a script stay two frames, each named by the line it starts on.
+/// A crash shows the Darklang function it happened in, then the user's code that called it.
+/// With none of the user's code, it shows the Darklang function alone.
+test aCrashShowsTheDarklangFunctionItHappenedIn = Instance.withInstance(fun i ->
+  let path =
+    script(i, "half.dark", "let half(n: Int64): Int64 = 10 / n\nhalf(0)\n")
+
+  let (_, fromScript) = Instance.ran(i, [ "run", path ])
+  let (_, fromEval) = Instance.ran(i, [ "eval", "10 / 0" ])
+  Stdlib.Test.all(
+    [ Instance.says(
+        fromScript,
+        "  in Stdlib.Int64.Divide.divide\n  called from half\n  called from line 2 of the script",
+        "the Darklang function, then the user's code")
+
+      Instance.says(
+        fromEval,
+        "  in Stdlib.Int64.Divide.divide",
+        "no user code: Darklang's") ]))
+
+
+/// Two nested lambdas in a script stay two lines, each named by the line it starts on.
 test scriptLambdaFramesGiveTheirLines = Instance.withInstance(fun i ->
   let path = $"{Instance.home(i)}/lambdas.dark"
   let source =
@@ -761,17 +804,104 @@ test scriptLambdaFramesGiveTheirLines = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "run", path ])
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 1, "boom fails")
-      Instance.says(out, "- Lambda in Source (line 2)\n", "the top-level expression")
-      Instance.says(out, "- Lambda in Source (line 4)\n", "the outer lambda")
-      Instance.says(out, "- Lambda in Source (line 5)\n", "the inner lambda")
-      Instance.doesNotSay(out, "(×", "no lambdas merged") ]))
+      Instance.says(
+        out,
+        "Script error: Cannot unwrap None\n  in boom\n",
+        "the error, then where")
+
+      Instance.says(
+        out,
+        "  called from line 5 of the script\n",
+        "the inner lambda")
+
+      Instance.says(
+        out,
+        "  called from line 4 of the script\n",
+        "the outer lambda")
+
+      Instance.says(
+        out,
+        "  called from line 2 of the script",
+        "the top-level expression")
+
+      Instance.doesNotSay(out, "(×", "no lambdas merged")
+      Instance.doesNotSay(out, "Call stack", "no raw stack") ]))
+
+
+/// After an edit, `run` keeps the approval if the new version needs the same permissions.
+/// An edit that needs more (here, writing a file) is refused.
+test anEditNeedingNoNewPermissionsKeepsTheApproval =
+  Instance.withInstance(fun i ->
+    let dir = Instance.home(i)
+    let _ = Stdlib.Cli.File.writeText($"{dir}/note.txt", "hello")
+    let source =
+      "let label(s: String): String = \"note: \" + s\n"
+      + "let main(args: List<String>): Int64 =\n"
+      + $"  match Stdlib.Cli.File.readText(\"{dir}/note.txt\") with\n"
+      + "  | Ok(text) ->\n"
+      + "    Stdlib.printLine(Tests.Keep.label(text))\n"
+      + "    0\n"
+      + "  | Error(_) -> 1\n"
+
+    let path = script(i, "keep.dark", source)
+    let _ = Instance.ran(i, [ "module", "/Tests.Keep", path ])
+
+    let _ =
+      Instance.ran(
+        i,
+        [ "permissions"
+          "approve"
+          "Tests.Keep.main"
+          $"file read {dir}"
+          "--yes" ])
+
+    let (firstCode, first) = Instance.ran(i, [ "run", "Tests.Keep.main" ])
+
+    let _ =
+      Instance.ran(
+        i,
+        [ "fn", "Tests.Keep.label", "(s: String): String = \"NOTE: \" + s" ])
+
+    let (keptCode, kept) = Instance.ran(i, [ "run", "Tests.Keep.main" ])
+
+    let _ =
+      Instance.ran(
+        i,
+        [ "fn"
+          "Tests.Keep.label"
+          $"(s: String): String =\n  let _ = Stdlib.Cli.File.writeText(\"{dir}/copy.txt\", s)\n  s" ])
+
+    let (widerCode, wider) = Instance.ran(i, [ "run", "Tests.Keep.main" ])
+    Stdlib.Test.all(
+      [ Instance.exitedWith(firstCode, 0, $"the approved version runs: {first}")
+        Instance.says(first, "note: hello", "and prints")
+        Instance.exitedWith(
+          keptCode,
+          0,
+          $"after a text-only edit it still runs: {kept}")
+
+        Instance.says(
+          kept,
+          "Kept the approval for Tests.Keep.main",
+          "and says why")
+
+        Instance.says(kept, "NOTE: hello", "running the edit")
+        Instance.exitedWith(
+          widerCode,
+          1,
+          $"an edit that also writes is refused: {wider}")
+
+        Instance.doesNotSay(
+          wider,
+          "Kept the approval",
+          "and its approval is not moved") ]))
 
 
 /// `eval --allow` grants access for that one evaluation, as `run --allow` does.
 test evalAllowGrantsForOneEvaluation = Instance.withInstance(fun i ->
   let dir = $"{Instance.home(i)}/elsewhere"
   let target = $"{dir}/data.txt"
-  let _ = Stdlib.Cli.Posix.mkdir(dir, 493)
+  let _ = Stdlib.Cli.Posix.mkdir(dir, Stdlib.Cli.Posix.Modes.defaultDir)
   let _ = Stdlib.Cli.File.writeText(target, "hello")
   let source = $"{Instance.home(i)}/reader.dark"
   let _ =
@@ -782,10 +912,70 @@ test evalAllowGrantsForOneEvaluation = Instance.withInstance(fun i ->
   let _ = Instance.ran(i, [ "module", "/Me.Reader", source ])
   let call = $"Me.Reader.size(\"{target}\")"
   let (deniedCode, _) = Instance.ran(i, [ "eval", call ])
-  let (code, out) = Instance.ran(i, [ "eval", "--allow", $"file read {dir}", call ])
+
+  let (code, out) =
+    Instance.ran(i, [ "eval", "--allow", $"file read {dir}", call ])
+
   let (againCode, _) = Instance.ran(i, [ "eval", call ])
+
+  let (afterCode, afterOut) =
+    Instance.ran(i, [ "eval", call, "--allow", $"file read {dir}" ])
+
   Stdlib.Test.all(
     [ Instance.exitedWith(deniedCode, 1, "denied without --allow")
       Instance.exitedWith(code, 0, "allowed for this evaluation")
       Instance.says(out, "5", "read the file")
+      Instance.exitedWith(
+        afterCode,
+        0,
+        "--allow after the expression counts too")
+
+      Instance.says(afterOut, "5", "and reads the file")
       Instance.exitedWith(againCode, 1, "nothing remembered") ]))
+
+
+/// Calls carrying an EXPLICIT type argument take a different path through Apply than the usual inferred
+/// case: resolving the type argument is the one step that can need the package store before anything has
+/// run, so it hands off to `callBuiltinAsync`/`callPackageAsync` instead of staying synchronous.
+///
+/// Nothing else in either suite exercises that. It must not retry the synchronous path after the await:
+/// cache misses aren't cached, so that never ends for a type argument not in the store. A scalar type
+/// arg, a container one and a custom one each resolve differently, so all three are here.
+test explicitTypeArgs = Instance.withInstance(fun i ->
+  let scalar = Instance.output(i, [ "eval", "Stdlib.Json.parse<Int64>(\"3\")" ])
+
+  let container =
+    Instance.output(i, [ "eval", "Stdlib.Json.parse<List<Int64>>(\"[1,2]\")" ])
+
+  let custom =
+    Instance.output(
+      i,
+      [ "eval", "Stdlib.Json.parse<Stdlib.Uuid.ParseError>(\"{}\")" ])
+
+  Stdlib.Test.all(
+    [ Instance.says(scalar, "Ok", "a scalar type arg resolves")
+      Instance.says(scalar, "3", "and parses")
+      Instance.says(container, "Ok", "a container type arg resolves")
+      Instance.says(container, "[1, 2]", "and parses")
+      Instance.says(custom, "ParseError", "a custom type arg resolves") ]))
+
+
+/// A `None` from `getAt` must still compare and match as a plain `None`. The native version threads the
+/// list's element type through, so the repr gained a type argument; this pins that the change is
+/// display-only.
+test getAtNoneIsStillNone = Instance.withInstance(fun i ->
+  let eq =
+    Instance.output(
+      i,
+      [ "eval"
+        "(Stdlib.List.getAt([1,2,3], 99)) == Stdlib.Option.Option.None" ])
+
+  let dflt =
+    Instance.output(
+      i,
+      [ "eval"
+        "Stdlib.Option.withDefault(Stdlib.List.getAt([1,2,3], 99), 0)" ])
+
+  Stdlib.Test.all(
+    [ Instance.says(eq, "true", "out-of-bounds None equals None")
+      Instance.says(dflt, "0", "and withDefault sees it as None") ]))

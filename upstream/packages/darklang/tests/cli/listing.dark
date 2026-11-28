@@ -9,3 +9,135 @@ module GroupedByModule =
           [ ("", [ "top" ]), ("A", [ "g", "h" ]), ("B.y", [ "f", "e" ]) ])
 
         Cli.Listing.groupedByModule([]) |> Stdlib.Test.equal([]) ])
+
+
+/// "Not found" names the path, once. Naming it at the traversal covers every caller,
+/// which is why none of them adds it again.
+test notFoundNamesThePath = Instance.withInstance(fun i ->
+  // A real prefix, so the traversal gets past it: it reports the FIRST missing segment,
+  // and a wholly unknown path would only ever report its first.
+  let missing = "Darklang.Stdlib.NoSuchModule.thing"
+  let expected = "Not found: Darklang.Stdlib.NoSuchModule"
+  let viewed = Instance.output(i, [ "view", missing ])
+  let twice =
+    Stdlib.List.length(Stdlib.String.split(viewed, "NoSuchModule")) > 2
+
+  Stdlib.Test.all(
+    [ Instance.says(viewed, expected, "view names the path")
+
+      Instance.says(
+        Instance.output(i, [ "ls", missing ]),
+        expected,
+        "ls names it")
+
+      Instance.says(
+        Instance.output(i, [ "nav", missing ]),
+        expected,
+        "nav names it")
+
+      Stdlib.Test.expect(
+        Stdlib.Bool.not(twice),
+        $"view names the path once: {viewed}") ]))
+
+
+/// `tree` refuses what it cannot show: an unknown flag must not be dropped with the real ones,
+/// and an unresolvable path must not fall back to where you stand.
+test treeRefusesWhatItCannotShow = Instance.withInstance(fun i ->
+  let badFlag = Instance.output(i, [ "tree", "--zzbogus" ])
+
+  let badPath = Instance.output(i, [ "tree", "Zz.NoSuchThing" ])
+
+  let twoPaths =
+    Instance.output(i, [ "tree", "Darklang.Stdlib", "Darklang.Cli" ])
+
+  let withDepth =
+    Instance.output(i, [ "tree", "Darklang.Stdlib.Option", "--depth=1" ])
+
+  // The header the render prints. Seeing it in a refusal means it showed a tree anyway.
+  let header = "Package tree from"
+  Stdlib.Test.all(
+    [ Instance.says(
+        badFlag,
+        "does not take `--zzbogus`",
+        "an unknown flag is refused")
+
+      Instance.doesNotSay(badFlag, header, "with no tree")
+      Instance.says(badPath, "Not found", "an unknown path is refused")
+      Instance.doesNotSay(badPath, header, "with no tree")
+      Instance.says(
+        twoPaths,
+        "does not take `Darklang.Cli`",
+        "a second path is refused")
+
+      Instance.says(withDepth, header, "--depth=1 shows a tree") ]))
+
+
+/// The reference listings answer: `builtins` by module, `commands` from the registry.
+test referenceListingsAnswer =
+  Instance.withInstance(fun i ->
+    Stdlib.Test.all(
+      [ Instance.says(
+          Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "builtins" ])),
+          "Int64:",
+          "builtins lists them by module")
+
+        Instance.says(
+          Stdlib.Cli.Tui.Text.stripSgr(Instance.said(i, [ "commands" ])),
+          "nav",
+          "commands lists the registry") ]))
+
+
+/// A full name means the same thing wherever you stand, and a miss names what was typed.
+test fullNamesAfterNav =
+  let branch = SCM.Branch.mainBranchId
+  let root = Cli.Packages.PackageLocation.Module([])
+  let inList =
+    Cli.Packages.PackageLocation.Module([ "Darklang", "Stdlib", "List" ])
+
+  let walk = fun(start, path) ->
+    Cli.Packages.Traversal.traverse(branch, start, path)
+
+  Stdlib.Test.all(
+    [ walk(inList, "Stdlib.String.length")
+      |> Stdlib.Test.equal(walk(root, "Stdlib.String.length"))
+
+      walk(inList, "Darklang.Stdlib.String.length")
+      |> Stdlib.Test.equal(walk(root, "Darklang.Stdlib.String.length"))
+
+      walk(inList, "Stdlib.String")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Ok(
+          Cli.Packages.PackageLocation.Module(
+            [ "Darklang", "Stdlib", "String" ])))
+
+      walk(inList, "map")
+      |> Stdlib.Test.equal(walk(root, "Darklang.Stdlib.List.map"))
+
+      walk(inList, "Stdlib.String.nope")
+      |> Stdlib.Test.equal(
+        Stdlib.Result.Result.Error("Not found: Stdlib.String.nope")) ])
+
+
+/// A name a command creates means the same wherever you stand, as a name it looks up does.
+test createdFullNamesAfterNav =
+  let branch = SCM.Branch.mainBranchId
+  let root = Cli.Packages.PackageLocation.Module([])
+  let inList =
+    Cli.Packages.PackageLocation.Module([ "Darklang", "Stdlib", "List" ])
+
+  let darklang = Cli.Packages.PackageLocation.Module([ "Darklang" ])
+  let at = fun(start, name) ->
+    Cli.Packages.Location.parseFrom(branch, start, name)
+
+  Stdlib.Test.all(
+    [ at(inList, "Darklang.Stdlib.String.made")
+      |> Stdlib.Test.equal(at(root, "Darklang.Stdlib.String.made"))
+
+      at(inList, "Stdlib.String.made")
+      |> Stdlib.Test.equal(at(root, "Darklang.Stdlib.String.made"))
+
+      at(inList, "made")
+      |> Stdlib.Test.equal(at(root, "Darklang.Stdlib.List.made"))
+
+      at(darklang, "Stdlib.List.made")
+      |> Stdlib.Test.equal(at(root, "Darklang.Stdlib.List.made")) ])

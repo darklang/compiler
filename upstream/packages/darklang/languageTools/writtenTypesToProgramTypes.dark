@@ -273,8 +273,14 @@ module TypeReference =
     match t with
     | Builtin(b) -> Builtin.toPT(ctx, b)
     | QualifiedName(qn) ->
-      let (typeName, typeArgs, unresolvedNames) = Identifiers.QualifiedType.toPT(ctx, qn)
-      (ProgramTypes.TypeReference.TCustomType(typeName, typeArgs), unresolvedNames)
+      // `Stream<T>` in a type argument parses as a custom name, but is the builtin, as in F#
+      match qn.modules, qn.typ.name, qn.typeArgs with
+      | [], "Stream", [inner] ->
+        let (inner, unresolvedNames) = TypeReference.toPT(ctx, inner)
+        (ProgramTypes.TypeReference.TStream(inner), unresolvedNames)
+      | _ ->
+        let (typeName, typeArgs, unresolvedNames) = Identifiers.QualifiedType.toPT(ctx, qn)
+        (ProgramTypes.TypeReference.TCustomType(typeName, typeArgs), unresolvedNames)
 
 
 module TraitRef =
@@ -644,8 +650,9 @@ module Expr =
               argsUnresolvedNames |> Stdlib.List.flatten ])
 
         // Arguments and locals shadow package functions in pipe calls too.
-        // Unshadowed names resolve function-first. Mirrors the F# lowering.
-        if fn.modules |> Stdlib.List.isEmpty then
+        // Unshadowed names resolve function-first. Mirrors the F# lowering: a name
+        // with type args (`|> parse<T>`) is always a fn call.
+        if Stdlib.List.isEmpty(fn.modules) && Stdlib.List.isEmpty(typeArgs) then
           let isArgument =
             match Stdlib.Dict.get(context.argMap, fn.fn.name) with
             | Some(_) -> true
@@ -1505,21 +1512,11 @@ module ImplDeclaration =
   /// the module is already named for the type. So `impl Add for Int64` in `Darklang.Stdlib.Int64`
   /// is `Darklang.Stdlib.Int64.Add`, not `...Int64.Int64.Add`.
   ///
-  /// This used to be unconditional, and the reason was real: one name holds ONE item here
-  /// (`LibDB/PackageOpPlayback.fs` says so at the `SetName` fold, which rebinds without
-  /// filtering on kind), so in a module named for its type an impl could be handed the same name
-  /// as a trait declared beside it, the second binding unlisted the first, and the trait went
-  /// unreachable. `Show.show p` answered `MissingImpl` for a trait that was right there.
+  /// One name holds ONE item, so in a module named for its type an impl can land on the name of
+  /// a trait declared beside it. That collision is refused at the save (`implNameCollision` in
+  /// the at-rest checker) rather than dodged with a longer name.
   ///
-  /// The doubled name dodged that by never colliding, at the cost of a name nobody wants to read
-  /// or type: `dark deprecate impl Darklang.Stdlib.Int64.Int64.Add` is the shape of it, and
-  /// `dark constraints` prints these. So the collision is now REFUSED at the save instead of
-  /// being designed around, by `implNameCollision` in the at-rest checker. A genuine name
-  /// conflict told to the author beats a verbose name that avoids it silently.
-  ///
-  /// The F# parser in `LibParser/WrittenTypes.fs` (`implMemberPath`) has always dropped the
-  /// segment, which is why the stdlib's 204 impls already carry the short form. These two agree
-  /// now; they did not before, and nothing caught it because the two paths are never exercised
+  /// Must agree with `implMemberPath` in `LibParser/WrittenTypes.fs`; nothing runs the two
   /// against each other.
   let memberPath(
     currentModule: List<String>,

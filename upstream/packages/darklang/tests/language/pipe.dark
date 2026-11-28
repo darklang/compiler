@@ -12,7 +12,7 @@ test functions =
       ([] |> Stdlib.List.prepend(1 + ((+)(1, 3)))) |> Stdlib.Test.equal([ 5 ]) ])
 
 test argErrorRaises =
-  ([] |> Stdlib.List.prepend(Stdlib.Test.raiseRuntimeError("err")))
+  ([] |> Stdlib.List.prepend(Darklang.Language.Tests.raiseRuntimeError("err")))
   => raises "Uncaught exception: err"
 
 // general
@@ -29,6 +29,13 @@ test general =
       // lambda in variable
       (let x = fun a -> a + 1 in (5 |> x |> x |> (fun v -> v + 3)))
       |> Stdlib.Test.equal(10) ])
+
+// A lambda that pipes into an outer lambda captures it.
+test pipeIntoCapturedLambda =
+  (let f = fun a -> a + 1
+   let g = fun x -> x |> f
+   Stdlib.List.map([ 1, 2 ], g))
+  |> Stdlib.Test.equal([ 2, 3 ])
 
 // A pipe gives a lambda one argument, so a two-parameter lambda stops short.
 test pipeIntoTwoParameterLambdaRaises =

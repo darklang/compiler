@@ -88,6 +88,8 @@ type IssueCode =
   | UnknownDeclaredTypeVariable
   | AmbiguousType
   | NonExhaustiveMatch
+  /// A match case that earlier cases already cover, so it never runs
+  | UnreachableMatchCase
   | UnsupportedConstruct
 
 
@@ -202,6 +204,7 @@ type Context =
   | TypeArity(ProgramTypes.Hash, Int64, Int64)
   | ArgumentIndex(Int64)
   | UncoveredPattern(Option<String>)
+  | UnreachableCase
   | InfixOperandUnsupported(ProgramTypes.InfixFnName)
   | RecordRequiredForConstruction
   | RecordRequiredForFieldAccess
@@ -435,6 +438,7 @@ let issueCodeToString(code: IssueCode): String =
   | UnknownDeclaredTypeVariable -> "UnknownDeclaredTypeVariable"
   | AmbiguousType -> "AmbiguousType"
   | NonExhaustiveMatch -> "NonExhaustiveMatch"
+  | UnreachableMatchCase -> "UnreachableMatchCase"
   | UnsupportedConstruct -> "UnsupportedConstruct"
 
 
@@ -450,7 +454,7 @@ let nameRefToStringWith(resolve: ProgramTypes.Hash -> Option<String>, name: Name
     | Some(name) -> name
     | None ->
       let hex = ProgramTypes.hashToString(hash)
-      let short = Stdlib.String.slice(hex, 0, 12)
+      let short = Stdlib.String.first(hex, 12)
       $"#{short}"
   | TraitMethod(traitHash, method) ->
     let traitName =
@@ -458,7 +462,7 @@ let nameRefToStringWith(resolve: ProgramTypes.Hash -> Option<String>, name: Name
       | Some(name) -> name
       | None ->
         let hex = ProgramTypes.hashToString(traitHash)
-        $"#{Stdlib.String.slice(hex, 0, 12)}"
+        $"#{Stdlib.String.first(hex, 12)}"
 
     $"{traitName}.{method}"
 
@@ -556,7 +560,7 @@ let contextToStringWith(
     | Some(name) -> name
     | None ->
       let hex = ProgramTypes.hashToString(hash)
-      let short = Stdlib.String.slice(hex, 0, 12)
+      let short = Stdlib.String.first(hex, 12)
       $"the type #{short}"
 
   let name = fun ref -> nameRefToStringWith(customTypeName, ref)
@@ -581,7 +585,7 @@ let contextToStringWith(
     let traitName =
       match customTypeName(traitHash) with
       | Some(name) -> name
-      | None -> $"#{Stdlib.String.slice(ProgramTypes.hashToString(traitHash), 0, 12)}"
+      | None -> $"#{Stdlib.String.first(ProgramTypes.hashToString(traitHash), 12)}"
 
     match code with
     | ImplMethodSet ->
@@ -655,6 +659,7 @@ let contextToStringWith(
     match witness with
     | Some(witness) -> $"Match is not exhaustive; an uncovered pattern is {witness}"
     | None -> "Match is not exhaustive; values outside the listed patterns are not covered"
+  | UnreachableCase -> "This case can never match; earlier cases already match every value it would"
   | InfixOperandUnsupported(operation) ->
     let symbol = PrettyPrinter.ProgramTypes.infixFnName(operation)
     $"Operator {symbol} does not accept this operand type"
@@ -684,7 +689,7 @@ let contextToStringWith(
     let traitName =
       match customTypeName(traitHash) with
       | Some(name) -> name
-      | None -> $"#{Stdlib.String.slice(ProgramTypes.hashToString(traitHash), 0, 12)}"
+      | None -> $"#{Stdlib.String.first(ProgramTypes.hashToString(traitHash), 12)}"
 
     // `subject` is the type the diagnostic is about, named when we know it. The run-time
     // message for the same situation says "Bool has no implementation of X", and these used
@@ -807,10 +812,42 @@ let appendListHint(callee: String, expected: StaticType, actual: StaticType): St
   | _ -> ""
 
 
+/// A Result or Option handed over where the value inside it was wanted, as `Stdlib.List.zip`'s
+/// Result passed straight to `Stdlib.List.map`.
+let unwrapHint(
+  customTypeName: ProgramTypes.Hash -> Option<String>,
+  expected: StaticType,
+  actual: StaticType)
+  : String =
+  let kind = fun t ->
+    match t with
+    | TCustom(hash, _) ->
+      match customTypeName(hash) with
+      | Some(name) when Stdlib.String.endsWith(name, "Stdlib.Result.Result") -> "Result"
+      | Some(name) when Stdlib.String.endsWith(name, "Stdlib.Option.Option") -> "Option"
+      | _ -> ""
+    | _ -> ""
+
+  let wanted =
+    match expected with
+    | TInferenceVariable(_) -> "unknown"
+    | TRigidVariable(_) -> "unknown"
+    | _ -> kind(expected)
+
+  match kind(actual), wanted with
+  | "Result", "" -> " (that is a Result: match `Ok(x)` and `Error(e)` to get at the value)"
+  | "Option", "" -> " (that is an Option: match `Some(x)` and `None` to get at the value)"
+  | _ -> ""
+
+
 let issueToStringWith(customTypeName: ProgramTypes.Hash -> Option<String>, issue: Issue): String =
   // Only where a value is handed over: an Int64 where `?` wanted a String error wants `mapError`.
   let hint = fun(expected, actual) ->
-    let typeHint = stringExpectedHint(expected, actual) + tupleParameterHint(expected, actual)
+    let typeHint =
+      stringExpectedHint(expected, actual)
+      + tupleParameterHint(expected, actual)
+      + unwrapHint(customTypeName, expected, actual)
+
     match issue.code, issue.context with
     | TypeMismatch, At(FunctionArgument(1, Some(callee))) ->
       typeHint + appendListHint(callee, expected, actual)

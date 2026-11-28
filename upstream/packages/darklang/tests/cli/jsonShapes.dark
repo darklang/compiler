@@ -64,7 +64,7 @@ let hasKeys(
 
 /// The keys of `search --json`. The hint keys are there, empty, when something matched.
 val searchKeys =
-  [ "query", "results", "alsoSearched", "wordCounts", "didYouMean" ]
+  [ "query", "results", "alsoSearched", "wordCounts", "didYouMean", "partial" ]
 
 
 /// A list that answers `{}` or `null` when it is empty is the same break as a missing key.
@@ -109,7 +109,8 @@ let about(cmd: String, result: Stdlib.Test.Result): Stdlib.Test.Result =
       Stdlib.List.map(messages, fun m -> $"`dark {cmd}`: {m}"))
   | FailedChecks(checks) ->
     Stdlib.Test.Result.FailedChecks(
-      Stdlib.List.map(checks, fun((position, check)) -> (position, about(cmd, check))))
+      Stdlib.List.map(checks, fun((position, check)) ->
+        (position, about(cmd, check))))
 
 
 /// Run for the EFFECT. A setup step that fails is reported as itself, not as the confusing
@@ -228,6 +229,16 @@ test emptyAnswersKeepTheirShape = Instance.withInstance(fun i ->
                  Stdlib.List.isEmpty(rows(field(j, "didYouMean")))),
                "suggests a name")) ])
 
+      // A question in plain words: no item has every word, so the closest are offered.
+      check(
+        i,
+        [ "search", "run a shell command and get its output", "--json" ],
+        [ (fun j -> rowsHaveKeys(field(j, "partial"), [ "matched", "name" ]))
+          (fun j ->
+             isTrue(
+               Stdlib.Bool.not(Stdlib.List.isEmpty(rows(field(j, "partial")))),
+               "offers partial matches")) ])
+
       check(
         i,
         [ "search", "length", "zzzq", "--json" ],
@@ -274,7 +285,12 @@ test aDraftThroughCommitKeepsItsShape =
           [ (fun j ->
                rowsHaveKeys(
                  field(j, "changed"),
-                 [ "change", "followed", "hash", "kind", "name" ]))
+                 [ "change"
+                   "followed"
+                   "hash"
+                   "kind"
+                   "name"
+                   "newEffects" ]))
 
             (fun j ->
                isTrue(int(j, "draftOps") > 0, "counts the draft's ops")) ])
@@ -351,7 +367,7 @@ test aNameSavedTwiceIsStillNew = Instance.withInstance(fun i ->
 test branchListingsAreArrays =
   Instance.withInstance(fun i ->
     Stdlib.Test.all(
-      [ step(i, [ "switch", "jsonbr" ])
+      [ step(i, [ "switch", "-c", "jsonbr" ])
         step(i, [ "switch", "main" ])
         check(
           i,
@@ -527,8 +543,8 @@ test typecheckNamesOnlyWhatIsInScope = Instance.withInstance(fun i ->
 
 
 /// A module's fns are checked against what their bodies call, wherever that lives. Their
-/// signatures here name nothing outside the module, and the audit once took that to mean it
-/// had everything, never loaded the callee and reported the fn incomplete. One calls into
+/// signatures here name nothing outside the module, and the audit must still load the callee
+/// rather than report the fn incomplete. One calls into
 /// Stdlib; the other into a fn in another module that takes a type of that module's own.
 test typecheckLoadsWhatAModuleBodyCalls =
   Instance.withInstance(fun i ->
@@ -609,19 +625,13 @@ let refusesQuietly(
   args: List<String>,
   reason: String)
   : Stdlib.Test.Result =
-  let cmd = Stdlib.String.join(args, " ")
-  match Instance.run(i, args) with
-  | Error(e) -> Stdlib.Test.fail($"`dark {cmd}` could not run: {e}")
-  | Ok(out) ->
-    about(
-      cmd,
-      Stdlib.Test.all(
-        [ out.stdout |> Stdlib.Test.equal("")
-          isTrue(
-            Stdlib.String.contains(out.stderr, reason),
-            $"should say '{reason}' on stderr. It said: {out.stderr}")
-
-          out.exitCode |> Stdlib.Test.equal(1) ]))
+  let out = Instance.call(i, Instance.command(args))
+  about(
+    Stdlib.String.join(args, " "),
+    Stdlib.Test.all(
+      [ Instance.stdoutIsEmpty(out, "a refusal is not a payload")
+        Instance.stderrSays(out, reason, "it says why")
+        Instance.exitedWith(out.exitCode, 1, "a refusal") ]))
 
 
 /// `deprecate --json` and `delete --json` answer one object. A dry run, and `--json` without
@@ -652,14 +662,16 @@ test deprecateAndDeleteAnswerInJson = Instance.withInstance(fun i ->
       step(i, [ "fn", "Tests.JsonDep.alone", "() : Int64 = 7204" ])
 
       step(i, [ "fn", "Tests.JsonDep.newer", "() : Int64 = 7205" ])
+
+      step(i, [ "commit", "json fixture", "-y" ])
       check(
         i,
         [ "deprecate"
           "Tests.JsonDep.alone"
-          "--kind"
-          "superseded-by"
           "--replacement"
           "Tests.JsonDep.newer"
+          "--reason"
+          "Use newer"
           "--dry-run"
           "--json" ],
         [ (fun j -> hasKeys(j, keys))
@@ -668,7 +680,8 @@ test deprecateAndDeleteAnswerInJson = Instance.withInstance(fun i ->
              |> Stdlib.Test.equal("Tests.JsonDep.alone"))
 
           (fun j -> string(j, "itemType") |> Stdlib.Test.equal("fn"))
-          (fun j -> string(j, "kind") |> Stdlib.Test.equal("superseded-by"))
+          (fun j -> string(j, "kind") |> Stdlib.Test.equal("replacement"))
+          (fun j -> string(j, "message") |> Stdlib.Test.equal("Use newer"))
           (fun j ->
              string(j, "replacement")
              |> Stdlib.Test.equal("Tests.JsonDep.newer"))
@@ -689,9 +702,14 @@ test deprecateAndDeleteAnswerInJson = Instance.withInstance(fun i ->
 
       check(
         i,
-        [ "delete", "Tests.JsonDep.alone", "-m", "unused", "--json", "--yes" ],
+        [ "delete"
+          "Tests.JsonDep.alone"
+          "--reason"
+          "unused"
+          "--json"
+          "--yes" ],
         [ (fun j -> hasKeys(j, keys))
-          (fun j -> string(j, "kind") |> Stdlib.Test.equal("obsolete"))
+          (fun j -> string(j, "kind") |> Stdlib.Test.equal("deprecated"))
           (fun j -> string(j, "message") |> Stdlib.Test.equal("unused"))
           dryRun(false) ])
 
@@ -707,15 +725,173 @@ test deprecateAndDeleteAnswerInJson = Instance.withInstance(fun i ->
 
       refusesQuietly(
         i,
-        [ "deprecate"
-          "Tests.JsonDep.nothing"
-          "--kind"
-          "obsolete"
-          "--json"
-          "--yes" ],
+        [ "deprecate", "Tests.JsonDep.nothing", "--json", "--yes" ],
         "Could not resolve")
 
       refusesQuietly(
         i,
         [ "delete", "Tests.JsonDep.leaf", "--json", "--yes" ],
         "live dependent") ]))
+
+
+test deleteModuleAnswersInJson = Instance.withInstance(fun i ->
+  let names =
+    Stdlib.AltJson.Json.Array(
+      [ Stdlib.AltJson.Json.String("Tests.JsonDeleteBatch.Nested.second")
+        Stdlib.AltJson.Json.String("Tests.JsonDeleteBatch.first") ])
+
+  let dryRun = fun expected ->
+    (fun j ->
+       field(j, "dryRun")
+       |> Stdlib.Test.equal(Stdlib.AltJson.Json.Bool(expected)))
+
+  Stdlib.Test.all(
+    [ step(i, [ "fn", "Tests.JsonDeleteBatch.first", "(): Int64 = 2573" ])
+
+      step(
+        i,
+        [ "fn", "Tests.JsonDeleteBatch.Nested.second", "(): Int64 = 2574" ])
+
+      step(i, [ "commit", "json fixture", "-y" ])
+      check(
+        i,
+        [ "delete", "Tests.JsonDeleteBatch", "--json" ],
+        [ (fun j ->
+             string(j, "deprecated")
+             |> Stdlib.Test.equal("Tests.JsonDeleteBatch"))
+
+          (fun j -> string(j, "itemType") |> Stdlib.Test.equal("module"))
+          (fun j -> field(j, "names") |> Stdlib.Test.equal(names))
+          dryRun(true) ])
+
+      check(
+        i,
+        [ "delete", "Tests.JsonDeleteBatch", "--json", "--dry-run", "--yes" ],
+        [ dryRun(true) ])
+
+      Instance.says(
+        Instance.said(i, [ "restore", "Tests.JsonDeleteBatch.first" ]),
+        "is not deprecated",
+        "the previews write nothing")
+
+      check(
+        i,
+        [ "delete"
+          "Tests.JsonDeleteBatch"
+          "--json"
+          "--yes"
+          "--reason"
+          "unused" ],
+        [ (fun j -> string(j, "kind") |> Stdlib.Test.equal("deprecated"))
+          (fun j -> string(j, "message") |> Stdlib.Test.equal("unused"))
+          (fun j -> field(j, "names") |> Stdlib.Test.equal(names))
+          dryRun(false) ])
+
+      Instance.says(
+        Instance.said(i, [ "restore", "Tests.JsonDeleteBatch.first" ]),
+        "Undeprecated",
+        "confirmed module delete writes the deprecation") ]))
+
+
+/// `test run --json`: one answer with every test and the totals, passing or failing, and the
+/// same keys when nothing matched.
+test testRunAnswersWithEveryTest = Instance.withInstance(fun i ->
+  let runKeys = [ "tests", "passed", "failed", "ran", "cached", "seed" ]
+  let statuses = fun j ->
+    rows(field(j, "tests"))
+    |> Stdlib.List.map(fun t -> (string(t, "name"), string(t, "status")))
+    |> Stdlib.List.sort
+
+  Stdlib.Test.all(
+    [ step(i, [ "test", "add", "Tests.JsonRun.passes", "Stdlib.Test.pass()" ])
+
+      step(
+        i,
+        [ "test", "add", "Tests.JsonRun.fails", "Stdlib.Test.fail(\"nope\")" ])
+
+      check(
+        i,
+        [ "test", "run", "--json", "Tests.JsonRun" ],
+        [ (fun j -> hasKeys(j, runKeys))
+          (fun j ->
+             rowsHaveKeys(
+               field(j, "tests"),
+               [ "name", "status", "messages", "cached" ]))
+
+          (fun j ->
+             statuses(j)
+             |> Stdlib.Test.equal(
+               [ ("Tests.JsonRun.fails", "failed")
+                 ("Tests.JsonRun.passes", "passed") ]))
+
+          (fun j -> int(j, "passed") |> Stdlib.Test.equal(1))
+          (fun j -> int(j, "failed") |> Stdlib.Test.equal(1)) ])
+
+      check(
+        i,
+        [ "test", "run", "--json", "Tests.JsonRunNothing" ],
+        [ (fun j -> hasKeys(j, runKeys))
+          (fun j -> fieldIsArray(j, "tests")) ]) ]))
+
+
+/// Bare `traces --json` is the listing bare `traces` prints, as JSON. A new instance has no
+/// traces, so the eval's is the only row.
+test bareTracesAnswersInJson = Instance.withInstance(fun i ->
+  Stdlib.Test.all(
+    [ step(i, [ "eval", "1 + 1" ])
+      check(
+        i,
+        [ "traces", "--json" ],
+        [ (fun j ->
+             rowsHaveKeys(
+               j,
+               [ "id"
+                 "entry"
+                 "input"
+                 "answered"
+                 "status"
+                 "pinned"
+                 "durationMs"
+                 "created"
+                 "updated" ]))
+
+          (fun j ->
+             rows(j)
+             |> Stdlib.List.map(fun row -> string(row, "input"))
+             |> Stdlib.Test.equal([ "1 + 1" ])) ]) ]))
+
+
+/// `ps --json` says what a process runs and how it stands in the table's words, not in the
+/// runtime's union encoding.
+test psAnswersInPlainWords = Instance.withInstance(fun i ->
+  check(
+    i,
+    [ "ps", "--json" ],
+    [ (fun j ->
+         match rows(field(j, "thisInstance")) with
+         | [] -> Stdlib.Test.fail("lists no process, not even itself")
+         | [me, ...] ->
+           Stdlib.Test.all(
+             [ string(me, "entry")
+               |> Stdlib.Test.equal("Darklang.Cli.executeCliCommand")
+
+               string(me, "status") |> Stdlib.Test.equal("running") ])) ]))
+
+
+/// `search --json` ranks and caps each section the way the text view does.
+test searchJsonRanksAndLimitsLikeText = Instance.withInstance(fun i ->
+  check(
+    i,
+    [ "search", "List.map", "--json", "--limit", "2" ],
+    [ (fun j ->
+         let results = rows(field(j, "results"))
+         let fns =
+           results |> Stdlib.List.filter(fun r -> string(r, "kind") == "fn")
+
+         Stdlib.Test.all(
+           [ results
+             |> Stdlib.List.head
+             |> Stdlib.Option.map(fun r -> string(r, "name"))
+             |> Stdlib.Test.equal(Option.Some("Darklang.Stdlib.List.map"))
+
+             Stdlib.List.length(fns) |> Stdlib.Test.equal(2) ])) ]))

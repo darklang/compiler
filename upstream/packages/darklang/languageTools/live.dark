@@ -778,19 +778,14 @@ module Values =
   /// performed. `None` when no recorded trace went through it, which is not an error: there is
   /// nothing to show yet.
   ///
-  /// One mechanism, not two. This used to re-run the ONE function on the arguments a recorded
-  /// call gave it, which needed those arguments stored (a recording level that no longer
-  /// exists) and
-  /// performed that function's effects for real -- so opening a file in an editor could charge a
-  /// card. Replaying the whole run answers every effect from the log instead, and because the
-  /// pure code is recomputed, the values follow an edit to a callee.
+  /// The whole run is replayed rather than the one function, so no effect is performed for real,
+  /// and because the pure code is recomputed, the values follow an edit to a callee.
   let replay(
     accountID: Option<Uuid>,
     branchId: Uuid,
     entry: ProgramTypes.PackageLocation)
     : Option<Values> =
-    newestRun(branchId, entry)
-    |> Stdlib.Option.map(fun run -> replayRun(accountID, branchId, run))
+    newestRun(branchId, entry) |> Stdlib.Option.map(fun run -> replayRun(accountID, branchId, run))
 
 
   /// The newest recorded run that went through <param entry>: the one `replay` shows.
@@ -823,7 +818,7 @@ module Values =
     let fns = Stdlib.List.length(Tracing.Store.fnsOf(run.id))
     if run.durationMs > maxDurationMs || fns > maxFns then
       let why =
-        $"too large to show live values: its last run took {Stdlib.display(run.durationMs)} ms through {Stdlib.display(fns)} fns, and a replay takes many times that (dark traces inspect {Stdlib.String.slice(run.id, 0, 8)})"
+        $"too large to show live values: its last run took {Stdlib.display(run.durationMs)} ms through {Stdlib.display(fns)} fns, and a replay takes many times that (dark traces inspect {Stdlib.String.first(run.id, 8)})"
 
       Values { byExpr = Stdlib.Dict.empty, problem = Option.None, skipped = Option.Some(why) }
     else

@@ -111,8 +111,8 @@ test aMergeIntoABranchMakesNoMergeCommit =
         "under one merge commit") ])
 
 
-// #6039, exactly as reported: a caller added on a branch, then main changes what it calls. The merge
-// repoints the caller at main's version, as a rebase would.
+// A caller added on a branch, then main changes what it calls. The merge repoints the caller
+// at main's version, as a rebase would.
 test aCallerAddedOnABranchFollowsWhatMainChangedWhenItMerges =
   scenario(fun dark ->
     [ switch(dark, "main")
@@ -185,7 +185,12 @@ test mergeRefusesAndSaysWhy =
         "a branch with a live child")
 
       run(dark, [ "branch", "archive", "kid", "-y" ])
-      save(dark, "Tests.App.bad", "(): Int64 = \"text\"")
+      refuses(
+        dark,
+        [ "fn", "Tests.App.bad", "(): Int64 = \"text\"" ],
+        "type error",
+        "a save with a type error")
+
       run(dark, [ "commit", "bad", "-y", "--allow-type-errors" ])
       refuses(
         dark,
@@ -217,7 +222,44 @@ test aMergeLeavesMainsOwnDraftAlone =
         [ "merged branch \"feat\"", "feat work" ],
         "the merge committed only the branch's work")
 
-      evals(dark, "Tests.App.onFeat()", "1", "which landed") ])
+      evals(dark, "Tests.App.onFeat()", "1", "which landed")
+      says(
+        dark,
+        [ "log", "feat" ],
+        "merged from branch \"feat\"",
+        "the merged branch's log reads its merge")
+
+      says(
+        dark,
+        [ "log", "feat" ],
+        "SetName Tests.App.onFeat",
+        "and lists the ops it carried")
+
+      says(
+        dark,
+        [ "diff", "feat" ],
+        "is merged",
+        "its diff says it is merged") ])
+
+
+// The branch saved the same code main's draft holds, so both carry its body. The merge lands the
+// branch's committed copy, so discarding main's draft afterwards leaves the merged name its body.
+test aMergeLandsABodyMainsDraftAlsoHolds =
+  scenario(fun dark ->
+    [ save(dark, "Tests.App.f", "(): Int64 = 7 + 35")
+      switch(dark, "feat")
+      save(dark, "Tests.App.g", "(): Int64 = 7 + 35")
+      commit(dark, "feat work")
+      switch(dark, "main")
+      merge(dark, "feat")
+      says(
+        dark,
+        [ "log", "feat" ],
+        "2 ops merged from branch \"feat\"",
+        "the merge carried the body with the name")
+
+      run(dark, [ "discard", "-y" ])
+      evals(dark, "Tests.App.g()", "42", "the merged name still runs") ])
 
 
 test docsAndDeprecationsMadeOnABranchArriveWithTheMerge =
@@ -231,10 +273,7 @@ test docsAndDeprecationsMadeOnABranchArriveWithTheMerge =
         "Tests.App.f",
         "/// Documented on the branch.\nlet f(): Int64 = 1")
 
-      run(
-        dark,
-        [ "deprecate", "fn", "Tests.App.old", "--kind", "obsolete", "-y" ])
-
+      run(dark, [ "deprecate", "fn", "Tests.App.old", "-y" ])
       says(
         dark,
         [ "view", "Tests.App.f" ],
@@ -289,3 +328,146 @@ test aValueMadeOnABranchWorksAfterTheMerge =
       evals(dark, "Tests.App.plusOne()", "43", "and so does its caller")
       draftIsEmpty(dark, "nothing is left in main's draft")
       same(conflicts(dark), [], "and nothing collided") ])
+
+
+// A branch merged into a parent that is not main lands there, and `--dry-run` says so first.
+test aMergeIntoABranchLandsThereAndNotOnMain = scenario(fun dark ->
+  let f = "Tests.CliMerge.landed"
+  let setup =
+    Stdlib.Test.all(
+      [ switch(dark, "parent")
+        switch(dark, "child")
+        saveNumber(dark, f, "7")
+        commit(dark, "merge fixture") ])
+
+  // --dry-run records nothing, so it has to answer the same question the merge does without doing it.
+  let dryRun =
+    Cli.Tests.Instance.output(dark, [ "merge", "child", "--dry-run" ])
+
+  [ setup
+    Cli.Tests.Instance.doesNotSay(dryRun, "ERROR:", "`merge --dry-run` runs")
+    Cli.Tests.Instance.says(
+      dryRun,
+      "parent",
+      "it names the parent it would merge into")
+
+    Cli.Tests.Instance.says(dryRun, f, "and the name that would land")
+    says(
+      dark,
+      [ "merge", "child", "-y" ],
+      "Merged",
+      "the merge reports what it merged")
+
+    evalsOn(dark, "parent", f + "()", "7", "the merged fn runs on the parent")
+    notFoundOn(dark, "main", f + "()", "and the merge did not reach main") ])
+
+
+/// A merge moves committed work onto main and there is no undo for it, so on a pipe it refuses
+/// without `-y`, and the refusal leaves the branch to merge.
+test aMergeOnAPipeAsksFirst =
+  scenario(fun dark ->
+    [ switch(dark, "askbr")
+      saveNumber(dark, "Tests.Ask.a", "31")
+      commit(dark, "ask work")
+      switch(dark, "main")
+      refuses(
+        dark,
+        [ "merge", "askbr" ],
+        "Merge not done",
+        "a piped merge with no -y refuses")
+
+      doesNotSay(
+        dark,
+        [ "merge", "askbr" ],
+        "Merged",
+        "and does not claim it merged")
+
+      notFound(dark, "Tests.Ask.a()", "main does not have the work")
+      says(
+        dark,
+        [ "merge", "askbr", "-y" ],
+        "Merged",
+        "-y merges the same branch")
+
+      evals(dark, "Tests.Ask.a()", "31", "and main has the work") ])
+
+
+test aBareMergeOrRebaseMeansTheBranchYouAreOn =
+  scenario(fun dark ->
+    [ refuses(
+        dark,
+        [ "rebase" ],
+        "no branch to rebase",
+        "on main a bare rebase has nothing to mean")
+
+      switch(dark, "barebr")
+      save(dark, "Tests.Bare.one", "(x: Int64): Int64 = x + 1")
+      commit(dark, "bare branch work")
+      says(
+        dark,
+        [ "rebase", "--dry-run" ],
+        "barebr",
+        "a bare rebase resolves to the branch you're on")
+
+      says(dark, [ "merge", "--dry-run" ], "barebr", "and so does a bare merge")
+      onBranch(dark, "barebr", "a dry run moves nothing")
+      notFoundOn(dark, "main", "Tests.Bare.one(1)", "and merges nothing")
+      refuses(
+        dark,
+        [ "merge", "nosuchbranch" ],
+        "no branch",
+        "a named branch is still looked up") ])
+
+
+/// An unbind on a branch takes a main name away there, shows as a removal, and takes it off main
+/// when the branch merges. No verb writes one yet, so it is authored through `SCM.PackageOps.add`,
+/// which needs package-write.
+test anUnbindOnABranchTakesTheNameOffMainWhenItMerges =
+  scenario(fun dark ->
+    [ saveNumber(dark, "Tests.App.gone", "1")
+      commit(dark, "gone soon")
+      switch(dark, "feat")
+      run(dark, [ "permissions", "allow", "package-write" ])
+      says(
+        dark,
+        [ "eval"
+          "Darklang.SCM.PackageOps.add(Builtin.scmCurrentBranch(), [ Darklang.LanguageTools.ProgramTypes.PackageOp.Unbind(Darklang.LanguageTools.ProgramTypes.PackageLocation { owner = \"Tests\", modules = [ \"App\" ], name = \"gone\" }, Stdlib.Option.Option.None) ])" ],
+        "Ok",
+        "the unbind is authored on the branch")
+
+      notFound(dark, "Tests.App.gone()", "the name is gone on the branch")
+      says(dark, [ "status" ], "1 item removed", "status names the removal")
+      saysAll(
+        dark,
+        [ "commit", "remove gone", "-y" ],
+        [ "REMOVED (1)", "Tests.App.gone" ],
+        "commit's review lists it by name")
+
+      switch(dark, "main")
+      evals(dark, "Tests.App.gone()", "1", "main still has it before the merge")
+      merge(dark, "feat")
+      notFound(dark, "Tests.App.gone()", "and main no longer has the name")
+      same(
+        commits(dark),
+        [ "merged branch \"feat\"", "remove gone", "gone soon" ],
+        "the removal's commit travelled with the merge") ])
+
+
+/// Two branches that save identical code hold the same ops. Merging one commits what it landed,
+/// and archiving the other does not bring that work back as main's draft.
+test aMergeCommitsWorkASiblingBranchAlsoHolds =
+  scenario(fun dark ->
+    [ switch(dark, "one")
+      saveNumber(dark, "Tests.App.f", "99")
+      commit(dark, "one work")
+      switch(dark, "main")
+      switch(dark, "two")
+      saveNumber(dark, "Tests.App.f", "99")
+      commit(dark, "two work")
+      switch(dark, "main")
+      merge(dark, "one")
+      draftIsEmpty(dark, "everything the merge landed is committed by it")
+      run(dark, [ "branch", "archive", "two", "-y" ])
+      draftIsEmpty(
+        dark,
+        "and archiving the sibling does not bring the work back as draft") ])

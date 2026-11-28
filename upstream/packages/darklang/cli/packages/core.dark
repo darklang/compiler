@@ -90,6 +90,32 @@ let definitionFromArgs(args: List<String>): Result<String, String> =
       Result.Ok(joined)
 
 
+/// <fn definitionFromArgs>, and the text of a `--description <text>` among <param args>: the doc
+/// `fn`, `type`, `val`, `trait` and `test add` give what they save.
+let definitionAndDescription(args: List<String>): Result<(String * Option<String>), String> =
+  match takeDescription(args) with
+  | Error(message) -> Result.Error(message)
+  | Ok((description, rest)) ->
+    match definitionFromArgs(rest) with
+    | Error(message) -> Result.Error(message)
+    | Ok(definition) -> Result.Ok((definition, description))
+
+
+/// The last `--description <text>` in <param args>, and the arguments without it.
+let takeDescription(args: List<String>): Result<(Option<String> * List<String>), String> =
+  match args with
+  | [] -> Result.Ok((Option.None, []))
+  | ["--description"] -> Result.Error("`--description` needs a value.")
+  | ["--description", text, ...rest] ->
+    match takeDescription(rest) with
+    | Ok((None, others)) -> Result.Ok((Option.Some(Stdlib.String.trim(text)), others))
+    | other -> other
+  | [arg, ...rest] ->
+    match takeDescription(rest) with
+    | Ok((description, others)) -> Result.Ok((description, Stdlib.List.prepend(others, arg)))
+    | Error(message) -> Result.Error(message)
+
+
 /// Where the code of <param definition> starts: past blank lines and `//` comment lines, so a
 /// declaration with a comment above it is still recognised as a whole declaration.
 let codeAfterComments(definition: String): String =
@@ -406,8 +432,10 @@ let commitAuthored(
               branchId,
               issue,
               PrettyPrinter.ProgramTypes.PackageLocation.packageLocation,
-              LanguageTools.AtRestTypeChecker.issueToStringWith(
-                (fun hash -> AtRestCheck.customTypeName(branchId, hash)),
+              AtRestCheck.issueMessage(
+                branchId,
+                Stdlib.List.prepend(location.modules, location.owner),
+                [],
                 issue))
 
           Option.Some(first)
@@ -460,7 +488,10 @@ let authorInline(
       LanguageTools.WrittenTypes.SourceFile.SourceFileDeclaration) ->
     Option<AppState>)
   : AppState =
-  match Location.parseRelativeTo(state.packageData.currentLocation, locationStr) with
+  match Location.parseFrom(
+          state.currentBranchId,
+          state.packageData.currentLocation,
+          locationStr) with
   | Error(msg) ->
     printErr($"Invalid location: {msg}")
     failed(state)
@@ -484,6 +515,40 @@ let authorInline(
     | None ->
       hint |> Stderr.lines
       failed(state)
+
+
+/// Capture the current hash if this name is deprecated before the save.
+let deprecatedHashBeforeSave(
+  branchId: Uuid,
+  location: LanguageTools.ProgramTypes.PackageLocation,
+  kind: LanguageTools.ProgramTypes.ItemKind)
+  : Option<LanguageTools.ProgramTypes.Hash> =
+  match SCM.Propagation.hashOn(branchId, location, kind) with
+  | None -> Option.None
+  | Some(hash) ->
+    LanguageTools.PackageManager.currentDeprecation(branchId, location, hash, kind)
+    |> Stdlib.Option.map(fun _ -> hash)
+
+
+/// Whether the code stayed the same and what to tell the author about its deprecation.
+let deprecationSaveNote(
+  branchId: Uuid,
+  location: LanguageTools.ProgramTypes.PackageLocation,
+  kind: LanguageTools.ProgramTypes.ItemKind,
+  previous: LanguageTools.ProgramTypes.Hash)
+  : Option<(Bool * String)> =
+  let name = PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(location)
+  match SCM.Propagation.hashOn(branchId, location, kind) with
+  | None -> Option.None
+  | Some(current) ->
+    let unchanged = current == previous
+    match LanguageTools.PackageManager.currentDeprecation(branchId, location, current, kind) with
+    | Some(_) ->
+      let status = if unchanged then "unchanged and still deprecated" else "still deprecated"
+      Option.Some((unchanged, $"{name} is {status}. Use `dark restore {name}` to reactivate it."))
+    | None when Stdlib.Bool.not(unchanged) ->
+      Option.Some((false, $"The new definition of {name} is active."))
+    | _ -> Option.None
 
 
 /// Shared tail of the authoring flow: build the name-resolution context, convert the written
@@ -524,6 +589,8 @@ let saveAuthored(
     if Errors.reportUnresolvedNames(state.currentBranchId, home, unresolvedNames) then
       failed(state)
     else
+      let previouslyDeprecated = deprecatedHashBeforeSave(state.currentBranchId, location, kind)
+      let previousHash = SCM.Propagation.hashOn(state.currentBranchId, location, kind)
       match commitAuthored(state.currentBranchId, location, kind, hash, ops) with
       | Ok(committed) ->
         let isUpdate = committed.isUpdate
@@ -544,6 +611,11 @@ let saveAuthored(
           else
             Stdlib.Cli.UI.Colors.success("✓")
 
+        let deprecationNote =
+          previouslyDeprecated
+          |> Stdlib.Option.andThen(fun previous ->
+            deprecationSaveNote(state.currentBranchId, location, kind, previous))
+
         if reverted then
           Stdlib.printLine($"{glyph} Put {kindWord} {fullPath} back to an earlier version")
         else if landed then
@@ -555,9 +627,20 @@ let saveAuthored(
             | None -> ""
 
           Stdlib.printLine($"{glyph} {action} {kindWord} {fullPath}{alsoNamed}")
-        else
+        else if deprecationNote == Option.None then
           Stdlib.printLine(
             Stdlib.Cli.UI.Colors.hint($"= {kindWord} {fullPath} is unchanged; nothing was saved"))
+
+        if landed && kind == LanguageTools.ProgramTypes.ItemKind.Fn then
+          Stdlib.printLine(
+            "  effects: "
+            + Effects.saveSummary(
+              previousHash |> Stdlib.Option.map(LanguageTools.ProgramTypes.hashToString),
+              LanguageTools.ProgramTypes.hashToString(committed.boundHash)))
+
+        deprecationNote
+        |> Stdlib.Option.toList
+        |> Stdlib.List.iter(fun((_, message)) -> Stdlib.printLine(message))
 
         let sourceShift = Stdlib.UInt64.fromInt64(firstLineShift) |> Stdlib.Option.withDefault(0u64)
         AtRestCheck.printUnresolvedTraitCalls(committed.unresolvedTraitCalls, sourceShift)
@@ -580,7 +663,7 @@ let saveAuthored(
         | None -> ()
 
         Propagate.printFollowed(followed)
-        state
+        if Stdlib.Option.isSome(ownIssue) then failed(state) else state
       | Error(msg) ->
         let fullPath = PrettyPrinter.ProgramTypes.PackageLocation.packageLocation(location)
         Text.printWrappedErr(

@@ -34,8 +34,8 @@ module Registry =
       [ ("get", Accepts.between(1, 1, []))
         ("set", Accepts.textBetween(2, 2))
         ("unset", Accepts.between(1, 1, []))
-        ("list", Accepts.nothing()) ],
-      Accepts.nothing())
+        ("list", Accepts.flagsOnly([ "--json" ])) ],
+      Accepts.flagsOnly([ "--json" ]))
 
 
   let acceptsInstall(): Accepts.Accepts =
@@ -56,7 +56,7 @@ module Registry =
 
 
   let acceptsLs(): Accepts.Accepts =
-    Accepts.upTo(1, [ "--include-deprecated", "--include-internal", "--versions" ])
+    Accepts.upTo(1, [ "--include-deprecated", "--include-internal", "--versions", "--json" ])
 
 
   let acceptsBack(): Accepts.Accepts = Accepts.nothing()
@@ -77,7 +77,7 @@ module Registry =
   let acceptsTree(): Accepts.Accepts =
     Accepts.withValues(
       [ "--depth" ],
-      Accepts.upTo(1, [ "--toc", "--include-deprecated", "--include-internal" ]))
+      Accepts.upTo(1, [ "--toc", "--include-deprecated", "--include-internal", "--json" ]))
 
 
   let acceptsSearch(): Accepts.Accepts =
@@ -98,6 +98,7 @@ module Registry =
           "--exact"
           "--shallow"
           "--with-docs"
+          "--brief"
           "--include-deprecated"
           "--include-internal"
           "--json" ]))
@@ -109,7 +110,12 @@ module Registry =
 
   let acceptsTest(): Accepts.Accepts =
     Accepts.subcommands(
-      [ ("run", Accepts.withValues([ "--jobs", "--seed" ], Accepts.freeText(0, [ "--force" ])))
+      [ (
+          "run",
+          Accepts.withValues(
+            [ "--jobs", "--seed" ],
+            Accepts.freeText(0, [ "--force", "--brief", "--verbose", "--json" ])))
+
         ("count", Accepts.withValues([ "--for" ], Accepts.freeText(0, [])))
         ("add", Accepts.text(2)) ],
       Accepts.nothing())
@@ -196,7 +202,7 @@ module Registry =
 
   let acceptsBranches(): Accepts.Accepts = Accepts.flagsOnly([ "--all", "--json" ])
 
-  let acceptsSwitch(): Accepts.Accepts = Accepts.upTo(1, [])
+  let acceptsSwitch(): Accepts.Accepts = Accepts.upTo(1, [ "-c", "--create" ])
 
   let acceptsDiff(): Accepts.Accepts = Accepts.upTo(1, [ "--source", "--json" ])
 
@@ -294,21 +300,17 @@ module Registry =
 
   let acceptsDeprecate(): Accepts.Accepts =
     Accepts.withValues(
-      [ "--kind", "--replacement", "--message", "-m" ],
-      Accepts.between(1, 2, [ "-y", "--yes", "--dry-run", "--json" ]))
+      [ "--replacement", "--reason", "-m" ],
+      Accepts.between(1, 2, [ "--block-execution", "-y", "--yes", "--dry-run", "--json" ]))
 
 
   let acceptsDelete(): Accepts.Accepts =
     Accepts.withValues(
-      [ "--message", "-m" ],
+      [ "--reason", "-m" ],
       Accepts.between(
         1,
         2,
         [ "-y", "--yes", "--ignore-dependents", "--force", "--dry-run", "--json" ]))
-
-
-  let acceptsExportSeed(): Accepts.Accepts =
-    Accepts.between(1, 1, [])
 
 
   let acceptsTraces(): Accepts.Accepts =
@@ -411,83 +413,559 @@ module Registry =
 
   let allCommands(): List<CommandHandler> =
     [ ("quit", "Exit the CLI", [ "exit", "q" ], acceptsQuit, Quit.execute, Quit.help, Quit.complete)
-      ("help", "Show help for commands", [ "commands", "?", "--help", "-h" ], acceptsHelp, Help.execute, Help.help, Help.complete)
-      ("config", "Manage CLI configuration", [], acceptsConfig, Config.execute, Config.help, Config.complete)
-      ("install", "Install CLI for your user account", [], acceptsInstall, Installation.Install.execute, Installation.Install.help, Installation.Install.complete)
-      ("update", "Update CLI to latest version", [ "upgrade" ], acceptsUpdate, Installation.Update.execute, Installation.Update.help, Installation.Update.complete)
-      ("uninstall", "Remove CLI installation", [], acceptsUninstall, Installation.Uninstall.execute, Installation.Uninstall.help, Installation.Uninstall.complete)
-      ("install-status", "Show installation status", [], acceptsInstallStatus, Installation.Status.execute, Installation.Status.help, Installation.Status.complete)
-      ("version", "Display CLI version", [ "--version", "-v" ], acceptsVersion, Installation.Version.execute, Installation.Version.help, Installation.Version.complete)
-      ("nav", "Navigate between owners, modules, and items", [ "cd" ], acceptsNav, Packages.Nav.execute, Packages.Nav.help, Packages.Nav.complete)
-      ("ls", "List package contents", [ "dir" ], acceptsLs, Packages.Listing.execute, Packages.Listing.help, Packages.Listing.complete)
-      ("back", "Go back to previous location", [], acceptsBack, Packages.Back.execute, Packages.Back.help, Packages.Back.complete)
-      ("clear", "Clear the screen", [ "cls" ], acceptsClear, Cli.Clear.execute, Cli.Clear.help, Cli.Clear.complete)
-      ("format", "Format .dark files", [ "fmt" ], acceptsFormat, Cli.Format.execute, Cli.Format.help, Cli.Format.complete)
-      ("run-script", "Run a package function by name, or a Dark script file", [ "run" ], acceptsRunScript, Cli.Run.execute, Cli.Run.help, Cli.Run.complete)
-      ("eval", "Evaluate a Dark expression", [], acceptsEval, Cli.Eval.execute, Cli.Eval.help, Cli.Eval.complete)
-      ("view", "View details of a module, type, value, fn, trait, impl or test", [], acceptsView, Packages.View.execute, Packages.View.help, Packages.View.complete)
-      ("tree", "Display package hierarchy in tree format", [ "packages" ], acceptsTree, Packages.Tree.execute, Packages.Tree.help, Packages.Tree.complete)
-      ("search", "Search modules, types, functions, values, traits, impls and tests", [], acceptsSearch, Packages.Search.execute, Packages.Search.help, Packages.Search.complete)
-      ("typecheck", "Audit package declarations without changing them", [], acceptsTypecheck, Packages.Typecheck.execute, Packages.Typecheck.help, Packages.Typecheck.complete)
-      ("test", "Run package tests", [ "tests" ], acceptsTest, Packages.Test.execute, Packages.Test.help, Packages.Test.complete)
-      ("deps", "Show dependencies and dependents", [ "dependencies" ], acceptsDeps, Cli.Deps.execute, Cli.Deps.help, Cli.Deps.complete)
-      ("val", "Create a new value", [ "let" ], acceptsVal, Packages.Value.execute, Packages.Value.help, Packages.Value.complete)
-      ("fn", "Create a new function", [ "function" ], acceptsFn, Packages.Fn.execute, Packages.Fn.help, Packages.Fn.complete)
-      ("type", "Create a new type", [], acceptsType, Packages.Type.execute, Packages.Type.help, Packages.Type.complete)
-      ("trait", "Create a new trait", [], acceptsTrait, Packages.TraitCommand.execute, Packages.TraitCommand.help, Packages.TraitCommand.complete)
-      ("impl", "Implement a trait for a type", [], acceptsImpl, Packages.ImplCommand.execute, Packages.ImplCommand.help, Packages.ImplCommand.complete)
-      ("module", "Define multiple package declarations", [], acceptsModule, Packages.ModuleCommand.execute, Packages.ModuleCommand.help, Packages.ModuleCommand.complete)
-      ("edit", "Change an item without retyping it", [], acceptsEdit, Packages.Edit.execute, Packages.Edit.help, Packages.Edit.complete)
-      ("rename", "Give an item a different name (its content and callers are untouched)", [], acceptsRename, Packages.Rename.execute, Packages.Rename.help, Packages.Rename.complete)
-      ("hash", "Show hash of a package item", [], acceptsHash, Packages.Hash.execute, Packages.Hash.help, Packages.Hash.complete)
+      (
+        "help",
+        "Show help for commands",
+        [ "commands", "?", "--help", "-h" ],
+        acceptsHelp,
+        Help.execute,
+        Help.help,
+        Help.complete)
+
+      (
+        "config",
+        "Manage CLI configuration",
+        [],
+        acceptsConfig,
+        Config.execute,
+        Config.help,
+        Config.complete)
+
+      (
+        "install",
+        "Install CLI for your user account",
+        [],
+        acceptsInstall,
+        Installation.Install.execute,
+        Installation.Install.help,
+        Installation.Install.complete)
+
+      (
+        "update",
+        "Update CLI to latest version",
+        [ "upgrade" ],
+        acceptsUpdate,
+        Installation.Update.execute,
+        Installation.Update.help,
+        Installation.Update.complete)
+
+      (
+        "uninstall",
+        "Remove CLI installation",
+        [],
+        acceptsUninstall,
+        Installation.Uninstall.execute,
+        Installation.Uninstall.help,
+        Installation.Uninstall.complete)
+
+      (
+        "install-status",
+        "Show installation status",
+        [],
+        acceptsInstallStatus,
+        Installation.Status.execute,
+        Installation.Status.help,
+        Installation.Status.complete)
+
+      (
+        "version",
+        "Display CLI version",
+        [ "--version", "-v" ],
+        acceptsVersion,
+        Installation.Version.execute,
+        Installation.Version.help,
+        Installation.Version.complete)
+
+      (
+        "nav",
+        "Navigate between owners, modules, and items",
+        [ "cd" ],
+        acceptsNav,
+        Packages.Nav.execute,
+        Packages.Nav.help,
+        Packages.Nav.complete)
+
+      (
+        "ls",
+        "List package contents",
+        [ "dir" ],
+        acceptsLs,
+        Packages.Listing.execute,
+        Packages.Listing.help,
+        Packages.Listing.complete)
+
+      (
+        "back",
+        "Go back to previous location",
+        [],
+        acceptsBack,
+        Packages.Back.execute,
+        Packages.Back.help,
+        Packages.Back.complete)
+
+      (
+        "clear",
+        "Clear the screen",
+        [ "cls" ],
+        acceptsClear,
+        Clear.execute,
+        Clear.help,
+        Clear.complete)
+
+      (
+        "format",
+        "Format .dark files",
+        [ "fmt" ],
+        acceptsFormat,
+        Format.execute,
+        Format.help,
+        Format.complete)
+
+      (
+        "run-script",
+        "Run a package function by name, or a Dark script file",
+        [ "run" ],
+        acceptsRunScript,
+        Run.execute,
+        Run.help,
+        Run.complete)
+
+      (
+        "eval",
+        "Evaluate a Dark expression",
+        [],
+        acceptsEval,
+        Eval.execute,
+        Eval.help,
+        Eval.complete)
+
+      (
+        "view",
+        "View details of a module, type, value, fn, trait, impl or test",
+        [],
+        acceptsView,
+        Packages.View.execute,
+        Packages.View.help,
+        Packages.View.complete)
+
+      (
+        "tree",
+        "Display package hierarchy in tree format",
+        [ "packages" ],
+        acceptsTree,
+        Packages.Tree.execute,
+        Packages.Tree.help,
+        Packages.Tree.complete)
+
+      (
+        "search",
+        "Search modules, types, functions, values, traits, impls and tests",
+        [],
+        acceptsSearch,
+        Packages.Search.execute,
+        Packages.Search.help,
+        Packages.Search.complete)
+
+      (
+        "typecheck",
+        "Audit package declarations without changing them",
+        [],
+        acceptsTypecheck,
+        Packages.Typecheck.execute,
+        Packages.Typecheck.help,
+        Packages.Typecheck.complete)
+
+      (
+        "test",
+        "Run package tests",
+        [ "tests" ],
+        acceptsTest,
+        Packages.Test.execute,
+        Packages.Test.help,
+        Packages.Test.complete)
+
+      (
+        "deps",
+        "Show dependencies and dependents",
+        [ "dependencies" ],
+        acceptsDeps,
+        Deps.execute,
+        Deps.help,
+        Deps.complete)
+
+      (
+        "val",
+        "Create a new value",
+        [ "let" ],
+        acceptsVal,
+        Packages.Value.execute,
+        Packages.Value.help,
+        Packages.Value.complete)
+
+      (
+        "fn",
+        "Create a new function",
+        [ "function" ],
+        acceptsFn,
+        Packages.Fn.execute,
+        Packages.Fn.help,
+        Packages.Fn.complete)
+
+      (
+        "type",
+        "Create a new type",
+        [],
+        acceptsType,
+        Packages.Type.execute,
+        Packages.Type.help,
+        Packages.Type.complete)
+
+      (
+        "trait",
+        "Create a new trait",
+        [],
+        acceptsTrait,
+        Packages.TraitCommand.execute,
+        Packages.TraitCommand.help,
+        Packages.TraitCommand.complete)
+
+      (
+        "impl",
+        "Implement a trait for a type",
+        [],
+        acceptsImpl,
+        Packages.ImplCommand.execute,
+        Packages.ImplCommand.help,
+        Packages.ImplCommand.complete)
+
+      (
+        "module",
+        "Define multiple package declarations",
+        [],
+        acceptsModule,
+        Packages.ModuleCommand.execute,
+        Packages.ModuleCommand.help,
+        Packages.ModuleCommand.complete)
+
+      (
+        "edit",
+        "Change an item without retyping it",
+        [],
+        acceptsEdit,
+        Packages.Edit.execute,
+        Packages.Edit.help,
+        Packages.Edit.complete)
+
+      (
+        "rename",
+        "Give an item a different name (its content and callers are untouched)",
+        [],
+        acceptsRename,
+        Packages.Rename.execute,
+        Packages.Rename.help,
+        Packages.Rename.complete)
+
+      (
+        "hash",
+        "Show hash of a package item",
+        [],
+        acceptsHash,
+        Packages.Hash.execute,
+        Packages.Hash.help,
+        Packages.Hash.complete)
+
       // SCM commands
-      ("status", "What's in your draft, in one line", [ "wip", "changes" ], acceptsStatus, Cli.Status.execute, Cli.Status.help, Cli.Status.complete)
+      (
+        "status",
+        "What's in your draft, in one line",
+        [ "wip", "changes" ],
+        acceptsStatus,
+        Status.execute,
+        Status.help,
+        Status.complete)
+
       // `commits`, not `log`: every noun in this CLI says what it lists (`ops`, `branches`, `conflicts`), and
       // `log` only reads as "commits" if you've used git. `log` is its own command, meaning whichever
       // history you're standing in.
-      ("commits", "Your commits, newest first", [ "history" ], acceptsCommits, Cli.Commits.execute, Cli.Commits.help, Cli.Commits.complete)
-      ("commit", "Review your draft, propagate, and commit it", [], acceptsCommit, Cli.Commit.execute, Cli.Commit.help, Cli.Commit.complete)
-      ("discard", "Drop your draft: everything authored since the last commit", [ "reset" ], acceptsDiscard, Cli.Discard.execute, Cli.Discard.help, Cli.Discard.complete)
-      ("show", "Show what a commit contains, or what one op does", [], acceptsShow, Cli.Commits.executeShow, Cli.Commits.helpShow, Cli.Commits.complete)
-      ("branch", "Work on an isolated line of work (create / switch / inspect)", [ "br" ], acceptsBranch, Cli.Branch.execute, Cli.Branch.help, Cli.Branch.complete)
-      ("rebase", "Accept the parent's changes into a branch", [], acceptsRebase, Cli.Branch.executeRebaseCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("merge", "Merge a branch into its parent", [], acceptsMerge, Cli.Branch.executeMergeCmd, Cli.Branch.mergeHelp, Cli.Branch.complete)
-      ("branches", "List your branches", [], acceptsBranches, Cli.Branch.executeBranchesCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("switch", "Move onto a branch (`switch main` returns)", [ "checkout" ], acceptsSwitch, Cli.Branch.executeSwitchCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("diff", "What a branch changes vs its parent", [], acceptsDiff, Cli.Branch.executeDiffCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("log", "History: commits on main, a branch's ops on a branch", [], acceptsLog, Cli.Branch.executeLogCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("resolve", "Settle one conflicted name on a branch", [], acceptsResolve, Cli.Branch.executeResolveCmd, Cli.Branch.help, Cli.Branch.complete)
-      ("constraints", "Standing findings about the store: stale usages, kind changes, superseded overrides, rival implementations", [], acceptsConstraints, Cli.ConstraintsCmd.execute, Cli.ConstraintsCmd.help, Cli.ConstraintsCmd.complete)
-      ("ack", "Leave a constraint finding for now (`dark ack --all`)", [], acceptsAck, Cli.ConstraintsCmd.executeAckCmd, Cli.ConstraintsCmd.help, Cli.ConstraintsCmd.complete)
-      ("undeprecate", "Put a deprecated fn/type/value/trait/impl/test back on the shelf", [ "restore" ], acceptsUndeprecate, Packages.Deprecate.executeUndeprecate, Packages.Deprecate.undeprecateHelp, Packages.Deprecate.complete)
-      ("backups", "Copies of the store: what exists, take one, prune", [], acceptsBackups, Cli.Backups.execute, Cli.Backups.help, Cli.Backups.complete)
-      ("builtins", "List all builtin functions and values", [], acceptsBuiltins, Builtins.execute, Builtins.help, Builtins.complete)
-      ("find-values", "Find values of a given type", [], acceptsFindValues, Packages.FindValues.execute, Packages.FindValues.help, Packages.FindValues.complete)
-      ("impls", "List the implementations of a trait on this branch", [], acceptsImpls, Packages.Impls.execute, Packages.Impls.help, Packages.Impls.complete)
-      ("serve", "Start an HTTP server", [ "http-server" ], acceptsServe, Http.Serve.execute, Http.Serve.help, Http.Serve.complete)
-      ("docs", "Browse in-CLI documentation", [ "doc", "man" ], acceptsDocs, Docs.Command.execute, Docs.Command.help, Docs.Command.complete)
-      ("undo", "Step an item back to its previous version", [], acceptsUndo, Cli.Undo.execute, Cli.Undo.help, Cli.Undo.complete)
-      ("deprecate", "Mark a fn/type/value/trait/impl/test as deprecated", [], acceptsDeprecate, Packages.Deprecate.execute, Packages.Deprecate.help, Packages.Deprecate.complete)
-      ("delete", "Take a fn/type/value/trait/impl/test off the shelf (sugar for deprecate --kind obsolete)", [], acceptsDelete, Packages.Delete.execute, Packages.Delete.help, Packages.Delete.complete)
-      ("export-seed", "Export minimal seed.db from current database", [], acceptsExportSeed, ExportSeed.execute, ExportSeed.help, ExportSeed.complete)
-      ("traces", "The runs this instance has kept: what ran, what it did, and resuming one", [ "trace", "exec", "runs" ], acceptsTraces, Tracing.execute, Tracing.help, Tracing.complete)
-      ("conflicts", "Review what a merge or rebase auto-resolved", [], acceptsConflicts, Conflicts.execute, Conflicts.help, Conflicts.complete)
-      ("effects", "See what code might do and why", [], acceptsEffects, Effects.execute, Effects.help, Effects.complete)
-      ("permissions", "Review effects and runtime permission policies", [ "perms" ], acceptsPermissions, Permissions.Command.execute, Permissions.Command.help, Permissions.Command.complete)
+      (
+        "commits",
+        "Your commits, newest first",
+        [ "history" ],
+        acceptsCommits,
+        Commits.execute,
+        Commits.help,
+        Commits.complete)
+
+      (
+        "commit",
+        "Review your draft, propagate, and commit it",
+        [],
+        acceptsCommit,
+        Commit.execute,
+        Commit.help,
+        Commit.complete)
+
+      (
+        "discard",
+        "Drop your draft: everything authored since the last commit",
+        [ "reset" ],
+        acceptsDiscard,
+        Discard.execute,
+        Discard.help,
+        Discard.complete)
+
+      (
+        "show",
+        "Show what a commit contains, or what one op does",
+        [],
+        acceptsShow,
+        Commits.executeShow,
+        Commits.helpShow,
+        Commits.complete)
+
+      (
+        "branch",
+        "Work on an isolated line of work (create / switch / inspect)",
+        [ "br" ],
+        acceptsBranch,
+        Branch.execute,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "rebase",
+        "Accept the parent's changes into a branch",
+        [],
+        acceptsRebase,
+        Branch.executeRebaseCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "merge",
+        "Merge a branch into its parent",
+        [],
+        acceptsMerge,
+        Branch.executeMergeCmd,
+        Branch.mergeHelp,
+        Branch.complete)
+
+      (
+        "branches",
+        "List your branches",
+        [],
+        acceptsBranches,
+        Branch.executeBranchesCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "switch",
+        "Move onto a branch (`switch main` returns)",
+        [ "checkout" ],
+        acceptsSwitch,
+        Branch.executeSwitchCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "diff",
+        "What a branch changes vs its parent",
+        [],
+        acceptsDiff,
+        Branch.executeDiffCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "log",
+        "History: commits on main, a branch's ops on a branch",
+        [],
+        acceptsLog,
+        Branch.executeLogCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "resolve",
+        "Settle one conflicted name on a branch",
+        [],
+        acceptsResolve,
+        Branch.executeResolveCmd,
+        Branch.help,
+        Branch.complete)
+
+      (
+        "constraints",
+        "Standing findings: stale usages, kind changes, rival impls",
+        [],
+        acceptsConstraints,
+        ConstraintsCmd.execute,
+        ConstraintsCmd.help,
+        ConstraintsCmd.complete)
+
+      (
+        "ack",
+        "Leave a constraint finding for now (`dark ack --all`)",
+        [],
+        acceptsAck,
+        ConstraintsCmd.executeAckCmd,
+        ConstraintsCmd.help,
+        ConstraintsCmd.complete)
+
+      (
+        "undeprecate",
+        "Put a deprecated fn/type/value/trait/impl/test back on the shelf",
+        [ "restore" ],
+        acceptsUndeprecate,
+        Packages.Deprecate.executeUndeprecate,
+        Packages.Deprecate.undeprecateHelp,
+        (fun(_, args) -> Packages.Deprecate.completeItemTypes(args)))
+
+      (
+        "backups",
+        "Copies of the store: what exists, take one, prune",
+        [],
+        acceptsBackups,
+        Backups.execute,
+        Backups.help,
+        Backups.complete)
+
+      (
+        "builtins",
+        "List all builtin functions and values",
+        [],
+        acceptsBuiltins,
+        Builtins.execute,
+        Builtins.help,
+        Builtins.complete)
+
+      (
+        "find-values",
+        "Find values of a given type",
+        [],
+        acceptsFindValues,
+        Packages.FindValues.execute,
+        Packages.FindValues.help,
+        Packages.FindValues.complete)
+
+      (
+        "impls",
+        "List the implementations of a trait on this branch",
+        [],
+        acceptsImpls,
+        Packages.Impls.execute,
+        Packages.Impls.help,
+        Packages.Impls.complete)
+
+      (
+        "serve",
+        "Start an HTTP server",
+        [ "http-server" ],
+        acceptsServe,
+        Http.Serve.execute,
+        Http.Serve.help,
+        Http.Serve.complete)
+
+      (
+        "docs",
+        "Browse in-CLI documentation",
+        [ "doc", "man" ],
+        acceptsDocs,
+        Docs.Command.execute,
+        Docs.Command.help,
+        Docs.Command.complete)
+
+      (
+        "undo",
+        "Step an item back to its previous version",
+        [],
+        acceptsUndo,
+        Undo.execute,
+        Undo.help,
+        Undo.complete)
+
+      (
+        "deprecate",
+        "Mark a fn/type/value/trait/impl/test as deprecated",
+        [],
+        acceptsDeprecate,
+        Packages.Deprecate.execute,
+        Packages.Deprecate.help,
+        Packages.Deprecate.complete)
+
+      (
+        "delete",
+        "Deprecate items with a live-dependents check",
+        [],
+        acceptsDelete,
+        Packages.Delete.execute,
+        Packages.Delete.help,
+        Packages.Delete.complete)
+
+      (
+        "traces",
+        "The runs this instance has kept: what ran, what it did, and resuming one",
+        [ "trace", "exec", "runs" ],
+        acceptsTraces,
+        Tracing.execute,
+        Tracing.help,
+        Tracing.complete)
+
+      (
+        "conflicts",
+        "Review what a merge or rebase auto-resolved",
+        [],
+        acceptsConflicts,
+        Conflicts.execute,
+        Conflicts.help,
+        Conflicts.complete)
+
+      (
+        "effects",
+        "See what code might do and why",
+        [],
+        acceptsEffects,
+        Effects.execute,
+        Effects.help,
+        Effects.complete)
+
+      (
+        "permissions",
+        "Review effects and runtime permission policies",
+        [ "perms" ],
+        acceptsPermissions,
+        Permissions.Command.execute,
+        Permissions.Command.help,
+        Permissions.Command.complete)
+
       ("ops", "Read this instance's op log", [], acceptsOps, Ops.execute, Ops.help, Ops.complete)
-      ("ps", "What is running: this instance's own processes, then every other Dark on this machine", [ "processes" ], acceptsPs, Cli.Ps.execute, Cli.Ps.help, Cli.Ps.complete)
-      ("workbench", "Open the workbench -- a framed, navigable package tree (CLI-UX redesign)", [ "wb" ], acceptsWorkbench, Workbench.execute, Workbench.help, Workbench.complete) ]
-    |> Stdlib.List.map((
-      fun((name, desc, aliases, accepts, execute, help, complete)) ->
-        CommandHandler
-          { name = name
-            description = desc
-            aliases = aliases
-            accepts = accepts
-            execute = execute
-            help = help
-            complete = complete }
-      ))
+      (
+        "ps",
+        "What is running: this instance's processes, then other Darks on this machine",
+        [ "processes" ],
+        acceptsPs,
+        Ps.execute,
+        Ps.help,
+        Ps.complete)
+
+      (
+        "workbench",
+        "Open the workbench -- a framed, navigable package tree",
+        [ "wb" ],
+        acceptsWorkbench,
+        Workbench.execute,
+        Workbench.help,
+        Workbench.complete) ]
+    |> Stdlib.List.map(fun((name, desc, aliases, accepts, execute, help, complete)) ->
+      CommandHandler
+        { name = name
+          description = desc
+          aliases = aliases
+          accepts = accepts
+          execute = execute
+          help = help
+          complete = complete })
 
 
   let findCommandIn(commands: List<CommandHandler>, name: String): CommandHandler =
@@ -512,7 +990,13 @@ module Registry =
           accepts = (fun () -> Accepts.text(0))
           execute =
             (fun(state, args) ->
-               Stdlib.printErrorLine(View.formatError($"Unknown command: {name}"))
+               let names =
+                 commands
+                 |> Stdlib.List.map(fun cmd -> Stdlib.List.prepend(cmd.aliases, cmd.name))
+                 |> Stdlib.List.flatten
+
+               let hint = Accepts.didYouMean(name, names)
+               Stdlib.printErrorLine(View.formatError($"Unknown command: {name}.{hint}"))
                Stdlib.printErrorLine("Use 'help' to see available commands.")
                { state with exitCode = 1 })
           help = (fun _state -> $"No help available for command: {name}")
@@ -533,13 +1017,32 @@ module Registry =
       | _ -> false
 
     // The script runner decides whether --help is an option or a script argument.
+    let options = args |> Stdlib.List.takeWhile(fun a -> a != "--")
     let asksForHelp =
       handler.name != "run-script"
-      && (Stdlib.List.contains(args, "--help") || Stdlib.List.contains(args, "-h") || firstIsHelp)
+      && (Stdlib.List.contains(options, "--help")
+          || Stdlib.List.contains(options, "-h")
+          || firstIsHelp)
 
-    if asksForHelp then
+    // An unknown name has no help to show; `dark frobnicate --help` is refused like `dark frobnicate`.
+    let known = Stdlib.List.any(state.allCommandsCache, fun cmd -> cmd.name == handler.name)
+    if asksForHelp && known then
       executeCommandHelp(name, state)
     else
+      let state = { state with output = Output.modeOf(options) }
+
+      // `--plain` and `--pretty` go with every command, so none of them declares them.
+      let (options, args) =
+        if handler.name == "run-script" then
+          (options, args)
+        else
+          let rest = Stdlib.List.drop(args, Stdlib.List.length(options))
+          let kept =
+            options
+            |> Stdlib.List.filter(fun a -> Stdlib.Bool.not(Stdlib.List.contains(Output.flags, a)))
+
+          (kept, Stdlib.List.concat(kept, rest))
+
       // What the command takes is declared beside it (`accepts`), and checked here, once, before it
       // runs: a flag it does not have, a word past the last it takes, or nothing where it needs
       // something. A refusal exits 1 and the command never sees the arguments. The usage is not
@@ -551,11 +1054,31 @@ module Registry =
         printHint($"  `dark {name} --help` shows what it takes.")
         { state with exitCode = 1 }
       | None ->
+        // A `--` with no flag-like word after it changes nothing, so it goes, and commands that
+        // match their words by position never see it. One before a word like `-foo` stays, for
+        // the command's own parsing to honour.
+        let words = Stdlib.List.drop(args, Stdlib.List.length(options) + 1)
+        let args =
+          if
+            handler.name != "run-script"
+            && Stdlib.List.length(options) < Stdlib.List.length(args)
+            && Stdlib.Bool.not(Stdlib.List.any(words, fun a -> Stdlib.String.startsWith(a, "-")))
+          then
+            Stdlib.List.concat(options, words)
+          else
+            args
+
         let ex = handler.execute
         ex(state, args)
 
 
   let executeCommandHelp(name: String, state: AppState): AppState =
+    Stdlib.printLine(commandHelpText(name, state))
+    state
+
+
+  /// What `dark <name> --help`, `dark <name> help` and `dark help <name>` all print.
+  let commandHelpText(name: String, state: AppState): String =
     let handler = findCommandIn(state.allCommandsCache, name)
     let helpFn = handler.help
     let aliasSuffix =
@@ -581,8 +1104,7 @@ module Registry =
       && Stdlib.Bool.not(Stdlib.String.startsWith(firstLine, "dark "))
 
     let summarised = if alreadySummarised then body else $"{handler.description}\n{body}"
-    Stdlib.printLine(summarised + aliasSuffix)
-    state
+    summarised + aliasSuffix
 
 
   // Command groups organized by category, for `dark help`.
@@ -637,15 +1159,7 @@ module Registry =
       ("Security", [ "effects", "permissions" ])
       (
         "Utilities",
-        [ "clear"
-          "help"
-          "docs"
-          "quit"
-          "builtins"
-          "export-seed"
-          "workbench"
-          "backups"
-          "config" ]) ]
+        [ "clear", "help", "docs", "quit", "builtins", "workbench", "backups", "config" ]) ]
 
 
   let formatCommandGroup(
@@ -714,7 +1228,21 @@ module Registry =
     let header =
       "Workflow: fn Me.Demo.f <body> → eval 'Me.Demo.f(2)' → status → commit\nhelp <command> for details. AI agents: docs for-ai"
 
-    header + "\n\n" + groupsText
+    let globalFlags =
+      [ "Global flags:"
+        "  --branch <name>       run on that branch, this time only"
+        "  --json                answer as JSON, on commands that answer"
+        "  --no-input            never prompt (same as DARK_NO_INPUT=1)"
+        "  --no-color            no colour (same as NO_COLOR=1)"
+        "  --plain               one record per line, as when piped"
+        "  --pretty              for a person, even when piped"
+        "  --trace, --no-trace   record a trace of this run, or don't"
+        "  -h, --help            help for dark or any command"
+        "  -v, --version         print the version" ]
+      |> Stdlib.String.join("\n")
+
+    let footer = "More: `dark docs`. Report a bug: https://github.com/darklang/dark/issues"
+    header + "\n\n" + groupsText + "\n\n" + globalFlags + "\n\n" + footer
 
 
   /// Identifies what a completion request depends on, *ignoring* the partial token the user is mid-way

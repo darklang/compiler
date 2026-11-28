@@ -40,13 +40,13 @@ let itemLocation(location: PackageLocation): Option<LanguageTools.ProgramTypes.P
   | Test(loc) -> Option.Some(loc)
 
 
-/// Hand the file to `dark module`, which validates and applies it.
+/// Read the replacement source and apply it as an edit.
 let applyFile(
   state: AppState,
   loc: LanguageTools.ProgramTypes.PackageLocation,
   path: String)
   : AppState =
-  ModuleCommand.execute(state, [ moduleArgFor(loc), path ])
+  ModuleCommand.readAndSaveEdit(state, moduleArgFor(loc), path)
 
 
 /// After an edit lands: the runs that went through this function, if any. A replay recomputes
@@ -190,11 +190,7 @@ let applyPatch(
     | Error(message) -> reportPatchFailure(state, name, currentSource, message)
     | Ok(updatedSource) ->
       let updatedState =
-        ModuleCommand.define(
-          state,
-          moduleArgFor(declarationLocation),
-          updatedSource,
-          ModuleCommand.Caller.Edit)
+        ModuleCommand.saveEdit(state, moduleArgFor(declarationLocation), updatedSource)
 
       if updatedState.exitCode != 0 then
         let savedSource =
@@ -276,7 +272,7 @@ let execute(state: AppState, args: List<String>): AppState =
               | Error(e) ->
                 Stdlib.printErrorLine(
                   Stdlib.Cli.UI.Colors.error(
-                    $"Cannot edit {name}: no temp directory ({e.message})"))
+                    $"Cannot edit {name}: no temp directory ({Stdlib.display(e)})"))
 
                 failed(state)
               | Ok(dir) ->
@@ -285,14 +281,14 @@ let execute(state: AppState, args: List<String>): AppState =
                 | Error(e) ->
                   Stdlib.printErrorLine(
                     Stdlib.Cli.UI.Colors.error(
-                      $"Cannot edit {name}: could not write {path} ({e.message})"))
+                      $"Cannot edit {name}: could not write {path} ({Stdlib.display(e)})"))
 
                   failed(state)
                 | Ok(_) ->
                   let editor = editorCommand()
                   match Stdlib.Cli.Process.runInteractive(editor, [ path ]) with
                   | Error(e) ->
-                    printErr($"Could not run `{editor}`: {e.message}")
+                    printErr($"Could not run `{editor}`: {Stdlib.display(e)}")
                     Stdlib.printErrorLine(
                       Stdlib.Cli.UI.Colors.dimText(
                         $"  Set $EDITOR, or edit {path} and run `dark edit {name} {path}`."))
@@ -312,7 +308,7 @@ let execute(state: AppState, args: List<String>): AppState =
                   | Ok(_) ->
                     match Stdlib.Cli.File.readText(path) with
                     | Error(e) ->
-                      printErr($"Could not read back {path}: {e.message}")
+                      printErr($"Could not read back {path}: {Stdlib.display(e)}")
                       failed(state)
                     | Ok(after) ->
                       if Stdlib.String.trim(after) == Stdlib.String.trim(before) then

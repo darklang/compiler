@@ -32,6 +32,24 @@ let words(s: String): List<String> =
   |> Stdlib.List.filter(fun w -> w != "")
 
 
+/// `dark eval <expr>` exits 0 and prints exactly <param expected> on stdout.
+let evals(
+  i: Instance.T,
+  expr: String,
+  expected: String,
+  why: String)
+  : Stdlib.Test.Result =
+  match Instance.run(i, [ "eval", expr ]) with
+  | Error(e) -> Stdlib.Test.fail($"{why}: could not run: {e}")
+  | Ok(out) ->
+    let printed = Stdlib.String.trim(out.stdout)
+    if out.exitCode == 0 && printed == expected then
+      Stdlib.Test.Result.Pass
+    else
+      Stdlib.Test.fail(
+        $"{why}: `dark eval {expr}` exited {Stdlib.display(out.exitCode)}, printed {Stdlib.inspect(printed)}: {out.stderr}")
+
+
 /// A field of the newest trace in `traces list --json`.
 let latestField(i: Instance.T, name: String): Stdlib.AltJson.Json =
   match Stdlib.List.head(Traces.listed(i, 1)) with
@@ -385,15 +403,20 @@ test showReplaysAFunctionWithoutPerforming = Traces.withTraces(fun i ->
       "(name: String): String =\n  let upper = Stdlib.String.toUppercase(name)\n  let shouted = Stdlib.String.append(upper, \"!\")\n  let _ = Stdlib.printLine(shouted)\n  shouted",
       "stdout")
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.greet(\"bob\")" ])
+  let ran =
+    evals(
+      i,
+      "Tests.Prev.greet(\"bob\")",
+      "BOB!\nBOB!",
+      "the run printed for real")
+
   // The index knows which runs went through the function, where the call itself is
   // not recorded at all.
   let listed = Instance.said(i, [ "traces", "calls", "Tests.Prev.greet" ])
   let viewed = Instance.output(i, [ "traces", "show", "Tests.Prev.greet" ])
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "BOB!", "the run printed for real")
-
+      ran
       Instance.says(listed, "eval", "the run that went through it")
 
       Instance.says(
@@ -447,7 +470,7 @@ test showFailsWhenTheLogCannotAnswer = Traces.withTraces(fun i ->
 
 
 /// Looking at code must never touch the world, and a SPAWNED process is where that
-/// was easiest to get wrong: a preview records nothing, so a spawned child used to
+/// is easiest to get wrong: a preview records nothing, so a spawned child must not
 /// get the tracer that performs effects for real. A uuid is evidence either way:
 /// served from the log it matches the recording, rolled for real it cannot.
 test showServesASpawnedChildFromTheLog = Traces.withTraces(fun i ->
@@ -456,7 +479,7 @@ test showServesASpawnedChildFromTheLog = Traces.withTraces(fun i ->
       i,
       "Tests.Prev.conc",
       "(): String =\n  let h = Stdlib.Exec.spawn(fun () -> Stdlib.display(Stdlib.Uuid.generate()))\n  Stdlib.Exec.await(h)",
-      "concurrency; random")
+      "random")
 
   let recorded =
     lines(Instance.output(i, [ "eval", "Tests.Prev.conc()" ]))
@@ -565,8 +588,7 @@ test recursionIsALoopAndEmptyIterationsStaySilent = Traces.withTraces(fun i ->
       "(n: Int64): Int64 =\n  if n <= 1 then\n    1\n  else\n    let sub = Tests.Prev.fact(n - 1)\n    n * sub",
       "deny all")
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.fact(5)" ])
-
+  let ran = evals(i, "Tests.Prev.fact(5)", "120", "the run went five deep")
   let viewed = Instance.said(i, [ "traces", "show", "Tests.Prev.fact" ])
 
   // The second call is `fact 4`: its sub is 6 and its product is 24.
@@ -583,8 +605,7 @@ test recursionIsALoopAndEmptyIterationsStaySilent = Traces.withTraces(fun i ->
 
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "120", "the run went five deep")
-
+      ran
       Instance.says(
         viewed,
         "fact: showing iteration 5 of 5",
@@ -627,7 +648,8 @@ test everyIterationOfALoopIsReachable = Traces.withTraces(fun i ->
       "(n: Int64): Int64 =\n  Stdlib.List.range(1, n)\n  |> Stdlib.List.map(fun i ->\n    let big = i * 100\n    big)\n  |> Stdlib.List.length",
       "deny all")
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.scaled(30)" ])
+  let ran =
+    evals(i, "Tests.Prev.scaled(30)", "30", "the loop went round thirty times")
 
   // In the head, in the tail, and the ones in between, outside the window at both
   // ends.
@@ -664,7 +686,7 @@ test everyIterationOfALoopIsReachable = Traces.withTraces(fun i ->
 
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "30", "the loop went round thirty times")
+      ran
       pages
       Instance.says(
         asJson,
@@ -684,13 +706,12 @@ test fnsNamesWhatRunsWentThrough = Traces.withTraces(fun i ->
       "(xs: List<Int64>): Int64 =\n  Stdlib.List.length(xs)",
       "deny all")
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.counted([1, 2, 3])" ])
+  let ran = evals(i, "Tests.Prev.counted([1, 2, 3])", "3", "the run happened")
   let listed = Instance.said(i, [ "traces", "fns" ])
   let all = Instance.said(i, [ "traces", "fns", "--all" ])
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "3", "the run happened")
-
+      ran
       Instance.says(
         listed,
         "Tests.Prev.counted",
@@ -729,7 +750,7 @@ test viewAndEditPointAtTheRunsThatWentThrough = Traces.withTraces(fun i ->
           "(n: Int64): Int64 =\n  n * 5",
           "deny all") ])
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.doubled(4)" ])
+  let ran = evals(i, "Tests.Prev.doubled(4)", "8", "the run happened")
   let viewed = Instance.said(i, [ "view", "Tests.Prev.doubled" ])
   let quiet = Instance.said(i, [ "view", "Tests.Prev.unrun" ])
   let path = Instance.home(i) + "/doubled.dark"
@@ -740,8 +761,7 @@ test viewAndEditPointAtTheRunsThatWentThrough = Traces.withTraces(fun i ->
   let edited = Instance.said(i, [ "edit", "Tests.Prev.doubled", path ])
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "8", "the run happened")
-
+      ran
       Instance.says(
         viewed,
         "1 trace went through this: dark traces show Tests.Prev.doubled",
@@ -778,12 +798,11 @@ test twoNamesForOneFunctionFindTheSameRuns = Traces.withTraces(fun i ->
             "deny all"
             "--yes" ]) ])
 
-  let ran = Instance.said(i, [ "eval", "Tests.Prev.tripled(4)" ])
+  let ran = evals(i, "Tests.Prev.tripled(4)", "12", "one of them ran")
   let other = Instance.said(i, [ "traces", "calls", "Tests.Other.tripled" ])
   Stdlib.Test.all(
     [ defined
-      Instance.says(ran, "12", "one of them ran")
-
+      ran
       Instance.says(
         other,
         "eval",
@@ -848,14 +867,14 @@ test callsSaysHowOftenAndHowLongEachRunWasInTheFunction =
         "(n: Int64): Int64 =\n  if n < 2 then n else Tests.Prev.fib(n - 1) + Tests.Prev.fib(n - 2)",
         "deny all")
 
-    let ran = Instance.said(i, [ "eval", "Tests.Prev.fib(10)" ])
+    let ran = evals(i, "Tests.Prev.fib(10)", "55", "the run happened")
     let listed = Instance.said(i, [ "traces", "calls", "Tests.Prev.fib" ])
     let asJson =
       Instance.output(i, [ "traces", "calls", "Tests.Prev.fib", "--json" ])
 
     Stdlib.Test.all(
       [ defined
-        Instance.says(ran, "55", "the run happened")
+        ran
         Instance.says(listed, "time in it", "the listing has the time column")
         Instance.says(listed, "177", "fib(10) is 177 calls")
         Instance.says(asJson, "\"calls\":177", "and so does the JSON")
@@ -863,3 +882,26 @@ test callsSaysHowOftenAndHowLongEachRunWasInTheFunction =
           asJson,
           "\"totalUs\":0",
           "the run spent time in it") ]))
+
+
+/// A self tail call runs in the frame it is in, even while recorded, and is still counted as a
+/// call of its own.
+test callsCountsEverySelfTailCall = Traces.withTraces(fun i ->
+  let defined =
+    authored(
+      i,
+      "Tests.Prev.sumTo",
+      "(n: Int64, acc: Int64): Int64 =\n  if n == 0 then acc else Tests.Prev.sumTo(n - 1, acc + n)",
+      "deny all")
+
+  let ran = evals(i, "Tests.Prev.sumTo(100, 0)", "5050", "the run happened")
+  let asJson =
+    Instance.output(i, [ "traces", "calls", "Tests.Prev.sumTo", "--json" ])
+
+  Stdlib.Test.all(
+    [ defined
+      ran
+      Instance.says(
+        asJson,
+        "\"calls\":101",
+        "one call for each of 100 down to 0") ]))

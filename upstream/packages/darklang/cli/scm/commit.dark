@@ -52,6 +52,7 @@ let parseInclude(args: List<String>): List<String> =
 /// message text while the command quietly commits the whole draft.
 let unknownFlags(args: List<String>): List<String> =
   args
+  |> Stdlib.List.takeWhile(fun a -> a != "--")
   |> Stdlib.List.filter(fun a ->
     Stdlib.String.startsWith(a, "-") && Stdlib.Bool.not(isKnownFlag(a)))
 
@@ -67,6 +68,13 @@ let refuseUnknownFlags(args: List<String>): Bool =
 
 
 let parseArgs(args: List<String>): Args =
+  // Every word after `--` is message.
+  let afterDashes =
+    args
+    |> Stdlib.List.dropWhile(fun a -> a != "--")
+    |> Stdlib.List.drop(1)
+
+  let args = args |> Stdlib.List.takeWhile(fun a -> a != "--")
   let autoConfirm = Stdlib.List.contains(args, "-y") || Stdlib.List.contains(args, "--yes")
 
   // `-m` is accepted as a no-op marker: the message is positional, but a decade of git muscle
@@ -75,7 +83,11 @@ let parseArgs(args: List<String>): Args =
   let args = args |> Stdlib.List.filter(fun a -> a != "-m" && a != "--message")
 
   // Everything that isn't a flag is the message, so the flags have to come out first or they land in it.
-  let words = args |> Stdlib.List.filter(fun a -> Stdlib.Bool.not(Stdlib.String.startsWith(a, "-")))
+  let words =
+    args
+    |> Stdlib.List.filter(fun a -> Stdlib.Bool.not(Stdlib.String.startsWith(a, "-")))
+    |> Stdlib.List.concat(afterDashes)
+
   Args
     { message = Stdlib.String.trim(Stdlib.String.join(words, " "))
       autoConfirm = autoConfirm
@@ -382,7 +394,8 @@ let executeJson(state: AppState, args: List<String>): AppState =
   let r = selectedReview(state, review(state), parsed.include)
 
   // --json implies non-interactive: there is nobody to prompt. -y is still required to actually commit, so a
-  // plain `dark commit --json` is a safe dry review an agent can look at before deciding.
+  // plain `dark commit --json` is a safe dry review an agent can look at before deciding. Like the text
+  // view, it exits 1 whenever nothing was committed.
   // The same two gates the pretty path runs: an agent driving `--json -y` must not commit an unresolvable
   // reference, or a definite type error, that a person at the pretty prompt would have been refused.
   // Refusals are DATA here, not prose: `commit --json` is the documented dry review, and its
@@ -448,7 +461,7 @@ let executeJson(state: AppState, args: List<String>): AppState =
             conflicts = r.conflicts }))
 
   if failure == "" then
-    exitWith(state, printed)
+    exitWith(state, printed && didCommit)
   else
     printErr(failure)
     { state with exitCode = 1 }
@@ -510,9 +523,7 @@ let refuseTypeErrors(parsed: Args): Bool =
         | Failed ->
           let label = Packages.Typecheck.itemLabel(branchId, item.item)
           Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error($"    {label}:"))
-          Stdlib.List.concat(
-            Packages.AtRestCheck.issueLines(branchId, item.diagnostics),
-            Packages.AtRestCheck.issueLines(branchId, item.warnings))
+          Packages.AtRestCheck.itemIssueLines(branchId, item, [])
           |> Stdlib.List.iter(fun line ->
             Stdlib.printErrorLine(Stdlib.Cli.UI.Colors.error($"    {line}")))
         | _ -> ())
@@ -626,8 +637,7 @@ let executePretty(state: AppState, args: List<String>): AppState =
       if Stdlib.Cli.UI.Prompt.canAsk() || parsed.autoConfirm then
         Stderr.ok("  left as a draft.")
       else
-        Stderr.ok(
-          "  left as a draft. (`dark commit <message> -y` commits without the prompt -- a piped stdin can't answer it.)")
+        printErr(Prompt.refuseWithoutTerminal("Commit", "dark commit <message>"))
 
       failed(state)
     else
@@ -690,6 +700,7 @@ let help(_state: AppState): String =
     "                      they depend on comes along and is named;"
     "                      everything else stays a draft."
     "  -y, --yes           commit without the prompt (what an agent or a script wants)"
+    "  -m, --message       optional; the words after it are the message, as without it"
     "  --json              the same review, typed. Implies non-interactive, so a"
     "                      plain `dark commit --json` is a safe dry review."
     ""

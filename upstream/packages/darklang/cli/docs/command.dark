@@ -227,7 +227,7 @@ module Topics =
 
       DocTopic
         { name = "deprecation"
-          description = "Mark package items as deprecated / obsolete / harmful"
+          description = "Mark package items as deprecated"
           aliases = [ "deprecate", "delete" ]
           context = "cli"
           content = Docs.Deprecation.content
@@ -423,7 +423,10 @@ let execute(state: AppState, args: List<String>): AppState =
             // A topic with parts (for-ai) was read on its own first; another topic prints too.
             let found = pages |> Stdlib.List.filterMap(fun((_, page)) -> page)
             let shown =
-              if Stdlib.List.isEmpty(topic.subtopics) then [ (false, topic), ...found ] else found
+              if Stdlib.List.isEmpty(topic.subtopics) then
+                [ (false, topic), ...found ]
+              else
+                found
 
             shown
             |> Stdlib.List.uniqueBy(fun((isPart, t)) -> (isPart, t.name))
@@ -462,7 +465,7 @@ let execute(state: AppState, args: List<String>): AppState =
         failed(state)
 
 
-let help(_state: AppState): String =
+let help(state: AppState): String =
   [ Stdlib.Cli.UI.Colors.info("Usage: ") + Stdlib.Cli.UI.Colors.command("docs [topic]")
     "Browse in-CLI documentation."
     ""
@@ -476,7 +479,9 @@ let help(_state: AppState): String =
     + "  - Another topic, without the quick start"
 
     "  " + Stdlib.Cli.UI.Colors.command("docs syntax") + "  - Language syntax reference"
-    "  " + Stdlib.Cli.UI.Colors.command("docs errors") + "  - Common errors and fixes" ]
+    "  " + Stdlib.Cli.UI.Colors.command("docs errors") + "  - Common errors and fixes"
+    ""
+    Packages.Signatures.help(state) ]
   |> Stdlib.String.join("\n")
 
 

@@ -9,6 +9,7 @@ test aBranchSeesMainsCommitsButNotMainsDraft =
       commit(dark, "base")
       saveNumber(dark, "Tests.App.a", "2")
       saveNumber(dark, "Tests.App.draftOnly", "3")
+      evals(dark, "Tests.App.a()", "2", "main runs its own draft")
       switch(dark, "feat")
       evals(
         dark,
@@ -42,7 +43,7 @@ test aBranchOffABranchSeesItsParentsCommits =
       saveNumber(dark, "Tests.App.featDraft", "2")
       says(
         dark,
-        [ "switch", "child" ],
+        [ "switch", "-c", "child" ],
         "(off \"feat\")",
         "switching from a branch starts the new one off it")
 
@@ -60,13 +61,16 @@ test aBranchOffABranchSeesItsParentsCommits =
       notFound(dark, "Tests.App.featDraft()", "but not the parent's draft")
       saveNumber(dark, "Tests.App.onChild", "3")
       commit(dark, "child work")
+      evals(dark, "Tests.App.onChild()", "3", "the child sees its own work")
       notFoundOn(
         dark,
         "feat",
         "Tests.App.onChild()",
         "the parent does not see the child's work")
 
-      notFoundOn(dark, "main", "Tests.App.onFeat()", "and main sees neither") ])
+      notFoundOn(dark, "main", "Tests.App.onFeat()", "and main sees neither")
+
+      notFoundOn(dark, "main", "Tests.App.onChild()", "of the two") ])
 
 
 test switchStaysButBranchFlagAndEnvVarAreForOneCommand =
@@ -180,8 +184,7 @@ test archivingABranchThrowsAwayItsUnmergedWork =
         "`commits --json` lists it even without --all") ])
 
 
-// Odd, but today's behaviour: switching to the name of a merged branch starts a fresh branch
-// with the same name.
+// A merged branch's name is free again: `switch -c` starts a fresh branch with it.
 test switchingToAMergedBranchsNameStartsAFreshBranch =
   scenario(fun dark ->
     [ switch(dark, "feat")
@@ -191,7 +194,7 @@ test switchingToAMergedBranchsNameStartsAFreshBranch =
       merge(dark, "feat")
       says(
         dark,
-        [ "switch", "feat" ],
+        [ "switch", "-c", "feat" ],
         "this one is fresh",
         "switch says the name is being reused")
 
@@ -206,3 +209,394 @@ test switchingToAMergedBranchsNameStartsAFreshBranch =
         "Tests.App.a()",
         "1",
         "and sees the merged work through main") ])
+
+
+test switchToANewNameStartsNothing =
+  scenario(fun dark ->
+    [ switch(dark, "feature")
+      switch(dark, "main")
+      refuses(
+        dark,
+        [ "switch", "featur" ],
+        "There is no branch named `featur`. Did you mean `feature`?",
+        "a typo is refused, naming the branch it is close to")
+
+      says(
+        dark,
+        [ "switch", "mian" ],
+        "dark switch -c mian",
+        "and says how to start one")
+
+      same(branches(dark), [ "feature <- main" ], "nothing was started")
+      says(dark, [ "branch" ], "on main", "nor were we moved")
+
+      says(
+        dark,
+        [ "switch", "-c", "mian" ],
+        "started branch \"mian\"",
+        "-c starts it")
+
+      switch(dark, "main")
+      refuses(
+        dark,
+        [ "switch", "-c", "feature" ],
+        "already exists",
+        "-c refuses a taken name")
+
+      says(dark, [ "branch" ], "on main", "and does not switch onto it") ])
+
+
+test aBranchSubcommandWithNoArgumentsCreatesNothing = scenario(fun dark ->
+  let before = Cli.Tests.Instance.said(dark, [ "branches" ])
+  [ says(
+      dark,
+      [ "branch", "rename" ],
+      "needs 2 arguments",
+      "a subcommand with no arguments says so")
+
+    same(
+      Cli.Tests.Instance.said(dark, [ "branches" ]),
+      before,
+      "and the branch list is untouched")
+
+    says(
+      dark,
+      [ "branch", "renam" ],
+      "Did you mean",
+      "a typo is still named as a typo") ])
+
+
+test aBareWordAfterBranchIsRefusedAndStartsNothing = scenario(fun dark ->
+  let before = Cli.Tests.Instance.said(dark, [ "branches" ])
+  [ refuses(
+      dark,
+      [ "branch", "craete" ],
+      "Did you mean `create`?",
+      "a mistyped subcommand is named as one")
+
+    says(
+      dark,
+      [ "branch", "craete" ],
+      "dark branch create craete",
+      "and says how to make a branch by that name")
+
+    refuses(
+      dark,
+      [ "branch", "status" ],
+      "does not take `status`",
+      "a word that is no subcommand is refused too")
+
+    same(
+      Cli.Tests.Instance.said(dark, [ "branches" ]),
+      before,
+      "and no branch was started")
+
+    says(dark, [ "branch" ], "on main", "nor were we moved") ])
+
+
+test branchCreateStartsABranchAndRefusesATakenName =
+  scenario(fun dark ->
+    [ says(
+        dark,
+        [ "branch", "create", "list" ],
+        "started branch \"list\"",
+        "any name can be created")
+
+      same(branches(dark), [ "list <- main" ], "it is listed")
+      switch(dark, "main")
+      refuses(
+        dark,
+        [ "branch", "create", "list" ],
+        "already exists",
+        "creating it again is refused")
+
+      says(dark, [ "branch" ], "on main", "and does not switch onto it")
+
+      says(
+        dark,
+        [ "branch", "list" ],
+        "list",
+        "`branch list` still lists, with a branch called list")
+
+      refuses(
+        dark,
+        [ "branch", "fixme" ],
+        "dark branch create fixme",
+        "a new name points at create")
+
+      switch(dark, "list")
+      refuses(
+        dark,
+        [ "branch", "main" ],
+        "dark switch main",
+        "an existing name points at switch") ])
+
+
+/// The number in `status`'s "N followed", or 0 when it says none.
+let followedCount(dark: Cli.Tests.Instance.T): Int64 =
+  let said = Cli.Tests.Instance.said(dark, [ "status" ])
+  match Stdlib.Regex.find(said, "\\d+ followed") with
+  | Ok(Some(found)) ->
+    found
+    |> Stdlib.String.split(" ")
+    |> Stdlib.List.head
+    |> Stdlib.Option.withDefault("")
+    |> Stdlib.Int64.parse
+    |> Stdlib.Result.withDefault(0)
+  | _ -> 0
+
+
+/// A branch keeps its own record of what followed an edit: `status` on the branch reports the
+/// branch's follower, and main's staged repoint is left as it was.
+test statusOnABranchReportsTheBranchsOwnFollowers = scenario(fun dark ->
+  let base = "Tests.BranchFollow.base"
+  let caller = "Tests.BranchFollow.caller()"
+  let setup =
+    [ save(dark, base, "() : Int64 = 1001")
+
+      save(
+        dark,
+        "Tests.BranchFollow.caller",
+        "(): Int64 = (Tests.BranchFollow.base()) * 7")
+
+      commit(dark, "branchfollow v1") ]
+
+  let mainBefore = followedCount(dark)
+  let mainEdit = save(dark, base, "() : Int64 = 1003")
+  let mainStatus = followedCount(dark)
+  let onTheBranch =
+    [ switch(dark, "follow-branch")
+      save(dark, base, "() : Int64 = 1002")
+      evals(dark, caller, "7014", "the caller followed the edit, on the branch")
+      says(
+        dark,
+        [ "status" ],
+        "1 followed",
+        "the branch reports its own follower, from its own record")
+
+      switch(dark, "main") ]
+
+  Stdlib.List.flatten(
+    [ setup
+      [ mainEdit
+        same(
+          mainStatus,
+          mainBefore + 1,
+          "main's draft gained its own follower") ]
+
+      onTheBranch
+      [ same(
+          followedCount(dark),
+          mainStatus,
+          "main's own staged repoint is untouched")
+
+        evals(
+          dark,
+          caller,
+          "7021",
+          "and main's caller still follows main's edit") ] ]))
+
+
+/// Only a name nobody has starts a branch: a full branch id this store does not hold is refused.
+test switchRefusesAnIdThisStoreDoesNotHave = scenario(fun dark ->
+  let foreign = Stdlib.display(Stdlib.Uuid.generate())
+  [ says(
+      dark,
+      [ "switch", foreign ],
+      "no branch with id",
+      "the switch is refused, saying why")
+
+    says(dark, [ "branch" ], "on main", "and the process stayed where it was")
+    Cli.Tests.Instance.doesNotSay(
+      Cli.Tests.Instance.said(dark, [ "branches" ]),
+      foreign,
+      "no branch was started under the id's name") ])
+
+
+/// A branch pulled without its parent lists a parent this store has never registered, and says so.
+test aBranchWhoseParentIsNotInThisStoreSaysSo = scenario(fun dark ->
+  // A fresh instance denies guests package-write, which `SCM.Branch.create` needs.
+  [ run(dark, [ "permissions", "allow", "package-write" ])
+
+    run(
+      dark,
+      [ "eval"
+        "Darklang.SCM.Branch.create(\"orphan13\", Stdlib.Uuid.parse(\"11111111-2222-3333-4444-555555555555\") |> Builtin.unwrap) |> Stdlib.Option.isSome" ])
+
+    says(dark, [ "branches" ], "orphan13 (", "the orphan is listed")
+
+    says(
+      dark,
+      [ "branches" ],
+      "11111111 (a branch not in this store",
+      "and its parent is explained rather than shown as an id") ])
+
+
+test archivingAChildFromAtopItLandsOnItsParent =
+  scenario(fun dark ->
+    [ switch(dark, "archparent")
+      switch(dark, "archchild")
+      says(
+        dark,
+        [ "branch", "archive", "archchild", "-y" ],
+        "now on branch \"archparent\"",
+        "the child's parent, not main") ])
+
+
+/// Commit collapses MAIN's draft. A commit on a branch must leave main's draft as it was.
+test committingOnABranchLeavesMainsDraftUncollapsed = scenario(fun dark ->
+  // Two versions of one name: draft ops that a collapse would reduce.
+  let setup =
+    [ save(dark, "Tests.CollapseIso.item", "() : Int64 = 1")
+      save(dark, "Tests.CollapseIso.item", "() : Int64 = 2") ]
+
+  let before = number(status(dark), "draftOps")
+  Stdlib.List.concat(
+    setup,
+    [ says(
+        dark,
+        [ "switch", "-c", "cli-collapse-branch" ],
+        "cli-collapse-branch",
+        "the test is on the branch")
+
+      save(dark, "Tests.CollapseIso.onBranch", "() : Int64 = 9")
+      commit(dark, "branch commit")
+      says(
+        dark,
+        [ "switch", "main" ],
+        "main",
+        "and it put the run back on main")
+
+      same(
+        number(status(dark), "draftOps"),
+        before,
+        "the branch's commit left main's draft exactly as it was") ]))
+
+
+/// A branch verb takes the name `dark branches` prints, not only the id behind it.
+test everyBranchVerbAcceptsTheNameTheListingPrints = scenario(fun dark ->
+  let resolves(args: List<String>, why: String): Stdlib.Test.Result =
+    Cli.Tests.Instance.doesNotSay(
+      Cli.Tests.Instance.said(dark, args),
+      "no branch",
+      why)
+
+  [ switch(dark, "verbname")
+    save(dark, "Tests.Vn.one", "(x: Int64) : Int64 = x + 1")
+    switch(dark, "main")
+    says(dark, [ "branches" ], "verbname", "the listing prints the name")
+    resolves([ "diff", "verbname" ], "`dark diff verbname` resolves the name")
+    resolves([ "log", "verbname" ], "`dark log verbname` resolves the name")
+    resolves(
+      [ "rebase", "verbname" ],
+      "`dark rebase verbname` resolves the name")
+
+    resolves(
+      [ "conflicts", "branch", "verbname" ],
+      "and so does the conflicts preview")
+
+    says(
+      dark,
+      [ "diff", "notabranch" ],
+      "no branch",
+      "a name we don't have is still an error") ])
+
+
+/// Asking about a branch you're not on answers with the branch as it is now, not as it was.
+test askingAboutAnotherBranchGivesACurrentAnswer =
+  scenario(fun dark ->
+    [ switch(dark, "cachebr")
+      save(dark, "Tests.Br.one", "(x: Int64) : Int64 = x + 11")
+      switch(dark, "main")
+      says(dark, [ "diff", "cachebr" ], "one", "the first item shows up")
+      switch(dark, "cachebr")
+      save(dark, "Tests.Br.two", "(x: Int64) : Int64 = x + 22")
+      switch(dark, "main")
+      says(
+        dark,
+        [ "diff", "cachebr" ],
+        "two",
+        "and so does what was added since") ])
+
+
+/// Committing on a branch commits that branch's ops, under a commit of the branch's own.
+test committingOnABranchCommitsThatBranchsOps = scenario(fun dark ->
+  let setup =
+    [ switch(dark, "commitbr")
+      save(dark, "Tests.CommitBr.item", "() : Int64 = 7") ]
+
+  let committed =
+    Cli.Tests.Instance.said(dark, [ "commit", "on the branch", "-y" ])
+
+  let (_, onBranch, _) =
+    exec(
+      dark,
+      [ "eval"
+        "Stdlib.List.length(Darklang.SCM.PackageOps.commitsOnBranch(Darklang.SCM.PackageOps.currentBranch(), 100))" ])
+
+  let ownCommits =
+    onBranch
+    |> Stdlib.String.trim
+    |> Stdlib.Int64.parse
+    |> Stdlib.Result.withDefault(0)
+
+  Stdlib.List.flatten(
+    [ setup
+      [ Cli.Tests.Instance.says(
+          committed,
+          "commit",
+          "the branch commit reports a commit")
+
+        Cli.Tests.Instance.doesNotSay(
+          committed,
+          "Runtime Error",
+          "and does not throw on the way")
+
+        same(
+          ownCommits >= 1,
+          true,
+          $"the branch has a commit of its own, got: {onBranch}")
+
+        evals(
+          dark,
+          "Darklang.SCM.PackageOps.draftOpCount()",
+          "0",
+          "the branch's draft is empty once committed") ] ]))
+
+
+test branchSubcommandFlagsGoAnywhere =
+  scenario(fun dark ->
+    [ switch(dark, "feat")
+      saveNumber(dark, "Tests.App.a", "1")
+      commit(dark, "feat work")
+      switch(dark, "main")
+      switch(dark, "doomed")
+      switch(dark, "main")
+      says(
+        dark,
+        [ "branch", "diff", "--source", "feat" ],
+        "let a(): Int64",
+        "diff takes --source before the name")
+
+      says(
+        dark,
+        [ "branch", "merge", "--dry-run", "feat" ],
+        "feat",
+        "merge takes --dry-run before the name")
+
+      says(
+        dark,
+        [ "branch", "archive", "-y", "doomed" ],
+        "archived branch \"doomed\"",
+        "archive takes -y before the name")
+
+      says(
+        dark,
+        [ "branch", "merge", "-y", "feat" ],
+        "Merged 2 op(s) from branch \"feat\"",
+        "merge takes -y before the name")
+
+      same(
+        branches(dark),
+        [ "feat <- main [merged]" ],
+        "feat is merged and doomed is archived") ])

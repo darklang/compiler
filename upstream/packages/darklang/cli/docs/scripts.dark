@@ -8,7 +8,7 @@ let content(): String =
   + """
 Anything you will run again, such as a game or a tool, goes in a module with
 tests: save it and run its `main` by name (`docs for-ai`). A script file is for
-a quick one-off, and has no tests.
+a quick one-off; it can carry tests (see Tests below), but is not saved.
 
 Save your code in a .dark file and run it with `dark run <file> [args...]`.
 
@@ -41,17 +41,34 @@ It is [] when none are given. Use shell quotes to keep spaces in one argument,
 or `""` to pass an empty string.
 
 You do not need a main function. If you write one, call it in the final expression,
-for example `main(args)`. Functions do not capture top-level variables, so pass any
-arguments they need explicitly.
+for example `main(args)`. Functions above the first top-level `let` do not capture
+top-level variables, so pass any arguments they need explicitly. A function below a
+top-level `let` can use it, but can only call the functions above it.
 
 Runner options such as `--sandbox` go before the file path; everything after it,
 flags included, is the script's. A path starting with a dash goes after `--`.
 
+## Tests
+
+A script can hold tests, written as in a package: `test doubles = Stdlib.Test.equal(double(4), 8)`.
+`dark test run todo.dark` runs them with the file's functions, types and `val`s in
+scope and nothing else: no top-level statement runs. `dark run todo.dark` skips the
+tests. Tests go above the first top-level `let`.
+
+A test can't use a top-level `let`, or call a function below the first one. Such a test
+stops the run before any test starts:
+
+  error[SCRIPT-TEST-USES-LET] at 1:39: `totalForEast` calls `total`, which uses the top-level `let rows` on line 3.
+    hint: make it a `val` if it's a constant, or pass it to `total` as an argument
+  error[SCRIPT-TEST-BELOW-LET] at 2:33: `greets` calls `greet`, which is defined below the top-level `let rows` on line 3.
+    hint: move `greet` above line 3
+
 ## Results and exit codes
 
 Expressions run in order. Each must return Unit, except the last, which may return
-an Int64 exit code: 0 for success, or 1-255 for a portable failure code.
-Int64 is also accepted. A final Unit means success, so this is a complete script:
+an Int64 exit code from 0 to 255: 0 for success, anything else a failure. A
+number outside 0-255 fails the run with exit 1. A final Unit means success, so
+this is a complete script:
 
   Stdlib.printLine("Hello")
 

@@ -179,7 +179,7 @@ module Trait =
   /// The trait an operator is, and the method it maps to.
   ///
   /// None for an operator that is not a trait: `==` and `!=` are structural equality for
-  /// every value, and `++` is no longer in the language.
+  /// every value.
   ///
   /// The operator-to-trait table is not duplicated here on purpose. It lives once in F#
   /// (`NumericTraits`), which is also what the lowering uses, so the checker and the
@@ -336,18 +336,12 @@ module Test =
     Builtin.pmTestRunsInProcess(hash)
 
 
-  /// Share a read-only starting store on <param branchId> across the tests executed
-  /// by <param run>. Every test that cannot run in-process gets a fresh process on
-  /// it; one that writes reruns on a private copy. Cached-only runs create no
-  /// snapshot; cleanup also runs if the callback fails.
+  /// Share one starting store on <param branchId> across the tests executed by
+  /// <param run>. Every test that cannot run in-process gets a fresh process on a
+  /// layer over it. Cached-only runs create no snapshot; cleanup also runs if the
+  /// callback fails.
   let withStoreSnapshot(branchId: Uuid, seed: Int64, run: Run -> 'a): 'a =
     Builtin.pmTestWithStoreSnapshot(branchId, fun id -> run(Run { id = id, seed = seed }))
-
-
-  /// Whether the test <param hash> wrote to <param run>'s shared snapshot and so
-  /// ran again on a private copy.
-  let reran(run: Run, hash: ProgramTypes.Hash): Bool =
-    Builtin.pmTestReran(run.id, hash)
 
 
   /// Conservative proof that a passing result is reusable, one answer per hash,
@@ -425,7 +419,8 @@ module Test =
   /// The group and check of <param body> when it is `Stdlib.Test.group("name", check)`.
   let __group(body: ProgramTypes.Expr): Option<(String * ProgramTypes.Expr)> =
     match __resultExpr(body) with
-    | EApply(_, EFnName(_, name, _, _), _, [EString(_, [StringText(group)]), check]) when __isTestFn(name, "group") ->
+    | EApply(_, EFnName(_, name, _, _), _, [EString(_, [StringText(group)]), check])
+      when __isTestFn(name, "group") ->
       Option.Some((group, check))
     | _ -> Option.None
 
@@ -454,22 +449,30 @@ module Test =
 
 
   /// The rows and the check of <param e> when it is a `Stdlib.Test.table`, written
-  /// `table(rows, check)` or `rows |> table(check)`.
+  /// `table(rows, check)` or `rows |> table(check)`, in a group or not.
   let __table(e: ProgramTypes.Expr): Option<(ProgramTypes.Expr * ProgramTypes.Expr)> =
-    match __resultExpr(e) with
-    | EApply(_, EFnName(_, name, _, _), _, [rows, check]) when __isTestFn(name, "table") ->
-      Option.Some((rows, check))
-    | EPipe(id, first, steps) ->
-      match Stdlib.List.last(steps) with
-      | Some(EPipeFnCall(_, name, _, [check], _)) when __isTestFn(name, "table") ->
-        let rows =
-          match Stdlib.List.dropLast(steps) with
-          | [] -> first
-          | before -> ProgramTypes.Expr.EPipe(id, first, before)
-
+    match __group(e) with
+    | Some((_, check)) -> __table(check)
+    | None ->
+      match __resultExpr(e) with
+      | EApply(_, EFnName(_, name, _, _), _, [rows, check]) when __isTestFn(name, "table") ->
         Option.Some((rows, check))
+      | EPipe(id, first, steps) ->
+        match Stdlib.List.last(steps) with
+        | Some(EPipeFnCall(_, name, _, [check], _)) when __isTestFn(name, "table") ->
+          let rows =
+            match Stdlib.List.dropLast(steps) with
+            | [] -> first
+            | before -> ProgramTypes.Expr.EPipe(id, first, before)
+
+          Option.Some((rows, check))
+        | _ -> Option.None
       | _ -> Option.None
-    | _ -> Option.None
+
+
+  /// Whether <param body> is a `Stdlib.Test.table`, in a group or not.
+  let isTable(body: ProgramTypes.Expr): Bool =
+    Stdlib.Option.isSome(__table(body))
 
 
   /// How many tests <param body> holds, read from its code: one per row of a
@@ -622,8 +625,7 @@ module Test =
           __eachOrNone(rows, fun row ->
             match row with
             | DTuple(DString(name), result, []) ->
-              __asResultOfType(expected, result)
-              |> Stdlib.Option.map(fun result -> (name, result))
+              __asResultOfType(expected, result) |> Stdlib.Option.map(fun result -> (name, result))
             | _ -> Option.None)
           |> Stdlib.Option.map(fun rows -> Stdlib.Test.Result.Rows(rows))
         | _ -> Option.None

@@ -83,7 +83,7 @@ test aConflictIsFlaggedAndRebaseClearsIt =
     [ Authoring.ok(branchEdit)
       Authoring.ok(mainEdit)
       before |> Stdlib.Test.equal([])
-      Stdlib.List.length(diverged) > 0 |> Stdlib.Test.equal(true)
+      diverged |> Stdlib.Test.equal([ "Tests.RebaseGate.foo" ])
       Authoring.ok(rebased)
       SCM.Branches.nameConflicts(b) |> Stdlib.Test.equal([]) ])
 
@@ -149,7 +149,11 @@ test keepMineAddsAnOpAndRestampsNothing =
   let before = stamps()
   let keptMine = SCM.Branches.resolveKeepMine(b, "Tests.RestampTest.foo")
   let after = stamps()
-  let afterSet = after |> Stdlib.List.map(fun s -> (s, ())) |> Stdlib.Dict.fromList
+  let afterSet =
+    after
+    |> Stdlib.List.map(fun s -> (s, ()))
+    |> Stdlib.Dict.fromList
+
   Stdlib.Test.all(
     [ Authoring.ok(setup)
       Authoring.ok(keptMine)
@@ -214,6 +218,31 @@ test authoringOnAMergedBranchIsRefused =
       wasMerged |> Stdlib.Test.equal(true)
       refused |> Stdlib.Test.equal("refused")
       isMerged() |> Stdlib.Test.equal(true) ])
+
+
+// A name bound to content nobody stored would resolve and find nothing, so the store refuses it.
+test bindingANameToContentNobodyStoredIsRefused =
+  let ghost =
+    LanguageTools.ProgramTypes.Reference.PackageFn(
+      LanguageTools.ProgramTypes.Hash.Hash(Stdlib.String.repeat("a", 64)))
+
+  let added =
+    SCM.PackageOps.add(
+      Authoring.main(),
+      [ LanguageTools.ProgramTypes.PackageOp.SetName(
+          Authoring.loc("Ghost", "f"),
+          ghost,
+          Stdlib.Option.Option.None) ])
+
+  let refused =
+    match added with
+    | Ok(_) -> "accepted"
+    | Error(e) ->
+      if Stdlib.String.contains(e, "no such content") then "refused" else e
+
+  Stdlib.Test.all(
+    [ refused |> Stdlib.Test.equal("refused")
+      (SCM.StoreHealth.counts()).danglingBindings |> Stdlib.Test.equal(0) ])
 
 
 // `liveBindingFor` is THE branch-aware binding read: the chain first, then main. A plain

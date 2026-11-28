@@ -8,22 +8,60 @@ test deleteModuleTakesEverything = Instance.withInstance(fun i ->
 
   let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
   let _ = Instance.ran(i, [ "module", "/Me.Scratch", path ])
+
   let (refusedCode, refused) = Instance.ran(i, [ "delete", "Me.Scratch" ])
+
   let (code, out) = Instance.ran(i, [ "delete", "Me.Scratch", "--yes" ])
+
+  let (againCode, again) = Instance.ran(i, [ "delete", "Me.Scratch", "--yes" ])
+
+  let (missingCode, missing) =
+    Instance.ran(i, [ "delete", "Me.MissingDeleteTarget", "--yes" ])
+
   let listed = Instance.said(i, [ "ls", "Me.Scratch" ])
   Stdlib.Test.all(
     [ Instance.exitedWith(refusedCode, 1, "no terminal, no --yes")
-      Instance.says(refused, "add --yes to delete Me.Scratch", "says how")
+      Instance.says(
+        refused,
+        "`dark delete Me.Scratch -y` does it without asking",
+        "says how")
+
       Instance.exitedWith(code, 0, "deleted")
-      Instance.says(out, "Will delete 3 items in Me.Scratch", "names the count")
-      Instance.says(out, "Deleted Me.Scratch", "says so")
+      Instance.doesNotSay(
+        out,
+        "Will deprecate",
+        "confirmed delete prints just the result")
+
+      Instance.says(out, "Deleted 3 items in Me.Scratch", "names the count")
+
+      Instance.says(
+        out,
+        "  Me.Scratch.make",
+        "lists declarations in the result")
+
+      Instance.exitedWith(againCode, 1, "nothing left")
+      Instance.says(
+        again,
+        "No item or module named Me.Scratch was found.",
+        "the discarded items are gone")
+
+      Instance.doesNotSay(again, "Usage:", "a repeat delete is valid syntax")
+      Instance.exitedWith(missingCode, 1, "name is missing")
+      Instance.says(
+        missing,
+        "No item or module named Me.MissingDeleteTarget was found.",
+        "names it")
+
+      Instance.doesNotSay(missing, "Usage:", "a missing name is valid syntax")
       Instance.doesNotSay(listed, "make", "make is gone") ]))
 
 
 test deleteModuleKeepsWhatOthersUse = Instance.withInstance(fun i ->
   let lib = Instance.home(i) + "/lib.dark"
   let user = Instance.home(i) + "/user.dark"
-  let _ = Stdlib.Cli.File.writeAtomic(lib, "let one(): Int64 = 1\n") |> Builtin.unwrap
+  let _ =
+    Stdlib.Cli.File.writeAtomic(lib, "let one(): Int64 = 1\n") |> Builtin.unwrap
+
   let _ =
     Stdlib.Cli.File.writeAtomic(user, "let two(): Int64 = Me.Lib.one() + 1\n")
     |> Builtin.unwrap
@@ -33,7 +71,10 @@ test deleteModuleKeepsWhatOthersUse = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "delete", "Me.Lib", "--yes" ])
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 1, "refused")
-      Instance.says(out, "Used from outside Me.Lib: Me.User.two", "names the user") ]))
+      Instance.says(
+        out,
+        "Used from outside Me.Lib: Me.User.two",
+        "names the user") ]))
 
 
 test deleteModuleTakesImpls = Instance.withInstance(fun i ->
@@ -47,24 +88,73 @@ test deleteModuleTakesImpls = Instance.withInstance(fun i ->
   let (code, _) = Instance.ran(i, [ "delete", "Me.ImplCheck", "--yes" ])
   let after = Instance.said(i, [ "ls", "Me.ImplCheck.Point" ])
   Stdlib.Test.all(
-    [ Instance.says(before, "implementation of trait \"Display\"", "the impl was saved")
+    [ Instance.says(
+        before,
+        "implementation of trait \"Display\"",
+        "the impl was saved")
+
       Instance.exitedWith(code, 0, "deleted")
-      Instance.doesNotSay(after, "implementation of trait", "the impl is gone too") ]))
+      Instance.doesNotSay(
+        after,
+        "implementation of trait",
+        "the impl is gone too") ]))
 
 
-test deleteModuleRefusesWhenNothingResolves = Instance.withInstance(fun i ->
+// `Stdlib.List` is `Darklang.Stdlib.List`, so what uses it from outside holds it back.
+test deleteModuleByShortNameKeepsWhatOthersUse = Instance.withInstance(fun i ->
   let (code, out) = Instance.ran(i, [ "delete", "Stdlib.List", "--yes" ])
   Stdlib.Test.all(
-    [ Instance.exitedWith(code, 1, "nothing to delete")
-      Instance.says(out, "nothing was deleted", "says so")
-      Instance.doesNotSay(out, "Deleted", "claims no delete") ]))
+    [ Instance.exitedWith(code, 1, "used from outside")
+      Instance.says(out, "Used from outside Stdlib.List", "says so")
+      Instance.doesNotSay(out, "Deprecated ", "claims no deprecation") ]))
+
+
+// Without a terminal, the flag the refusal names is the one that gets through.
+test deleteWithDependentsRefusesOnce = Instance.withInstance(fun i ->
+  let _ = Instance.ran(i, [ "fn", "Me.Held.leaf", "(): Int64 = 7" ])
+
+  let _ =
+    Instance.ran(i, [ "fn", "Me.Holder.caller", "(): Int64 = Me.Held.leaf()" ])
+
+  let (itemCode, item) = Instance.ran(i, [ "delete", "Me.Held.leaf" ])
+
+  let (moduleCode, moduleOut) = Instance.ran(i, [ "delete", "Me.Held" ])
+
+  let (forcedCode, forced) =
+    Instance.ran(i, [ "delete", "Me.Held.leaf", "--force" ])
+
+  Stdlib.Test.all(
+    [ Instance.exitedWith(itemCode, 1, "the item has a caller")
+      Instance.says(item, "or pass `--force`.", "names the flag that works")
+      Instance.doesNotSay(
+        item,
+        "--ignore-dependents",
+        "which alone would stop at the prompt")
+
+      Instance.exitedWith(moduleCode, 1, "the module has a caller outside it")
+      Instance.says(
+        moduleOut,
+        "Pass `--force` to delete it anyway.",
+        "names the flag that works")
+
+      Instance.exitedWith(forcedCode, 0, "--force gets through")
+      Instance.says(
+        forced,
+        "dropped Me.Held.leaf from your draft",
+        "says it was discarded") ]))
 
 
 test deleteModuleRefusesAnOwner = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/scratch.dark"
-  let _ = Stdlib.Cli.File.writeAtomic(path, "let one(): Int64 = 1\n") |> Builtin.unwrap
+  let _ =
+    Stdlib.Cli.File.writeAtomic(path, "let one(): Int64 = 1\n")
+    |> Builtin.unwrap
+
   let _ = Instance.ran(i, [ "module", "/Me.Scratch", path ])
-  let (darklangCode, darklang) = Instance.ran(i, [ "delete", "Darklang", "--dry-run" ])
+
+  let (darklangCode, darklang) =
+    Instance.ran(i, [ "delete", "Darklang", "--dry-run" ])
+
   let (meCode, me) = Instance.ran(i, [ "delete", "Me", "--yes" ])
   let listed = Instance.said(i, [ "ls", "Me.Scratch" ])
   Stdlib.Test.all(
@@ -75,7 +165,7 @@ test deleteModuleRefusesAnOwner = Instance.withInstance(fun i ->
       Instance.says(listed, "one", "Me.Scratch is still there") ]))
 
 
-test deleteModuleListsTheFirstTen = Instance.withInstance(fun i ->
+test deleteModuleListsEveryItem = Instance.withInstance(fun i ->
   let path = Instance.home(i) + "/big.dark"
   let source =
     Stdlib.List.range(1, 12)
@@ -88,30 +178,283 @@ test deleteModuleListsTheFirstTen = Instance.withInstance(fun i ->
   let named =
     out
     |> Stdlib.String.split("\n")
-    |> Stdlib.List.filter(fun line -> Stdlib.String.startsWith(line, "    Me.Big.f"))
+    |> Stdlib.List.filter(fun line ->
+      Stdlib.String.startsWith(line, "  Me.Big.f"))
 
   Stdlib.Test.all(
     [ Instance.exitedWith(code, 0, "dry run")
-      Instance.says(out, "Will delete 12 items in Me.Big:\n", "the count")
-      Stdlib.Test.equal(Stdlib.List.length(named), 10)
-      Instance.says(out, "\n    and 2 more", "the rest counted") ]))
+      Instance.says(out, "Would delete 12 items in Me.Big:\n", "the count")
+      Stdlib.Test.equal(Stdlib.List.length(named), 12) ]))
 
 
-test deleteModuleTakesSubmodulesAndHonoursDryRun = Instance.withInstance(fun i ->
-  let outer = Instance.home(i) + "/outer.dark"
-  let inner = Instance.home(i) + "/inner.dark"
-  let _ = Stdlib.Cli.File.writeAtomic(outer, "let top(): Int64 = 1\n") |> Builtin.unwrap
-  let _ = Stdlib.Cli.File.writeAtomic(inner, "let deep(): Int64 = 2\n") |> Builtin.unwrap
-  let _ = Instance.ran(i, [ "module", "/Me.Outer", outer ])
-  let _ = Instance.ran(i, [ "module", "/Me.Outer.Inner", inner ])
-  let (dryCode, dry) = Instance.ran(i, [ "delete", "Me.Outer", "--dry-run" ])
-  let afterDry = Instance.said(i, [ "ls", "Me.Outer.Inner" ])
-  let (code, _) = Instance.ran(i, [ "delete", "Me.Outer", "--yes" ])
-  let after = Instance.said(i, [ "ls", "Me.Outer.Inner" ])
+test deleteModuleTakesSubmodulesAndHonoursDryRun =
+  Instance.withInstance(fun i ->
+    let outer = Instance.home(i) + "/outer.dark"
+    let inner = Instance.home(i) + "/inner.dark"
+    let _ =
+      Stdlib.Cli.File.writeAtomic(outer, "let top(): Int64 = 1\n")
+      |> Builtin.unwrap
+
+    let _ =
+      Stdlib.Cli.File.writeAtomic(inner, "let deep(): Int64 = 2\n")
+      |> Builtin.unwrap
+
+    let _ = Instance.ran(i, [ "module", "/Me.Outer", outer ])
+    let _ = Instance.ran(i, [ "module", "/Me.Outer.Inner", inner ])
+    let (dryCode, dry) = Instance.ran(i, [ "delete", "Me.Outer", "--dry-run" ])
+    let afterDry = Instance.said(i, [ "ls", "Me.Outer.Inner" ])
+    let (code, _) = Instance.ran(i, [ "delete", "Me.Outer", "--yes" ])
+    let after = Instance.said(i, [ "ls", "Me.Outer.Inner" ])
+    Stdlib.Test.all(
+      [ Instance.exitedWith(dryCode, 0, "dry run")
+        Instance.says(
+          dry,
+          "Would delete 2 items in Me.Outer:",
+          "counts the submodule's item")
+
+        Instance.says(dry, "  Me.Outer.Inner.deep", "names it")
+
+        Instance.says(afterDry, "deep", "the dry run deleted nothing")
+        Instance.exitedWith(code, 0, "deleted")
+        Instance.doesNotSay(after, "deep", "the submodule's item is gone") ]))
+
+
+test deprecatedModuleDiscoveryAndResave = Instance.withInstance(fun i ->
+  let path = Instance.home(i) + "/repro.dark"
+  let source = "let main(): Int64 = 0\n"
+  let _ = Stdlib.Cli.File.writeAtomic(path, source) |> Builtin.unwrap
+  let _ = Instance.ran(i, [ "module", "/Me.DeleteRepro", path ])
+  let _ = Instance.ran(i, [ "commit", "fixture", "-y" ])
+  let before = Instance.said(i, [ "search", "DeleteRepro" ])
+
+  let deletion = Instance.said(i, [ "delete", "Me.DeleteRepro", "--yes" ])
+
+  let listed = Instance.said(i, [ "ls", "Me" ])
+
+  let listedWithDeprecated =
+    Instance.said(i, [ "ls", "Me", "--include-deprecated" ])
+
+  let searched = Instance.said(i, [ "search", "DeleteRepro" ])
+
+  let included =
+    Instance.said(i, [ "search", "DeleteRepro", "--include-deprecated" ])
+
+  let _ =
+    Instance.ran(
+      i,
+      [ "fn"
+        "/Tests.HiddenModuleDocs.leaf"
+        "/// Mentions DeleteRepro.\nlet leaf(): Int64 = 19" ])
+
+  let docsOnly = Instance.said(i, [ "search", "DeleteRepro" ])
+  let (runCode, runOut) = Instance.ran(i, [ "run", "Me.DeleteRepro.main" ])
+  let sameModule = Instance.said(i, [ "module", "/Me.DeleteRepro", path ])
+
+  let sameFn =
+    Instance.said(i, [ "fn", "/Me.DeleteRepro.main", "(): Int64 = 0" ])
+
+  let changed =
+    Instance.said(i, [ "fn", "/Me.DeleteRepro.main", "(): Int64 = 1" ])
+
+  let after = Instance.said(i, [ "ls", "Me", "--include-deprecated" ])
   Stdlib.Test.all(
-    [ Instance.exitedWith(dryCode, 0, "dry run")
-      Instance.says(dry, "Will delete 2 items in Me.Outer:", "counts the submodule's item")
-      Instance.says(dry, "    Me.Outer.Inner.deep", "names it")
-      Instance.says(afterDry, "deep", "the dry run deleted nothing")
-      Instance.exitedWith(code, 0, "deleted")
-      Instance.doesNotSay(after, "deep", "the submodule's item is gone") ]))
+    [ Instance.says(before, "Me.DeleteRepro", "the module matches by name")
+      Instance.doesNotSay(before, "no name matches", "no docs-only hint")
+      Instance.says(
+        deletion,
+        "Deleted Me.DeleteRepro.main (still callable).",
+        "the confirmation names the function and explains the effect")
+
+      Instance.doesNotSay(
+        deletion,
+        "Will deprecate",
+        "confirmed delete skips the preview")
+
+      Instance.doesNotSay(listed, "DeleteRepro/", "hidden in ls")
+      Instance.says(
+        listed,
+        "No visible items in /Me.",
+        "explains the empty listing")
+
+      Instance.says(
+        listed,
+        "dark ls /Me --include-deprecated",
+        "shows how to reveal the module")
+
+      Instance.says(
+        listedWithDeprecated,
+        "DeleteRepro/ (deprecated)",
+        "labels the fully deprecated module")
+
+      Instance.doesNotSay(searched, "Me.DeleteRepro", "hidden in search")
+      Instance.says(
+        searched,
+        "Matching deprecated modules are hidden.",
+        "explains the missing name match")
+
+      Instance.says(
+        included,
+        "Me.DeleteRepro (deprecated)",
+        "labels the deprecated module in search")
+
+      Instance.says(
+        docsOnly,
+        "Tests.HiddenModuleDocs.leaf",
+        "keeps doc matches")
+
+      Instance.says(
+        docsOnly,
+        "the results below mention",
+        "explains the doc matches")
+
+      Instance.doesNotSay(
+        docsOnly,
+        "no name matches",
+        "the deprecated module matches by name")
+
+      Instance.exitedWith(runCode, 0, "deprecated function still runs")
+      Instance.says(runOut, "is deprecated.", "run warns")
+
+      Instance.says(
+        sameModule,
+        "is unchanged and still deprecated",
+        "module explains an identical save")
+
+      Instance.doesNotSay(
+        sameModule,
+        "Defined",
+        "the unchanged declaration was not defined again")
+
+      Instance.says(
+        sameModule,
+        "dark restore Me.DeleteRepro.main",
+        "explains how to reactivate it")
+
+      Instance.says(
+        sameFn,
+        "is unchanged and still deprecated",
+        "fn explains an identical save")
+
+      Instance.says(changed, "is active", "fn explains a different save")
+
+      Instance.says(after, "DeleteRepro/", "the module is listed")
+      Instance.doesNotSay(
+        after,
+        "DeleteRepro/ (deprecated)",
+        "the module has active code again") ]))
+
+
+test deletesRelativeToCurrentModule = Instance.withInstance(fun i ->
+  let _ =
+    Instance.ran(
+      i,
+      [ "fn", "/Me.RelativeDelete.Nested.main", "(): Int64 = 6281" ])
+
+  let expression =
+    "let initial = Darklang.Cli.initState() in let here = Darklang.Cli.Packages.Nav.execute(initial, [\"/Me.RelativeDelete\"]) in let result = Darklang.Cli.Packages.Delete.execute(here, [\"Nested\", \"--dry-run\"]) in result.exitCode"
+
+  let (code, out) =
+    Instance.ran(
+      i,
+      [ "eval", "--allow", "env read DARK_TELEMETRY", expression ])
+
+  Stdlib.Test.all(
+    [ Instance.exitedWith(code, 0, "the command evaluates")
+      Instance.says(
+        out,
+        "Would delete 1 item in Me.RelativeDelete.Nested",
+        "resolves the module")
+
+      Instance.says(
+        out,
+        "  Me.RelativeDelete.Nested.main",
+        "resolves the declaration") ]))
+
+
+test deletePreservesExecutionBlock = Instance.withInstance(fun i ->
+  let _ =
+    Instance.ran(i, [ "fn", "/Me.Blocked.single", "(): Int64 = 0 + 137 - 137" ])
+
+  let _ = Instance.ran(i, [ "commit", "fixture", "-y" ])
+
+  let (blockedCode, _) =
+    Instance.ran(
+      i,
+      [ "deprecate", "Me.Blocked.single", "--block-execution", "--yes" ])
+
+  let (deleteCode, deletion) =
+    Instance.ran(i, [ "delete", "Me.Blocked.single", "--yes" ])
+
+  let (singleRunCode, singleRun) =
+    Instance.ran(i, [ "run", "Me.Blocked.single" ])
+
+  let _ =
+    Instance.ran(i, [ "fn", "/Me.Blocked.alias", "(): Int64 = 0 + 137 - 137" ])
+
+  let _ = Instance.ran(i, [ "commit", "fixture", "-y" ])
+
+  let (aliasDeleteCode, aliasDelete) =
+    Instance.ran(i, [ "delete", "Me.Blocked.alias", "--yes" ])
+
+  let (aliasRunCode, aliasRun) = Instance.ran(i, [ "run", "Me.Blocked.alias" ])
+  Stdlib.Test.all(
+    [ Instance.exitedWith(blockedCode, 0, "blocked execution")
+      Instance.exitedWith(deleteCode, 1, "already deprecated")
+      Instance.says(deletion, "is already deprecated", "explains why")
+      Instance.exitedWith(singleRunCode, 1, "the execution block still applies")
+      Instance.says(singleRun, "--allow-harmful", "reports the block")
+      Instance.exitedWith(
+        aliasDeleteCode,
+        1,
+        "the same block applies under another name")
+
+      Instance.doesNotSay(
+        aliasDelete,
+        "still callable",
+        "does not claim the alias can run")
+
+      Instance.exitedWith(aliasRunCode, 1, "the alias still cannot run")
+      Instance.says(
+        aliasRun,
+        "--allow-harmful",
+        "reports the block on the alias") ]))
+
+
+test deleteDiscardsWhatWasNeverCommitted = Instance.withInstance(fun i ->
+  let _ = Instance.ran(i, [ "fn", "Me.Probe.bad", "(): Int64 = \"x\"" ])
+  let _ = Instance.ran(i, [ "fn", "Me.Probe.good", "(): Int64 = 8231" ])
+  let (code, out) = Instance.ran(i, [ "delete", "Me.Probe.bad", "-y" ])
+  let (viewCode, _) = Instance.ran(i, [ "view", "Me.Probe.bad" ])
+  let (commitCode, committed) = Instance.ran(i, [ "commit", "probe", "-y" ])
+  Stdlib.Test.all(
+    [ Instance.exitedWith(code, 0, out)
+      Instance.says(
+        out,
+        "dropped Me.Probe.bad from your draft",
+        "it is discarded")
+
+      Instance.exitedWith(viewCode, 1, "the name is gone")
+      Instance.exitedWith(commitCode, 0, committed) ]))
+
+
+test deleteModuleDiscardsNewItemsAndDeprecatesCommittedOnes =
+  Instance.withInstance(fun i ->
+    let _ = Instance.ran(i, [ "fn", "Me.Mixed.old", "(): Int64 = 8232" ])
+    let _ = Instance.ran(i, [ "commit", "old", "-y" ])
+    let _ = Instance.ran(i, [ "fn", "Me.Mixed.fresh", "(): Int64 = 8233" ])
+    let (code, out) = Instance.ran(i, [ "delete", "Me.Mixed", "-y" ])
+    let (freshCode, _) = Instance.ran(i, [ "view", "Me.Mixed.fresh" ])
+    let (oldCode, _) = Instance.ran(i, [ "view", "Me.Mixed.old" ])
+    Stdlib.Test.all(
+      [ Instance.exitedWith(code, 0, out)
+        Instance.says(
+          out,
+          "Those never committed are discarded",
+          "says which go")
+
+        Instance.exitedWith(freshCode, 1, "the new item is gone")
+
+        Instance.exitedWith(
+          oldCode,
+          0,
+          "the committed one is deprecated, still there") ]))

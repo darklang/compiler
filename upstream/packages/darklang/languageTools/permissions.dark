@@ -60,6 +60,7 @@ type Effect =
   | TraceRead
   | TraceWrite
   /// Starting a process beside this one (`Exec.spawn`); it runs under the spawner's access.
+  /// Not a permission: no rule grants or denies it.
   | Concurrency
   /// This process's own in-memory state: its package caches and store watch.
   | Runtime
@@ -136,6 +137,46 @@ type TokenMode =
   | EscapedDouble
 
 
+/// Split policy text at bare semicolons, preserving the syntax of each rule for tokens().
+let splitRuleSpecs(text: String): List<String> =
+  let finish(current: List<Char>, specs: List<String>): List<String> =
+    let spec =
+      current
+      |> Stdlib.List.reverse
+      |> Stdlib.String.fromList
+      |> Stdlib.String.trim
+
+    if spec == "" then specs else Stdlib.List.prepend(specs, spec)
+
+  let walk(
+    remaining: List<Char>,
+    mode: TokenMode,
+    current: List<Char>,
+    specs: List<String>)
+    : List<String> =
+    match remaining with
+    | [] -> Stdlib.List.reverse(finish(current, specs))
+    | [c, ...rest] ->
+      match mode, Stdlib.display(c) with
+      | Bare, ";" -> walk(rest, TokenMode.Bare, [], finish(current, specs))
+      | mode, charText ->
+        let next =
+          match mode, charText with
+          | Bare, "'" -> TokenMode.SingleQuoted
+          | SingleQuoted, "'" -> TokenMode.Bare
+          | Bare, "\"" -> TokenMode.DoubleQuoted
+          | DoubleQuoted, "\"" -> TokenMode.Bare
+          | Bare, "\\" -> TokenMode.EscapedBare
+          | DoubleQuoted, "\\" -> TokenMode.EscapedDouble
+          | EscapedBare, _ -> TokenMode.Bare
+          | EscapedDouble, _ -> TokenMode.DoubleQuoted
+          | _ -> mode
+
+        walk(rest, next, Stdlib.List.prepend(current, c), specs)
+
+  walk(Stdlib.String.toList(text), TokenMode.Bare, [], [])
+
+
 /// Every effect with its source case name and its rule name, in the F#
 /// `Effects.all` order. The rule name is what `permissions allow` and
 /// denial messages use.
@@ -204,7 +245,7 @@ let empty(): Policy =
 let isAbsolutePath(path: String): Bool =
   Stdlib.String.startsWith(path, "/")
   || Stdlib.String.startsWith(path, "\\\\")
-  || Stdlib.String.length(path) >= 3 && Stdlib.String.slice(path, 1, 3) == ":\\"
+  || Stdlib.String.startsWith(Stdlib.String.dropFirst(path, 1), ":\\")
 
 
 let scope(value: String): Scope<String> =
@@ -425,7 +466,7 @@ let parseRule(args: List<String>): Option<List<Rule>> =
   // rule text names exactly one Rule value and `renderRule` round-trips.
   | [name] ->
     match effectOfName(name) with
-    | Some(Raise) -> Option.None
+    | Some(Raise) | Some(Concurrency) -> Option.None
     | found -> found |> Stdlib.Option.map(fun effect -> [ Rule.Effect(effect) ])
   | _ -> Option.None
 
@@ -595,6 +636,62 @@ let renderHttpRule(rule: HttpRule): String =
 
     let url = $"{scheme}://{host}{port}{path}{query}"
     $"http {method} {quoteToken(url)}"
+
+
+/// For an HTTP rule on one host's exact path or query, the rule for any path on that host,
+/// as `http GET 'https://api.example.com/*'`.
+let hostWideHttpRule(text: String): Option<String> =
+  match parseRuleText(text) with
+  | Some([Http(rule)]) when rule.path != HttpPath.Subtree("/") ->
+    match rule.scheme, rule.host, rule.port with
+    | Only(scheme), Exact(_), Only(port) ->
+      let port = if port == defaultPort(scheme) then "" else ":" + Stdlib.display(port)
+      let url = $"{scheme}://{renderHostRule(rule.host)}{port}/*"
+      Option.Some($"http {scopeText(rule.method)} {quoteToken(url)}")
+    | _ -> Option.None
+  | _ -> Option.None
+
+
+/// The web rule without its ?query, so any query is allowed.
+let pathWideHttpRule(text: String): Option<String> =
+  match parseRuleText(text) with
+  | Some([Http(rule)]) ->
+    match rule.query with
+    | Only(_) -> Option.Some(renderHttpRule({ rule with query = Scope.All }))
+    | All -> Option.None
+  | _ -> Option.None
+
+
+/// The file rule for the whole folder, plus read or write if the program also needs them.
+let folderFileRules(text: String, alsoNeeded: List<Effect>): Option<List<String>> =
+  let folderOf(path: String): Option<String> =
+    match Stdlib.String.splitLast(path, "/") with
+    | Some((folder, _)) when folder != "" -> Option.Some(folder)
+    | _ -> Option.None
+
+  let denied =
+    match parseRuleText(text) with
+    | Some([FileRead(Only(path))]) -> Option.Some((Effect.FileRead, path))
+    | Some([FileWrite(Only(path))]) -> Option.Some((Effect.FileWrite, path))
+    | _ -> Option.None
+
+  match denied with
+  | Some((effect, path)) ->
+    match folderOf(path) with
+    | Some(folder) ->
+      let wanted =
+        [ Effect.FileRead, Effect.FileWrite ]
+        |> Stdlib.List.filter(fun e -> e == effect || Stdlib.List.contains(alsoNeeded, e))
+
+      wanted
+      |> Stdlib.List.map(fun e ->
+        if e == Effect.FileRead then
+          renderRule(Rule.FileRead(Scope.Only(folder)))
+        else
+          renderRule(Rule.FileWrite(Scope.Only(folder))))
+      |> Option.Some
+    | None -> Option.None
+  | None -> Option.None
 
 
 /// Faithful text for one process rule: `process <executable> [args…]`.
