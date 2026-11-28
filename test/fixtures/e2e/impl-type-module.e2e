@@ -1,0 +1,9 @@
+// An impl's methods see the module named for its type, as the interpreter's do,
+// even when the impl sits outside that module.
+type ImplMode = { bits: Int64 }
+module ImplMode =
+  let octalOf (n: Int64) : String = Stdlib.Int64.toString n
+impl Stdlib.Display for ImplMode =
+  let display (mode: ImplMode) : String = "0" + octalOf mode.bits
+
+Stdlib.display (ImplMode { bits = 644L }) = "0644"

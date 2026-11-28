@@ -156,7 +156,19 @@ let materialize offset items =
           }
         in
         let item = WS.Impl (path, declaration) in
-        let methodPath = path @ [ "__trait_impl_" ^ string_of_int ordinal ] in
+        (* Methods live under the type's module, as the interpreter's do, so a
+           body outside `module FileMode` still sees `FileMode.__octal`. *)
+        let typePath =
+          match (declaration.WT.forType, List.rev path) with
+          | WT.TCustom { WT.typ = { WT.name; _ }; _ }, last :: _ when last = name
+            ->
+              path
+          | WT.TCustom { WT.typ = { WT.name; _ }; _ }, _ -> path @ [ name ]
+          | _ -> path
+        in
+        let methodPath =
+          typePath @ [ "__trait_impl_" ^ string_of_int ordinal ]
+        in
         let methods =
           List.filter_map
             (function
