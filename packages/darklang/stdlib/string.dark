@@ -189,6 +189,36 @@ let __asciiGraphemeLengthAt(value: String, index: Int64, count: Int64, previous:
         let nextCount = if byte == 10 && previous == 13 then count else count + 1 in
         Stdlib.String.__asciiGraphemeLengthAt(value, index + 1, nextCount, byte)
 
+// The byte offset where the cluster `remaining` clusters on from `index` starts, or -1 past the
+// end. `previous` is the cluster in progress; `index` must start a cluster when it is empty. Two
+// ASCII bytes other than CR LF always break, so they skip decoding.
+let __graphemeOffsetAt(value: String, index: Int64, previous: List<Int64>, remaining: Int64): Int64 =
+    if index == Stdlib.String.__byteLength(value) then (if remaining == 0 then index else -1)
+    else
+        let byte = Stdlib.String.__byteAtUnchecked(value, index) in
+        let asciiBreak =
+            byte < 128 &&
+            (match previous with
+             | [] -> true
+             | [prior] -> prior < 128 && Stdlib.Bool.not(prior == 13 && byte == 10)
+             | _ -> false) in
+        if asciiBreak then
+            if remaining == 0 then index
+            else Stdlib.String.__graphemeOffsetAt(value, index + 1, [byte], remaining - 1)
+        else
+            match Stdlib.String.__Unicode.decodeAt(value, index) with
+            | Error(_) -> Builtin.crash("Invalid UTF-8 string")
+            | Ok(decoded) ->
+                let codepoint = Stdlib.Tuple2.first(decoded) in
+                let width = Stdlib.Tuple2.second(decoded) in
+                let starts =
+                    match previous with
+                    | [] -> true
+                    | _ -> Stdlib.String.__Unicode.__shouldBreak(previous, codepoint) in
+                if starts then
+                    if remaining == 0 then index
+                    else Stdlib.String.__graphemeOffsetAt(value, index + width, [codepoint], remaining - 1)
+                else Stdlib.String.__graphemeOffsetAt(value, index + width, Stdlib.List.push(previous, codepoint), remaining)
 let __graphemeLength(value: String): Int64 =
     if Stdlib.String.__isAscii(value) then Stdlib.String.__asciiGraphemeLengthAt(value, 0, 0, -1)
     else Stdlib.String.__Unicode.graphemeCountUtf8(value, 0, [], 0)
