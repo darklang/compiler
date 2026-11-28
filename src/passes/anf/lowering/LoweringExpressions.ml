@@ -89,7 +89,8 @@ and toANFBoundAtomCore ids sums typeNames inert expr gen env registry variants
             gen )
       in
       match expr with
-      | CheckedAST.Match _ | CheckedAST.Let _ -> (
+      | CheckedAST.Match _ | CheckedAST.Let _ | CheckedAST.If _
+      | CheckedAST.BinOp ((AST.And | AST.Or), _, _) -> (
           match
             LoweringTypeInference.inferTypeCore sums typeNames expr
               (R.typeEnvFromVarEnv env) registry variants functions names

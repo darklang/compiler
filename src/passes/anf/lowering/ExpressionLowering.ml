@@ -335,7 +335,13 @@ let lowerExpression (toANFCore : LoweringCallbacks.expressionLowerer)
         match atom value gen with
         | Ok (value, bindings, gen) -> compileContinuation value bindings gen
         | Error _ ->
-            let* value, gen = anf value gen in
+            (* A branching value joins before the body, so each `let` of an
+               `if`, `&&` or `match` adds a join instead of doubling the rest
+               of the function. *)
+            let* setup, joined, gen = bound value gen in
+            let value =
+              K.bindReturns setup (fun _ -> A.Return joined)
+            in
             let root, gen = A.freshVar gen in
             let* env, projections, gen =
               G.lowerLetPatternBindings pattern (A.Var root) valueType env []

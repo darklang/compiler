@@ -1,0 +1,32 @@
+// Each `let` of an `if`, `&&`, `||` or `match` joins before the rest of the function. Copying
+// the rest into both branches made these 24 lines 2^24 copies, and compiling never finished.
+let joinP (x: Int64) : Bool = x > 3L
+let joinCount (x: Int64) (o: Stdlib.Option.Option<Int64>) : Int64 =
+  let b1 = joinP (x + 1L) && joinP (x - 1L)
+  let b2 = joinP (x + 2L) || (match o with | Some v -> v > 2L | None -> false)
+  let b3 = joinP (x + 3L) && joinP (x - 3L)
+  let b4 = if joinP (x + 4L) then true else joinP (x - 4L)
+  let b5 = joinP (x + 5L) && joinP (x - 5L)
+  let b6 = joinP (x + 6L) || (match o with | Some v -> v > 6L | None -> false)
+  let b7 = joinP (x + 7L) && joinP (x - 7L)
+  let b8 = if joinP (x + 8L) then true else joinP (x - 8L)
+  let b9 = joinP (x + 9L) && joinP (x - 9L)
+  let b10 = joinP (x + 10L) || (match o with | Some v -> v > 10L | None -> false)
+  let b11 = joinP (x + 11L) && joinP (x - 11L)
+  let b12 = if joinP (x + 12L) then true else joinP (x - 12L)
+  let b13 = joinP (x + 13L) && joinP (x - 13L)
+  let b14 = joinP (x + 14L) || (match o with | Some v -> v > 14L | None -> false)
+  let b15 = joinP (x + 15L) && joinP (x - 15L)
+  let b16 = if joinP (x + 16L) then true else joinP (x - 16L)
+  let b17 = joinP (x + 17L) && joinP (x - 17L)
+  let b18 = joinP (x + 18L) || (match o with | Some v -> v > 18L | None -> false)
+  let b19 = joinP (x + 19L) && joinP (x - 19L)
+  let b20 = if joinP (x + 20L) then true else joinP (x - 20L)
+  let b21 = joinP (x + 21L) && joinP (x - 21L)
+  let b22 = joinP (x + 22L) || (match o with | Some v -> v > 22L | None -> false)
+  let b23 = joinP (x + 23L) && joinP (x - 23L)
+  let b24 = if joinP (x + 24L) then true else joinP (x - 24L)
+  Stdlib.List.length (Stdlib.List.filter [b1, b2, b3, b4, b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15, b16, b17, b18, b19, b20, b21, b22, b23, b24] (fun b -> b))
+
+joinCount 30L Stdlib.Option.Option.None = 24L
+joinCount 5L (Stdlib.Option.Option.Some 9L) = 13L
