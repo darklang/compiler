@@ -70,8 +70,11 @@ let __mapHelper<'a, 'b>(list: List<a>, fn: a -> b, acc: List<b>): List<b> =
             Stdlib.List.__mapHelper<a, b>(Stdlib.List.__tail<a>(list), fn, newAcc)
 
 // Flatten a list of lists into a single list - O(n*m)
+// The last list is shared, not copied, so `[x, ...rest]` (a flatten) costs O(1) in rest.
 let flatten<'a>(lists: List<List<a>>): List<a> =
-    Stdlib.List.__flattenHelper<a>(lists, Stdlib.List.__empty<a>())
+    match Stdlib.List.reverse<List<a>>(lists) with
+    | [] -> []
+    | last :: earlier -> Stdlib.List.fold<List<a>, List<a>>(earlier, last, fun acc l -> Stdlib.List.concat<a>(l, acc))
 
 let __flattenHelper<'a>(lists: List<List<a>>, acc: List<a>): List<a> =
     if Stdlib.List.__isEmpty<List<a>>(lists) then Stdlib.List.__reverse<a>(acc)
@@ -276,12 +279,7 @@ let __takeHelper<'a>(list: List<a>, n: Int64, acc: List<a>): List<a> =
 
 // Drop first n elements - O(n)
 let drop(list: List<'a>, count: Int64): List<'a> =
-  if count <= 0 then
-    list
-  else
-    match list with
-    | [] -> []
-    | _ :: tail -> drop(tail, count - 1)
+  Stdlib.List.__drop(list, count)
 
 // Check if any element satisfies a predicate - O(n)
 let any<'a>(list: List<a>, fn: (a) -> Bool): Bool =

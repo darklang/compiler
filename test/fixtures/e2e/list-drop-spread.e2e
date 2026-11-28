@@ -1,0 +1,10 @@
+// List.drop skips whole trees, and `[x, ...rest]` shares rest instead of copying it.
+Stdlib.List.drop [1L, 2L, 3L, 4L, 5L] 0L = [1L, 2L, 3L, 4L, 5L]
+Stdlib.List.drop [1L, 2L, 3L, 4L, 5L] 2L = [3L, 4L, 5L]
+Stdlib.List.drop [1L, 2L, 3L, 4L, 5L] 5L = []
+Stdlib.List.drop [1L, 2L, 3L, 4L, 5L] 9L = []
+Stdlib.List.drop [1L, 2L, 3L] -1L = [1L, 2L, 3L]
+Stdlib.List.all (Stdlib.List.range 0L 101L) (fun k -> Stdlib.List.drop (Stdlib.List.range 0L 99L) k == Stdlib.List.range k 99L) = true
+Stdlib.List.flatten [[1L], [2L, 3L], [], [4L]] = [1L, 2L, 3L, 4L]
+Stdlib.List.flatten [] = []
+let rest = [2L, 3L] in [1L, ...rest] = [1L, 2L, 3L]

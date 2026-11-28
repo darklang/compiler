@@ -237,6 +237,28 @@ let __concat<'a>(left: List<a>, right: List<a>): List<a> =
 let __last<'a>(list: List<a>): Stdlib.Option.Option<a> =
     Stdlib.List.__getAt<a>(list, Stdlib.List.__length<a>(list) - (1))
 
+// `tree` (of `weight`) as a digit before `rest`, without its first `count` elements
+// (count < weight): whole subtrees are skipped, so this is O(log n).
+let __dropTree<'a>(tree: List<a>, weight: Int64, count: Int64, rest: List<a>): List<a> =
+    let restLength = if Stdlib.List.__isNull<a>(rest) then 0 else Stdlib.List.__digitLength<a>(rest) in
+    if count == 0 then
+        Stdlib.List.__allocDigit<a>(weight, weight + restLength, tree, rest)
+    else
+        let childWeight = (weight - 1) / 2 in
+        if count - 1 >= childWeight then
+            Stdlib.List.__dropTree<a>(Stdlib.List.__nodeRight<a>(tree), childWeight, count - 1 - childWeight, rest)
+        else
+            let right = Stdlib.List.__allocDigit<a>(childWeight, childWeight + restLength, Stdlib.List.__nodeRight<a>(tree), rest) in
+            Stdlib.List.__dropTree<a>(Stdlib.List.__nodeLeft<a>(tree), childWeight, count - 1, right)
+
+// Drop the first `count` elements: whole digits, then part of one tree.
+let __drop<'a>(list: List<a>, count: Int64): List<a> =
+    if count <= 0 || Stdlib.List.__isNull<a>(list) then list
+    else
+        let weight = Stdlib.List.__digitWeight<a>(list) in
+        if count >= weight then Stdlib.List.__drop<a>(Stdlib.List.__digitRest<a>(list), count - weight)
+        else Stdlib.List.__dropTree<a>(Stdlib.List.__digitTree<a>(list), weight, count, Stdlib.List.__digitRest<a>(list))
+
 let __init<'a>(list: List<a>): List<a> =
     if Stdlib.List.__isNull<a>(list) then Stdlib.List.__empty<a>()
     else Stdlib.List.__reverse<a>(Stdlib.List.__tail<a>(Stdlib.List.__reverse<a>(list)))
