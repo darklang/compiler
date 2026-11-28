@@ -187,9 +187,12 @@ and parseApp grammar state index =
         stop := parseCtorParenFields grammar state next args;
         true
     (* The same holds for a parenthesized function value, such as the operator
-       section in `(==)(a, b)` or `(fun(a, b) -> a + b)(1, 2)`. *)
-    | WT.ELambda _
+       section in `(==)(a, b)`, `(fun(a, b) -> a + b)(1, 2)` or `(make(x))(a, b)`. *)
+    | _
       when tok state next = TLParen
+           && (match callee with
+              | WT.ELambda _ -> true
+              | _ -> tok state index = TLParen && tok state (next - 1) = TRParen)
            && (rng state (next - 1)).end_ = (rng state next).start ->
         stop := parseCtorParenFields grammar state next args;
         true
